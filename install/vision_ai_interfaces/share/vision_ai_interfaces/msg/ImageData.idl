@@ -1,0 +1,21 @@
+// generated from rosidl_adapter/resource/msg.idl.em
+// with input from vision_ai_interfaces/msg/ImageData.msg
+// generated code does not contain a copyright notice
+
+#include "builtin_interfaces/msg/Time.idl"
+#include "sensor_msgs/msg/Image.idl"
+#include "vision_ai_interfaces/msg/Waypoint.idl"
+
+module vision_ai_interfaces {
+  module msg {
+    struct ImageData {
+      string filename;
+
+      builtin_interfaces::msg::Time timestamp;
+
+      vision_ai_interfaces::msg::Waypoint waypoint;
+
+      sensor_msgs::msg::Image image;
+    };
+  };
+};

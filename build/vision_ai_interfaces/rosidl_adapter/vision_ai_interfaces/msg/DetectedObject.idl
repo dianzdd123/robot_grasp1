@@ -1,0 +1,34 @@
+// generated from rosidl_adapter/resource/msg.idl.em
+// with input from vision_ai_interfaces/msg/DetectedObject.msg
+// generated code does not contain a copyright notice
+
+
+module vision_ai_interfaces {
+  module msg {
+    struct DetectedObject {
+      string object_id;
+
+      int32 class_id;
+
+      string class_name;
+
+      float confidence;
+
+      string description;
+
+      @verbatim (language="comment", text=
+        "[x1, y1, x2, y2]")
+      sequence<float> bounding_box;
+
+      float center_x;
+
+      float center_y;
+
+      float world_x;
+
+      float world_y;
+
+      float world_z;
+    };
+  };
+};

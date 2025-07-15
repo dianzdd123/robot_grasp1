@@ -1,0 +1,14 @@
+{
+	"backtraceGraph" : 
+	{
+		"commands" : [],
+		"files" : [],
+		"nodes" : []
+	},
+	"installers" : [],
+	"paths" : 
+	{
+		"build" : "vision_ai_interfaces__py",
+		"source" : "/home/qi/ros2_ws/build/vision_ai_interfaces/vision_ai_interfaces__py"
+	}
+}

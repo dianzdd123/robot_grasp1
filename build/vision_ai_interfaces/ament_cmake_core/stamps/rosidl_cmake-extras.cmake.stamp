@@ -1,0 +1,4 @@
+# generated from rosidl_cmake/cmake/rosidl_cmake-extras.cmake.in
+
+set(vision_ai_interfaces_IDL_FILES "msg/ScanPlan.idl;msg/Waypoint.idl;msg/StitchResult.idl;msg/ImageData.idl;msg/DetectedObject.idl;msg/DetectionResult.idl;srv/PlanScan.idl;srv/ExecuteScan.idl;srv/ProcessStitching.idl;srv/ProcessDetection.idl")
+set(vision_ai_interfaces_INTERFACE_FILES "msg/ScanPlan.msg;msg/Waypoint.msg;msg/StitchResult.msg;msg/ImageData.msg;msg/DetectedObject.msg;msg/DetectionResult.msg;srv/PlanScan.srv;srv/PlanScan_Request.msg;srv/PlanScan_Response.msg;srv/ExecuteScan.srv;srv/ExecuteScan_Request.msg;srv/ExecuteScan_Response.msg;srv/ProcessStitching.srv;srv/ProcessStitching_Request.msg;srv/ProcessStitching_Response.msg;srv/ProcessDetection.srv;srv/ProcessDetection_Request.msg;srv/ProcessDetection_Response.msg")

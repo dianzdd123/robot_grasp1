@@ -1,0 +1,15 @@
+{
+  "package_name": "vision_ai_interfaces",
+  "non_idl_tuples": [
+    "/home/qi/ros2_ws/src/vision_ai_interfaces:msg/ScanPlan.msg",
+    "/home/qi/ros2_ws/src/vision_ai_interfaces:msg/Waypoint.msg",
+    "/home/qi/ros2_ws/src/vision_ai_interfaces:msg/StitchResult.msg",
+    "/home/qi/ros2_ws/src/vision_ai_interfaces:msg/ImageData.msg",
+    "/home/qi/ros2_ws/src/vision_ai_interfaces:msg/DetectedObject.msg",
+    "/home/qi/ros2_ws/src/vision_ai_interfaces:msg/DetectionResult.msg",
+    "/home/qi/ros2_ws/src/vision_ai_interfaces:srv/PlanScan.srv",
+    "/home/qi/ros2_ws/src/vision_ai_interfaces:srv/ExecuteScan.srv",
+    "/home/qi/ros2_ws/src/vision_ai_interfaces:srv/ProcessStitching.srv",
+    "/home/qi/ros2_ws/src/vision_ai_interfaces:srv/ProcessDetection.srv"
+  ]
+}
