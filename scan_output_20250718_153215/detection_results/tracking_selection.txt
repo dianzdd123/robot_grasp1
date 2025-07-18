@@ -1,3 +1,0 @@
-Selected Tracking Targets:
-==================================================
-- Orange potato (low) nearby in center right [h=50.5mm, d=299mm] (ID: potato_0)
