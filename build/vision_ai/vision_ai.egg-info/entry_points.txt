@@ -1,7 +1,0 @@
-[console_scripts]
-detection_node = vision_ai.detection_node:main
-gui_config_node = vision_ai.gui_config_node:main
-scan_executor_node = vision_ai.scan_executor_node:main
-scan_planner_node = vision_ai.scan_planner_node:main
-smart_stitcher_node = vision_ai.smart_stitcher_node:main
-tracking_node = vision_ai.tracking_node:main

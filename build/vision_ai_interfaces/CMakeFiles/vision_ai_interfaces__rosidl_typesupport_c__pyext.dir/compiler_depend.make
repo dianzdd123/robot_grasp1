@@ -280,8 +280,20 @@ CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c__pyext.dir/rosidl_generato
   rosidl_generator_c/vision_ai_interfaces/srv/detail/process_stitching__functions.h \
   rosidl_generator_c/vision_ai_interfaces/srv/detail/process_detection__type_support.h \
   rosidl_generator_c/vision_ai_interfaces/srv/detail/process_detection__struct.h \
-  rosidl_generator_c/vision_ai_interfaces/srv/detail/process_detection__functions.h
+  rosidl_generator_c/vision_ai_interfaces/srv/detail/process_detection__functions.h \
+  rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_position__type_support.h \
+  rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_position__struct.h \
+  rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_position__functions.h \
+  rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_close__type_support.h \
+  rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_close__struct.h \
+  rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_close__functions.h
 
+
+rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_close__functions.h:
+
+rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_close__struct.h:
+
+rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_position__functions.h:
 
 rosidl_generator_c/vision_ai_interfaces/srv/detail/process_detection__functions.h:
 
@@ -421,6 +433,8 @@ rosidl_generator_c/vision_ai_interfaces/msg/detail/stitch_result__functions.h:
 
 /usr/include/x86_64-linux-gnu/bits/uintn-identity.h:
 
+rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_position__type_support.h:
+
 /usr/include/x86_64-linux-gnu/bits/stdlib-float.h:
 
 /usr/include/x86_64-linux-gnu/bits/endianness.h:
@@ -512,6 +526,8 @@ rosidl_generator_c/vision_ai_interfaces/msg/detail/stitch_result__functions.h:
 /usr/include/stdlib.h:
 
 /usr/lib/gcc/x86_64-linux-gnu/11/include/stdint.h:
+
+rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_close__type_support.h:
 
 /usr/include/math.h:
 
@@ -632,6 +648,8 @@ rosidl_generator_c/vision_ai_interfaces/msg/detail/stitch_result__type_support.h
 /usr/include/python3.10/cpython/fileutils.h:
 
 /usr/include/x86_64-linux-gnu/bits/waitstatus.h:
+
+rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_position__struct.h:
 
 /usr/include/x86_64-linux-gnu/bits/types/struct_statx.h:
 

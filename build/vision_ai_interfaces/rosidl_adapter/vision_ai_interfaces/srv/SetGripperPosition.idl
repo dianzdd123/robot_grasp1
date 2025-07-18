@@ -1,0 +1,27 @@
+// generated from rosidl_adapter/resource/srv.idl.em
+// with input from vision_ai_interfaces/srv/SetGripperPosition.srv
+// generated code does not contain a copyright notice
+
+
+module vision_ai_interfaces {
+  module srv {
+    @verbatim (language="comment", text=
+      "Request")
+    struct SetGripperPosition_Request {
+      @verbatim (language="comment", text=
+        "夹爪位置 (0-850)")
+      int32 position;
+    };
+    @verbatim (language="comment", text=
+      "Response")
+    struct SetGripperPosition_Response {
+      @verbatim (language="comment", text=
+        "操作是否成功")
+      boolean success;
+
+      @verbatim (language="comment", text=
+        "状态消息")
+      string message;
+    };
+  };
+};

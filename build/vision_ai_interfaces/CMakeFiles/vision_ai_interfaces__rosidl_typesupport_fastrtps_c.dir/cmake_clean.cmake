@@ -19,6 +19,10 @@ file(REMOVE_RECURSE
   "CMakeFiles/vision_ai_interfaces__rosidl_typesupport_fastrtps_c.dir/rosidl_typesupport_fastrtps_c/vision_ai_interfaces/srv/detail/process_detection__type_support_c.cpp.o.d"
   "CMakeFiles/vision_ai_interfaces__rosidl_typesupport_fastrtps_c.dir/rosidl_typesupport_fastrtps_c/vision_ai_interfaces/srv/detail/process_stitching__type_support_c.cpp.o"
   "CMakeFiles/vision_ai_interfaces__rosidl_typesupport_fastrtps_c.dir/rosidl_typesupport_fastrtps_c/vision_ai_interfaces/srv/detail/process_stitching__type_support_c.cpp.o.d"
+  "CMakeFiles/vision_ai_interfaces__rosidl_typesupport_fastrtps_c.dir/rosidl_typesupport_fastrtps_c/vision_ai_interfaces/srv/detail/set_gripper_close__type_support_c.cpp.o"
+  "CMakeFiles/vision_ai_interfaces__rosidl_typesupport_fastrtps_c.dir/rosidl_typesupport_fastrtps_c/vision_ai_interfaces/srv/detail/set_gripper_close__type_support_c.cpp.o.d"
+  "CMakeFiles/vision_ai_interfaces__rosidl_typesupport_fastrtps_c.dir/rosidl_typesupport_fastrtps_c/vision_ai_interfaces/srv/detail/set_gripper_position__type_support_c.cpp.o"
+  "CMakeFiles/vision_ai_interfaces__rosidl_typesupport_fastrtps_c.dir/rosidl_typesupport_fastrtps_c/vision_ai_interfaces/srv/detail/set_gripper_position__type_support_c.cpp.o.d"
   "libvision_ai_interfaces__rosidl_typesupport_fastrtps_c.pdb"
   "libvision_ai_interfaces__rosidl_typesupport_fastrtps_c.so"
   "rosidl_typesupport_fastrtps_c/vision_ai_interfaces/msg/detail/detected_object__rosidl_typesupport_fastrtps_c.h"
@@ -41,6 +45,10 @@ file(REMOVE_RECURSE
   "rosidl_typesupport_fastrtps_c/vision_ai_interfaces/srv/detail/process_detection__type_support_c.cpp"
   "rosidl_typesupport_fastrtps_c/vision_ai_interfaces/srv/detail/process_stitching__rosidl_typesupport_fastrtps_c.h"
   "rosidl_typesupport_fastrtps_c/vision_ai_interfaces/srv/detail/process_stitching__type_support_c.cpp"
+  "rosidl_typesupport_fastrtps_c/vision_ai_interfaces/srv/detail/set_gripper_close__rosidl_typesupport_fastrtps_c.h"
+  "rosidl_typesupport_fastrtps_c/vision_ai_interfaces/srv/detail/set_gripper_close__type_support_c.cpp"
+  "rosidl_typesupport_fastrtps_c/vision_ai_interfaces/srv/detail/set_gripper_position__rosidl_typesupport_fastrtps_c.h"
+  "rosidl_typesupport_fastrtps_c/vision_ai_interfaces/srv/detail/set_gripper_position__type_support_c.cpp"
 )
 
 # Per-language clean rules from dependency scanning.

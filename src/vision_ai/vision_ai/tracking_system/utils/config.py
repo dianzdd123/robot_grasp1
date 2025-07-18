@@ -1,252 +1,222 @@
 #!/usr/bin/env python3
+"""
+追踪系统配置管理
+配置所有追踪参数和系统设置
+"""
 
 import os
-import numpy as np
 from dataclasses import dataclass
-from typing import Dict, Tuple, List
+from typing import Dict, List, Optional, Tuple
+from enum import Enum
 
-@dataclass
-class CameraConfig:
-    """相机配置"""
-    fx: float = 912.7
-    fy: float = 910.3  
-    cx: float = 640
-    cy: float = 360
-    depth_min: float = 0.16  # 最小深度160mm
-    depth_max: float = 3.0   # 最大深度3000mm
-    depth_accuracy: float = 0.002  # 1-2mm@1m
+class TrackingState(Enum):
+    """追踪状态枚举"""
+    IDLE = "idle"
+    INITIALIZING = "initializing"
+    SEARCHING = "searching"
+    TRACKING = "tracking"
+    APPROACHING = "approaching"
+    GRASPING = "grasping"
+    RETURNING = "returning"
+    PLACING = "placing"
+    RECOVERY = "recovery"
+    ERROR = "error"
 
-@dataclass
-class DetectionConfig:
-    """检测配置"""
-    yolo_model_path: str = "/home/qi/下载/best2.pt"
-    yolo_confidence: float = 0.5
-    sam2_checkpoint: str = "~/ros2_ws/src/vision_ai/models/sam2/sam2_hiera_large.pt"
-    sam2_config: str = "sam2_hiera_l.yaml"
-    device: str = "cuda"
-    
-    # YOLO类别映射
-    class_names: Dict[int, str] = None
-    
-    def __post_init__(self):
-        if self.class_names is None:
-            self.class_names = {
-                1: 'banana',
-                2: 'carrot', 
-                3: 'corn',
-                4: 'lemon',
-                5: 'greenlemon',
-                6: 'strawberry',
-                7: 'tomato',
-                8: 'potato',
-                9: 'redpepper'
-            }
+class TrackingMode(Enum):
+    """追踪模式枚举"""
+    FULL_MATCHING = "full_matching"          # 完整特征匹配
+    LIGHTWEIGHT_TRACKING = "lightweight"     # 轻量级追踪
+    SPATIAL_PREDICTION = "spatial_prediction" # 空间预测
 
-@dataclass
 class TrackingConfig:
-    """追踪配置"""
-    # 简化的距离阶段控制
-    height_phases: Dict[str, float] = None
+    """追踪系统配置类"""
     
-    # ID匹配阈值
-    color_hist_threshold: float = 0.4
-    hu_moment_threshold: float = 0.3
-    position_continuity_threshold: float = 50.0  # pixels
-    
-    # 特征权重
-    feature_weights: Dict[str, float] = None
-    
-    # 控制参数
-    proportional_factor: float = 0.1
-    movement_speed: float = 0.5  # 统一移动速度
-    
-    # 对齐阈值（新增）
-    alignment_thresholds: Dict[str, float] = None
-    
-    # 状态机参数
-    lost_frame_threshold: int = 10
-    lost_frame_threshold_approaching: int = 5  # 下降中更敏感
-    
-    def __post_init__(self):
-        if self.height_phases is None:
-            self.height_phases = {
-                'TRACKING': 350,        # 固定追踪高度
-                'APPROACHING_START': 350,  # 开始下降高度
-                'APPROACHING_END': 270,    # 结束下降高度  
-                'GRASPING': 270         # 抓取高度
-            }
+    def __init__(self):
+        # ================== 核心追踪参数 ==================
+        self.proportional_factor = 0.2
+        self.move_speed = 60
+        self.target_tolerance_xy = 30.0  # mm
+        self.target_tolerance_yaw = 5.0  # degrees
+        self.approach_height = 400.0     # mm
+        self.grasp_height_offset = 50.0  # mm
+        self.safe_height = 500.0         # mm
         
-        if self.feature_weights is None:
-            self.feature_weights = {
-                'color_hist': 0.4,
-                'position_continuity': 0.3,
-                'shape_moments': 0.3
-            }
+        # ================== 检测参数 ==================
+        self.detection_frequency = 10.0  # Hz
+        self.max_lost_frames = 10
+        self.feature_match_threshold = 0.6
+        self.spatial_continuity_threshold = 100.0  # pixels
         
-        if self.alignment_thresholds is None:
-            self.alignment_thresholds = {
-                'xy_tolerance': 10.0,      # mm - xy对齐容差
-                'yaw_tolerance': 5.0,      # 度 - yaw对齐容差
-                'descent_step': 5.0,       # mm - 每步下降距离
-                'approach_timeout': 30.0,  # 秒 - 接近超时
-                'tracking_timeout': 60.0   # 秒 - 追踪超时
-            }
-
-@dataclass
-class WorkspaceConfig:
-    """工作空间配置"""
-    x_limits: Tuple[float, float] = (-800, 800)
-    y_limits: Tuple[float, float] = (-800, 800)
-    z_limits: Tuple[float, float] = (100, 800)
-    min_height: float = 250.0  # 最小安全高度
-
-@dataclass
-class GripperConfig:
-    """夹爪配置"""
-    open_position: int = 850
-    closed_position: int = 0
-    partial_open: int = 70
-    width_offset: float = 50.0  # 夹爪宽度偏移量
-    
-    # 基于高度的pitch角度
-    pitch_rules: Dict[str, float] = None
-    
-    def __post_init__(self):
-        if self.pitch_rules is None:
-            self.pitch_rules = {
-                'low': (80, 0),      # height <= 80mm: pitch = 0
-                'medium': (150, -20), # 80 < height <= 150mm: pitch = -20
-                'high': (float('inf'), -40)  # height > 150mm: pitch = -40
-            }
-
-@dataclass
-class CoordinateTransformConfig:
-    """坐标变换配置"""
-    # 相机到世界坐标的偏移
-    camera_offset: Tuple[float, float, float] = (65, -30, -100)
-    # 旋转调整
-    roll_correction: float = -180
-    
-class TrackingSystemConfig:
-    """追踪系统总配置"""
-    
-    def __init__(self, config_file: str = None):
-        self.camera = CameraConfig()
-        self.detection = DetectionConfig()
-        self.tracking = TrackingConfig()
-        self.workspace = WorkspaceConfig()
-        self.gripper = GripperConfig()
-        self.coordinate_transform = CoordinateTransformConfig()
+        # ================== 轻量级追踪参数 ==================
+        self.lightweight_enable = True
+        self.lightweight_continuity_frames = 5
+        self.spatial_prediction_enable = True
         
-        # ROS话题配置
+        # ================== 特征匹配权重 ==================
+        self.feature_weights = {
+            'class_id': 1.0,
+            'hu_moments': 0.4,
+            'color_histogram': 0.4,
+            'spatial_continuity': 0.2
+        }
+        
+        # ================== 安全限制 ==================
+        self.min_z_height = 350.0  # mm
+        self.max_xy_distance = 1000.0  # mm
+        self.collision_avoidance = True
+        
+        # ================== ROS话题配置 ==================
         self.topics = {
-            'detection_result': '/detection_result',
+            # 输入话题
             'camera_color': '/camera/color/image_raw',
             'camera_depth': '/camera/depth/image_raw',
+            'camera_info': '/camera/color/camera_info',
             'xarm_current_pose': '/xarm/current_pose',
-            'tracking_status': '/tracking/status',
+            'detection_complete': '/detection_complete',
+            
+            # 输出话题
             'xarm_target_pose': '/xarm/target_pose',
             'xarm_gripper_target': '/xarm/gripper_target',
-            'tracking_visualization': '/tracking/visualization'
+            'tracking_status': '/tracking/status',
+            'tracking_visualization': '/tracking/visualization',
+            'tracking_control': '/tracking/control',
         }
         
-        # 服务配置
-        self.services = {
-            'start_tracking': '/tracking/start_tracking',
-            'stop_tracking': '/tracking/stop_tracking',
-            'emergency_stop': '/tracking/emergency_stop'
-        }
-        
-        # 文件路径配置
+        # ================== 文件路径配置 ==================
         self.paths = {
-            'tracking_selection': '/tmp/tracking_selection.txt',
-            'detection_results_dir': '/tmp/detection_results',
-            'logs_dir': '/tmp/tracking_logs'
+            'detection_results_dir': '',  # 由检测完成信号动态设置
+            'tracking_selection': '',     # 由检测完成信号动态设置
+            'reference_features_db': '',  # 参考特征数据库
+            'tracking_logs': '',          # 追踪日志
+            'motion_history': '',         # 运动历史
         }
         
-        if config_file:
-            self.load_from_file(config_file)
+        # ================== YOLO配置 ==================
+        self.yolo_config = {
+            'model_path': '/path/to/yolo/model',
+            'confidence_threshold': 0.5,
+            'nms_threshold': 0.4,
+            'input_size': 640,
+            'class_names': {
+                0: 'apple',
+                1: 'orange', 
+                2: 'carrot',
+                3: 'corn',
+                4: 'lemon',
+                5: 'greenlemon'
+            }
+        }
+        
+        # ================== SAM2配置 ==================
+        self.sam2_config = {
+            'model_path': '/path/to/sam2/model',
+            'model_cfg': 'sam2_hiera_b_plus.yaml',
+            'device': 'cuda',
+            'batch_size': 1
+        }
+        
+        # ================== 相机内参 ==================
+        self.camera_intrinsics = {
+            'fx': 651.01251,
+            'fy': 651.01251,
+            'cx': 640.0,
+            'cy': 360.0,
+            'depth_scale': 0.001  # RealSense深度比例
+        }
+        
+        # ================== 回退配置 ==================
+        self.recovery_config = {
+            'max_attempts': 3,
+            'waypoint_search_timeout': 30.0,  # seconds
+            'return_to_last_pose': True,
+            'search_waypoints': True
+        }
+        
+        # ================== 日志配置 ==================
+        self.logging_config = {
+            'level': 'INFO',
+            'format': '[%(asctime)s] [%(name)s] [%(levelname)s] %(message)s',
+            'file_logging': True,
+            'console_logging': True
+        }
     
-    def load_from_file(self, config_file: str):
-        """从文件加载配置"""
-        # TODO: 实现YAML配置文件加载
-        pass
+    def update_paths(self, scan_directory: str) -> None:
+        """更新文件路径配置"""
+        self.paths['detection_results_dir'] = os.path.join(scan_directory, 'detection_results')
+        self.paths['tracking_selection'] = os.path.join(scan_directory, 'detection_results', 'tracking_selection.txt')
+        self.paths['reference_features_db'] = os.path.join(scan_directory, 'detection_results', 'detection_results.json')
+        self.paths['tracking_logs'] = os.path.join(scan_directory, 'tracking_logs')
+        self.paths['motion_history'] = os.path.join(scan_directory, 'motion_history.json')
     
-    def get_current_height(self, state: str) -> float:
-        """根据状态获取当前应该的高度"""
-        return self.tracking.height_phases.get(state, 350)
+    def get_class_name(self, class_id: int) -> str:
+        """获取类别名称"""
+        return self.yolo_config['class_names'].get(class_id, f'class_{class_id}')
     
-    def check_xy_alignment(self, current_pos: Tuple, target_pos: Tuple) -> bool:
-        """检查xy是否对齐"""
-        if not current_pos or not target_pos:
+    def validate_config(self) -> bool:
+        """验证配置有效性"""
+        # 检查必要参数
+        required_params = [
+            'proportional_factor', 'move_speed', 'target_tolerance_xy',
+            'detection_frequency', 'max_lost_frames', 'feature_match_threshold'
+        ]
+        
+        for param in required_params:
+            if not hasattr(self, param):
+                print(f"[ERROR] Missing required parameter: {param}")
+                return False
+        
+        # 检查数值范围
+        if not (0 < self.proportional_factor <= 1.0):
+            print(f"[ERROR] proportional_factor must be in (0, 1], got {self.proportional_factor}")
             return False
         
-        error_x = abs(current_pos[0] - target_pos[0])
-        error_y = abs(current_pos[1] - target_pos[1])
+        if not (0 < self.detection_frequency <= 30.0):
+            print(f"[ERROR] detection_frequency must be in (0, 30], got {self.detection_frequency}")
+            return False
         
-        tolerance = self.tracking.alignment_thresholds['xy_tolerance']
-        return error_x <= tolerance and error_y <= tolerance
+        if not (0 < self.feature_match_threshold <= 1.0):
+            print(f"[ERROR] feature_match_threshold must be in (0, 1], got {self.feature_match_threshold}")
+            return False
+        
+        return True
     
-    def check_yaw_alignment(self, current_yaw: float, target_yaw: float) -> bool:
-        """检查yaw是否对齐"""
-        yaw_error = abs(current_yaw - target_yaw)
-        # 处理角度跨越180/-180的情况
-        if yaw_error > 180:
-            yaw_error = 360 - yaw_error
-        
-        tolerance = self.tracking.alignment_thresholds['yaw_tolerance']
-        return yaw_error <= tolerance
-    
-    def calculate_descent_height(self, progress_ratio: float) -> float:
-        """计算渐进下降的高度"""
-        start_height = self.tracking.height_phases['APPROACHING_START']
-        end_height = self.tracking.height_phases['APPROACHING_END']
-        
-        # 线性插值
-        current_height = start_height - (start_height - end_height) * progress_ratio
-        return max(end_height, current_height)
-    
-    def get_gripper_pitch(self, height_mm: float) -> float:
-        """根据物体高度计算pitch角"""
-        for rule, (threshold, pitch) in self.gripper.pitch_rules.items():
-            if height_mm <= threshold:
-                return pitch
-        return -40  # 默认值
-    
-    def calculate_gripper_width(self, object_width_mm: float) -> int:
-        """计算夹爪开口宽度"""
-        width = int(object_width_mm + self.gripper.width_offset)
-        return max(0, min(width, self.gripper.open_position))
-    
-    def is_position_safe(self, x: float, y: float, z: float) -> bool:
-        """检查位置是否在安全工作空间内"""
-        return (self.workspace.x_limits[0] <= x <= self.workspace.x_limits[1] and
-                self.workspace.y_limits[0] <= y <= self.workspace.y_limits[1] and
-                self.workspace.z_limits[0] <= z <= self.workspace.z_limits[1] and
-                z >= self.workspace.min_height)
-    
-    def apply_coordinate_transform(self, camera_point: Tuple[float, float, float], 
-                                 arm_pose: List[float]) -> Tuple[float, float, float]:
-        """应用坐标转换"""
-        x_c, y_c, z_c = camera_point
-        
-        # 坐标轴重排 + 偏移
-        reordered = np.array([
-            (y_c + self.coordinate_transform.camera_offset[0]),
-            (x_c + self.coordinate_transform.camera_offset[1]), 
-            -(z_c + self.coordinate_transform.camera_offset[2])
-        ])
-        
-        # 旋转矩阵
-        roll_corrected = abs(arm_pose[3]) + self.coordinate_transform.roll_correction
-        from scipy.spatial.transform import Rotation as R
-        R_matrix = R.from_euler('XYZ', [roll_corrected, arm_pose[4], arm_pose[5]], 
-                               degrees=True).as_matrix()
-        
-        # 应用变换
-        world_point = R_matrix @ reordered + np.array(arm_pose[:3])
-        
-        return tuple(world_point)
+    def print_config(self) -> None:
+        """打印配置信息"""
+        print("=" * 50)
+        print("TRACKING SYSTEM CONFIGURATION")
+        print("=" * 50)
+        print(f"Proportional Factor: {self.proportional_factor}")
+        print(f"Move Speed: {self.move_speed}")
+        print(f"Target Tolerance XY: {self.target_tolerance_xy} mm")
+        print(f"Detection Frequency: {self.detection_frequency} Hz")
+        print(f"Max Lost Frames: {self.max_lost_frames}")
+        print(f"Feature Match Threshold: {self.feature_match_threshold}")
+        print(f"Lightweight Tracking: {'Enabled' if self.lightweight_enable else 'Disabled'}")
+        print(f"Spatial Prediction: {'Enabled' if self.spatial_prediction_enable else 'Disabled'}")
+        print("=" * 50)
 
 # 全局配置实例
-TRACKING_CONFIG = TrackingSystemConfig()
+_config_instance = None
+
+def get_config() -> TrackingConfig:
+    """获取配置实例（单例模式）"""
+    global _config_instance
+    if _config_instance is None:
+        _config_instance = TrackingConfig()
+    return _config_instance
+
+def set_config(config: TrackingConfig) -> None:
+    """设置配置实例"""
+    global _config_instance
+    _config_instance = config
+
+# 测试配置
+if __name__ == "__main__":
+    config = get_config()
+    config.print_config()
+    
+    # 验证配置
+    if config.validate_config():
+        print("✅ Configuration validation passed")
+    else:
+        print("❌ Configuration validation failed")

@@ -749,7 +749,7 @@ class DetectionPipeline:
         
         # 创建可序列化的数据
         serializable_data = []
-        
+
         for obj in self.reference_data['objects']:
             obj_copy = obj.copy()
             # 移除不可序列化的mask

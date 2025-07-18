@@ -1,0 +1,3 @@
+Selected Tracking Targets:
+==================================================
+- Orange corn (low) at medium distance in top right area [h=38.5mm, d=302mm] (ID: corn_0)

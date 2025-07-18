@@ -27,7 +27,8 @@ setup(
             'smart_stitcher_node = vision_ai.smart_stitcher_node:main',
             'gui_config_node = vision_ai.gui_config_node:main',
             'detection_node = vision_ai.detection_node:main',
-            'tracking_node = vision_ai.tracking_node:main',
+            # 'tracking_node = vision_ai.tracking_node:main',
+            # 'static_grasp_node = vision_ai.static_grasp_node:main',
         ],
     },
 )

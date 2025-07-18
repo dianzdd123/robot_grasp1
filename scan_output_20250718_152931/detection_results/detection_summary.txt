@@ -1,0 +1,23 @@
+Detection Results Summary
+==================================================
+
+Total Objects Detected: 3
+Detection Time: 2025-07-18 15:30:01
+
+Detected Objects:
+------------------------------
+ 1. Orange potato in center right
+    ID: potato_0
+    Confidence: 0.962
+    Region: center-right
+
+ 2. Red redpepper in bottom center
+    ID: redpepper_0
+    Confidence: 0.957
+    Region: bottom-center
+
+ 3. Yellow banana in center area
+    ID: banana_0
+    Confidence: 0.943
+    Region: center
+

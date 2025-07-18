@@ -13,9 +13,28 @@ import numpy as np
 from rclpy.service import Service
 from std_srvs.srv import Trigger, SetBool
 
-# 添加自定义服务消息类型（如果需要更复杂的gripper控制）
-# from your_custom_msgs.srv import SetGripperPosition
-
+# 🆕 导入自定义服务类型
+try:
+    from vision_ai_interfaces.srv import SetGripperPosition, SetGripperClose
+except ImportError:
+    class SetGripperPosition:
+        class Request:
+            def __init__(self):
+                self.position = 0
+        class Response:
+            def __init__(self):
+                self.success = False
+                self.message = ""
+    
+    class SetGripperClose:
+        class Request:
+            def __init__(self):
+                self.position = -1  
+        class Response:
+            def __init__(self):
+                self.success = False
+                self.message = ""
+                self.actual_position = 0
 
 class XArmControllerNode(Node):
     def __init__(self):
@@ -24,12 +43,12 @@ class XArmControllerNode(Node):
         # 机械臂连接参数
         self.arm_ip = '192.168.1.117'
         self.safe_position = [0, 0, -0.15, 0, -0.1, 0]
-        self.safe_pose = [200, 0, 250, 179, -20, 0]
+        self.safe_pose = [200, 0, 250, 179, 0, 0]
         
-        # ========== 新增：夹爪参数 ==========
+        # 夹爪参数
         self.gripper_positions = {
             'fully_open': 850,
-            'closed': 0,
+            'closed': 150,
             'partial_open': 70
         }
         
@@ -51,7 +70,7 @@ class XArmControllerNode(Node):
             # 初始化机械臂
             self.initialize_arm()
             
-            # ========== 新增：初始化夹爪 ==========
+            # 初始化夹爪
             self.initialize_gripper()
             
             # 移动到初始位置
@@ -65,8 +84,6 @@ class XArmControllerNode(Node):
         self.joint_state_pub = self.create_publisher(JointState, '/xarm/joint_states', 10)
         self.current_pose_pub = self.create_publisher(PoseStamped, '/xarm/current_pose', 10)
         self.arm_state_pub = self.create_publisher(String, '/xarm/state', 10)
-        
-        # ========== 新增：夹爪状态发布者 ==========
         self.gripper_state_pub = self.create_publisher(Float64, '/xarm/gripper_position', 10)
         self.gripper_status_pub = self.create_publisher(String, '/xarm/gripper_status', 10)
         
@@ -75,8 +92,6 @@ class XArmControllerNode(Node):
             PoseStamped, '/xarm/target_pose', self.target_pose_callback, 10)
         self.joint_target_sub = self.create_subscription(
             Float64MultiArray, '/xarm/joint_target', self.joint_target_callback, 10)
-        
-        # ========== 新增：夹爪控制订阅者 ==========
         self.gripper_position_sub = self.create_subscription(
             Int32, '/xarm/gripper_target', self.gripper_position_callback, 10)
         
@@ -85,10 +100,16 @@ class XArmControllerNode(Node):
         self.go_home_srv = self.create_service(Trigger, '/xarm/go_home', self.go_home_callback)
         self.emergency_stop_srv = self.create_service(Trigger, '/xarm/emergency_stop', self.emergency_stop_callback)
         
-        # ========== 新增：夹爪服务 ==========
+        # 🆕 原有夹爪服务（保持兼容性）
         self.gripper_open_srv = self.create_service(Trigger, '/xarm/gripper_open', self.gripper_open_callback)
         self.gripper_close_srv = self.create_service(Trigger, '/xarm/gripper_close', self.gripper_close_callback)
         self.gripper_partial_srv = self.create_service(Trigger, '/xarm/gripper_partial_open', self.gripper_partial_callback)
+        
+        # 🆕 新增：带参数的夹爪服务
+        self.gripper_set_position_srv = self.create_service(
+            SetGripperPosition, '/xarm/set_gripper_position', self.set_gripper_position_callback)
+        self.gripper_close_with_pos_srv = self.create_service(
+            SetGripperClose, '/xarm/gripper_close_with_position', self.gripper_close_with_position_callback)
         
         # 状态监控定时器
         self.status_timer = self.create_timer(0.1, self.publish_status)
@@ -96,8 +117,80 @@ class XArmControllerNode(Node):
         # 运动控制锁
         self.motion_lock = threading.Lock()
         
-        self.get_logger().info('xArm Controller Node initialized with gripper support')
+        self.get_logger().info('xArm Controller Node initialized with enhanced gripper services')
 
+    # 🆕 新的夹爪服务回调方法
+    def set_gripper_position_callback(self, request, response):
+        """设置夹爪位置服务回调"""
+        try:
+            position = request.position
+            
+            # 验证位置范围
+            if not (0 <= position <= 850):
+                response.success = False
+                response.message = f"Position {position} out of range [0, 850]"
+                self.get_logger().error(response.message)
+                return response
+            
+            # 执行夹爪移动
+            code = self.arm.set_gripper_position(position, wait=True)
+            
+            if code == 0:
+                response.success = True
+                response.message = f"Gripper moved to position {position}"
+                self.get_logger().info(f"✅ Gripper moved to position: {position}")
+            else:
+                response.success = False
+                response.message = f"Failed to move gripper, error code: {code}"
+                self.get_logger().error(response.message)
+                
+        except Exception as e:
+            response.success = False
+            response.message = f"Error: {str(e)}"
+            self.get_logger().error(f'Error in set_gripper_position service: {e}')
+            
+        return response
+
+    def gripper_close_with_position_callback(self, request, response):
+        """带位置参数的夹爪关闭服务回调"""
+        try:
+            # 如果position为-1，使用默认关闭位置
+            if request.position == -1:
+                position = self.gripper_positions['closed']
+            else:
+                position = request.position
+            
+            # 验证位置范围
+            if not (0 <= position <= 850):
+                response.success = False
+                response.message = f"Position {position} out of range [0, 850]"
+                response.actual_position = -1
+                self.get_logger().error(response.message)
+                return response
+            
+            # 执行夹爪移动
+            code = self.arm.set_gripper_position(position, wait=True)
+            
+            if code == 0:
+                response.success = True
+                response.message = f"Gripper closed to position {position}"
+                response.actual_position = position
+                self.get_logger().info(f"🔴 Gripper closed to position: {position}")
+            else:
+                response.success = False
+                response.message = f"Failed to close gripper, error code: {code}"
+                response.actual_position = -1
+                self.get_logger().error(response.message)
+                
+        except Exception as e:
+            response.success = False
+            response.message = f"Error: {str(e)}"
+            response.actual_position = -1
+            self.get_logger().error(f'Error in gripper_close_with_position service: {e}')
+            
+        return response
+
+    # ========== 保持所有原有方法不变 ==========
     def initialize_arm(self):
         """初始化机械臂"""
         try:
@@ -118,7 +211,6 @@ class XArmControllerNode(Node):
         except Exception as e:
             self.get_logger().error(f'Failed to initialize xArm: {e}')
 
-    # ========== 新增：夹爪初始化方法 ==========
     def initialize_gripper(self):
         """初始化夹爪"""
         try:
@@ -204,13 +296,12 @@ class XArmControllerNode(Node):
                 state_msg.data = state_descriptions.get(state, f"unknown_state_{state}")
                 self.arm_state_pub.publish(state_msg)
             
-            # ========== 新增：发布夹爪状态 ==========
+            # 发布夹爪状态
             self.publish_gripper_status()
                 
         except Exception as e:
             self.get_logger().error(f'Error publishing status: {e}')
 
-    # ========== 新增：夹爪状态发布方法 ==========
     def publish_gripper_status(self):
         """发布夹爪状态"""
         try:
@@ -238,7 +329,6 @@ class XArmControllerNode(Node):
         except Exception as e:
             self.get_logger().error(f'Error publishing gripper status: {e}')
 
-    # ========== 新增：夹爪位置控制回调 ==========
     def gripper_position_callback(self, msg):
         """夹爪位置控制回调"""
         try:
@@ -258,6 +348,67 @@ class XArmControllerNode(Node):
                 
         except Exception as e:
             self.get_logger().error(f'Error in gripper position callback: {e}')
+
+    # 原有的夹爪服务回调方法（保持兼容性）
+    def gripper_open_callback(self, request, response):
+        """打开夹爪服务回调"""
+        try:
+            code = self.arm.set_gripper_position(self.gripper_positions['fully_open'], wait=True)
+            
+            if code == 0:
+                response.success = True
+                response.message = "Gripper opened successfully"
+                self.get_logger().info("🟢 Gripper opened")
+            else:
+                response.success = False
+                response.message = f"Failed to open gripper, error code: {code}"
+                
+        except Exception as e:
+            response.success = False
+            response.message = f"Error: {e}"
+            self.get_logger().error(f'Error in gripper open service: {e}')
+            
+        return response
+
+    def gripper_close_callback(self, request, response):
+        """关闭夹爪服务回调"""
+        try:
+            code = self.arm.set_gripper_position(self.gripper_positions['closed'], wait=True)
+            
+            if code == 0:
+                response.success = True
+                response.message = "Gripper closed successfully"
+                self.get_logger().info("🔴 Gripper closed")
+            else:
+                response.success = False
+                response.message = f"Failed to close gripper, error code: {code}"
+                
+        except Exception as e:
+            response.success = False
+            response.message = f"Error: {e}"
+            self.get_logger().error(f'Error in gripper close service: {e}')
+            
+        return response
+
+    def gripper_partial_callback(self, request, response):
+        """部分打开夹爪服务回调"""
+        try:
+            code = self.arm.set_gripper_position(self.gripper_positions['partial_open'], wait=True)
+            
+            if code == 0:
+                response.success = True
+                response.message = "Gripper partially opened successfully"
+                self.get_logger().info("🟡 Gripper partially opened")
+            else:
+                response.success = False
+                response.message = f"Failed to partially open gripper, error code: {code}"
+                
+        except Exception as e:
+            response.success = False
+            response.message = f"Error: {e}"
+            self.get_logger().error(f'Error in gripper partial open service: {e}')
+            
+        return response
 
     # ========== 新增：夹爪服务回调方法 ==========
     def gripper_open_callback(self, request, response):

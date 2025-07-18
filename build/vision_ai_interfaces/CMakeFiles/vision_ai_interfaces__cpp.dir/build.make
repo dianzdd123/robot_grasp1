@@ -116,6 +116,16 @@ CMakeFiles/vision_ai_interfaces__cpp: rosidl_generator_cpp/vision_ai_interfaces/
 CMakeFiles/vision_ai_interfaces__cpp: rosidl_generator_cpp/vision_ai_interfaces/srv/detail/process_detection__struct.hpp
 CMakeFiles/vision_ai_interfaces__cpp: rosidl_generator_cpp/vision_ai_interfaces/srv/detail/process_detection__traits.hpp
 CMakeFiles/vision_ai_interfaces__cpp: rosidl_generator_cpp/vision_ai_interfaces/srv/detail/process_detection__type_support.hpp
+CMakeFiles/vision_ai_interfaces__cpp: rosidl_generator_cpp/vision_ai_interfaces/srv/set_gripper_position.hpp
+CMakeFiles/vision_ai_interfaces__cpp: rosidl_generator_cpp/vision_ai_interfaces/srv/detail/set_gripper_position__builder.hpp
+CMakeFiles/vision_ai_interfaces__cpp: rosidl_generator_cpp/vision_ai_interfaces/srv/detail/set_gripper_position__struct.hpp
+CMakeFiles/vision_ai_interfaces__cpp: rosidl_generator_cpp/vision_ai_interfaces/srv/detail/set_gripper_position__traits.hpp
+CMakeFiles/vision_ai_interfaces__cpp: rosidl_generator_cpp/vision_ai_interfaces/srv/detail/set_gripper_position__type_support.hpp
+CMakeFiles/vision_ai_interfaces__cpp: rosidl_generator_cpp/vision_ai_interfaces/srv/set_gripper_close.hpp
+CMakeFiles/vision_ai_interfaces__cpp: rosidl_generator_cpp/vision_ai_interfaces/srv/detail/set_gripper_close__builder.hpp
+CMakeFiles/vision_ai_interfaces__cpp: rosidl_generator_cpp/vision_ai_interfaces/srv/detail/set_gripper_close__struct.hpp
+CMakeFiles/vision_ai_interfaces__cpp: rosidl_generator_cpp/vision_ai_interfaces/srv/detail/set_gripper_close__traits.hpp
+CMakeFiles/vision_ai_interfaces__cpp: rosidl_generator_cpp/vision_ai_interfaces/srv/detail/set_gripper_close__type_support.hpp
 CMakeFiles/vision_ai_interfaces__cpp: rosidl_generator_cpp/vision_ai_interfaces/msg/rosidl_generator_cpp__visibility_control.hpp
 
 rosidl_generator_cpp/vision_ai_interfaces/msg/scan_plan.hpp: /opt/ros/humble/lib/rosidl_generator_cpp/rosidl_generator_cpp
@@ -143,6 +153,8 @@ rosidl_generator_cpp/vision_ai_interfaces/msg/scan_plan.hpp: rosidl_adapter/visi
 rosidl_generator_cpp/vision_ai_interfaces/msg/scan_plan.hpp: rosidl_adapter/vision_ai_interfaces/srv/ExecuteScan.idl
 rosidl_generator_cpp/vision_ai_interfaces/msg/scan_plan.hpp: rosidl_adapter/vision_ai_interfaces/srv/ProcessStitching.idl
 rosidl_generator_cpp/vision_ai_interfaces/msg/scan_plan.hpp: rosidl_adapter/vision_ai_interfaces/srv/ProcessDetection.idl
+rosidl_generator_cpp/vision_ai_interfaces/msg/scan_plan.hpp: rosidl_adapter/vision_ai_interfaces/srv/SetGripperPosition.idl
+rosidl_generator_cpp/vision_ai_interfaces/msg/scan_plan.hpp: rosidl_adapter/vision_ai_interfaces/srv/SetGripperClose.idl
 rosidl_generator_cpp/vision_ai_interfaces/msg/scan_plan.hpp: /opt/ros/humble/share/geometry_msgs/msg/Accel.idl
 rosidl_generator_cpp/vision_ai_interfaces/msg/scan_plan.hpp: /opt/ros/humble/share/geometry_msgs/msg/AccelStamped.idl
 rosidl_generator_cpp/vision_ai_interfaces/msg/scan_plan.hpp: /opt/ros/humble/share/geometry_msgs/msg/AccelWithCovariance.idl
@@ -383,6 +395,36 @@ rosidl_generator_cpp/vision_ai_interfaces/srv/detail/process_detection__traits.h
 rosidl_generator_cpp/vision_ai_interfaces/srv/detail/process_detection__type_support.hpp: rosidl_generator_cpp/vision_ai_interfaces/msg/scan_plan.hpp
 	@$(CMAKE_COMMAND) -E touch_nocreate rosidl_generator_cpp/vision_ai_interfaces/srv/detail/process_detection__type_support.hpp
 
+rosidl_generator_cpp/vision_ai_interfaces/srv/set_gripper_position.hpp: rosidl_generator_cpp/vision_ai_interfaces/msg/scan_plan.hpp
+	@$(CMAKE_COMMAND) -E touch_nocreate rosidl_generator_cpp/vision_ai_interfaces/srv/set_gripper_position.hpp
+
+rosidl_generator_cpp/vision_ai_interfaces/srv/detail/set_gripper_position__builder.hpp: rosidl_generator_cpp/vision_ai_interfaces/msg/scan_plan.hpp
+	@$(CMAKE_COMMAND) -E touch_nocreate rosidl_generator_cpp/vision_ai_interfaces/srv/detail/set_gripper_position__builder.hpp
+
+rosidl_generator_cpp/vision_ai_interfaces/srv/detail/set_gripper_position__struct.hpp: rosidl_generator_cpp/vision_ai_interfaces/msg/scan_plan.hpp
+	@$(CMAKE_COMMAND) -E touch_nocreate rosidl_generator_cpp/vision_ai_interfaces/srv/detail/set_gripper_position__struct.hpp
+
+rosidl_generator_cpp/vision_ai_interfaces/srv/detail/set_gripper_position__traits.hpp: rosidl_generator_cpp/vision_ai_interfaces/msg/scan_plan.hpp
+	@$(CMAKE_COMMAND) -E touch_nocreate rosidl_generator_cpp/vision_ai_interfaces/srv/detail/set_gripper_position__traits.hpp
+
+rosidl_generator_cpp/vision_ai_interfaces/srv/detail/set_gripper_position__type_support.hpp: rosidl_generator_cpp/vision_ai_interfaces/msg/scan_plan.hpp
+	@$(CMAKE_COMMAND) -E touch_nocreate rosidl_generator_cpp/vision_ai_interfaces/srv/detail/set_gripper_position__type_support.hpp
+
+rosidl_generator_cpp/vision_ai_interfaces/srv/set_gripper_close.hpp: rosidl_generator_cpp/vision_ai_interfaces/msg/scan_plan.hpp
+	@$(CMAKE_COMMAND) -E touch_nocreate rosidl_generator_cpp/vision_ai_interfaces/srv/set_gripper_close.hpp
+
+rosidl_generator_cpp/vision_ai_interfaces/srv/detail/set_gripper_close__builder.hpp: rosidl_generator_cpp/vision_ai_interfaces/msg/scan_plan.hpp
+	@$(CMAKE_COMMAND) -E touch_nocreate rosidl_generator_cpp/vision_ai_interfaces/srv/detail/set_gripper_close__builder.hpp
+
+rosidl_generator_cpp/vision_ai_interfaces/srv/detail/set_gripper_close__struct.hpp: rosidl_generator_cpp/vision_ai_interfaces/msg/scan_plan.hpp
+	@$(CMAKE_COMMAND) -E touch_nocreate rosidl_generator_cpp/vision_ai_interfaces/srv/detail/set_gripper_close__struct.hpp
+
+rosidl_generator_cpp/vision_ai_interfaces/srv/detail/set_gripper_close__traits.hpp: rosidl_generator_cpp/vision_ai_interfaces/msg/scan_plan.hpp
+	@$(CMAKE_COMMAND) -E touch_nocreate rosidl_generator_cpp/vision_ai_interfaces/srv/detail/set_gripper_close__traits.hpp
+
+rosidl_generator_cpp/vision_ai_interfaces/srv/detail/set_gripper_close__type_support.hpp: rosidl_generator_cpp/vision_ai_interfaces/msg/scan_plan.hpp
+	@$(CMAKE_COMMAND) -E touch_nocreate rosidl_generator_cpp/vision_ai_interfaces/srv/detail/set_gripper_close__type_support.hpp
+
 vision_ai_interfaces__cpp: CMakeFiles/vision_ai_interfaces__cpp
 vision_ai_interfaces__cpp: rosidl_generator_cpp/vision_ai_interfaces/msg/detail/detected_object__builder.hpp
 vision_ai_interfaces__cpp: rosidl_generator_cpp/vision_ai_interfaces/msg/detail/detected_object__struct.hpp
@@ -430,10 +472,20 @@ vision_ai_interfaces__cpp: rosidl_generator_cpp/vision_ai_interfaces/srv/detail/
 vision_ai_interfaces__cpp: rosidl_generator_cpp/vision_ai_interfaces/srv/detail/process_stitching__struct.hpp
 vision_ai_interfaces__cpp: rosidl_generator_cpp/vision_ai_interfaces/srv/detail/process_stitching__traits.hpp
 vision_ai_interfaces__cpp: rosidl_generator_cpp/vision_ai_interfaces/srv/detail/process_stitching__type_support.hpp
+vision_ai_interfaces__cpp: rosidl_generator_cpp/vision_ai_interfaces/srv/detail/set_gripper_close__builder.hpp
+vision_ai_interfaces__cpp: rosidl_generator_cpp/vision_ai_interfaces/srv/detail/set_gripper_close__struct.hpp
+vision_ai_interfaces__cpp: rosidl_generator_cpp/vision_ai_interfaces/srv/detail/set_gripper_close__traits.hpp
+vision_ai_interfaces__cpp: rosidl_generator_cpp/vision_ai_interfaces/srv/detail/set_gripper_close__type_support.hpp
+vision_ai_interfaces__cpp: rosidl_generator_cpp/vision_ai_interfaces/srv/detail/set_gripper_position__builder.hpp
+vision_ai_interfaces__cpp: rosidl_generator_cpp/vision_ai_interfaces/srv/detail/set_gripper_position__struct.hpp
+vision_ai_interfaces__cpp: rosidl_generator_cpp/vision_ai_interfaces/srv/detail/set_gripper_position__traits.hpp
+vision_ai_interfaces__cpp: rosidl_generator_cpp/vision_ai_interfaces/srv/detail/set_gripper_position__type_support.hpp
 vision_ai_interfaces__cpp: rosidl_generator_cpp/vision_ai_interfaces/srv/execute_scan.hpp
 vision_ai_interfaces__cpp: rosidl_generator_cpp/vision_ai_interfaces/srv/plan_scan.hpp
 vision_ai_interfaces__cpp: rosidl_generator_cpp/vision_ai_interfaces/srv/process_detection.hpp
 vision_ai_interfaces__cpp: rosidl_generator_cpp/vision_ai_interfaces/srv/process_stitching.hpp
+vision_ai_interfaces__cpp: rosidl_generator_cpp/vision_ai_interfaces/srv/set_gripper_close.hpp
+vision_ai_interfaces__cpp: rosidl_generator_cpp/vision_ai_interfaces/srv/set_gripper_position.hpp
 vision_ai_interfaces__cpp: CMakeFiles/vision_ai_interfaces__cpp.dir/build.make
 .PHONY : vision_ai_interfaces__cpp
 

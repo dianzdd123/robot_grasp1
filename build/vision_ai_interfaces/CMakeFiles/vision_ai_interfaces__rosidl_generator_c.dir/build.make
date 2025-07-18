@@ -92,6 +92,8 @@ rosidl_generator_c/vision_ai_interfaces/msg/scan_plan.h: rosidl_adapter/vision_a
 rosidl_generator_c/vision_ai_interfaces/msg/scan_plan.h: rosidl_adapter/vision_ai_interfaces/srv/ExecuteScan.idl
 rosidl_generator_c/vision_ai_interfaces/msg/scan_plan.h: rosidl_adapter/vision_ai_interfaces/srv/ProcessStitching.idl
 rosidl_generator_c/vision_ai_interfaces/msg/scan_plan.h: rosidl_adapter/vision_ai_interfaces/srv/ProcessDetection.idl
+rosidl_generator_c/vision_ai_interfaces/msg/scan_plan.h: rosidl_adapter/vision_ai_interfaces/srv/SetGripperPosition.idl
+rosidl_generator_c/vision_ai_interfaces/msg/scan_plan.h: rosidl_adapter/vision_ai_interfaces/srv/SetGripperClose.idl
 rosidl_generator_c/vision_ai_interfaces/msg/scan_plan.h: /opt/ros/humble/share/geometry_msgs/msg/Accel.idl
 rosidl_generator_c/vision_ai_interfaces/msg/scan_plan.h: /opt/ros/humble/share/geometry_msgs/msg/AccelStamped.idl
 rosidl_generator_c/vision_ai_interfaces/msg/scan_plan.h: /opt/ros/humble/share/geometry_msgs/msg/AccelWithCovariance.idl
@@ -302,6 +304,30 @@ rosidl_generator_c/vision_ai_interfaces/srv/detail/process_detection__struct.h: 
 rosidl_generator_c/vision_ai_interfaces/srv/detail/process_detection__type_support.h: rosidl_generator_c/vision_ai_interfaces/msg/scan_plan.h
 	@$(CMAKE_COMMAND) -E touch_nocreate rosidl_generator_c/vision_ai_interfaces/srv/detail/process_detection__type_support.h
 
+rosidl_generator_c/vision_ai_interfaces/srv/set_gripper_position.h: rosidl_generator_c/vision_ai_interfaces/msg/scan_plan.h
+	@$(CMAKE_COMMAND) -E touch_nocreate rosidl_generator_c/vision_ai_interfaces/srv/set_gripper_position.h
+
+rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_position__functions.h: rosidl_generator_c/vision_ai_interfaces/msg/scan_plan.h
+	@$(CMAKE_COMMAND) -E touch_nocreate rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_position__functions.h
+
+rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_position__struct.h: rosidl_generator_c/vision_ai_interfaces/msg/scan_plan.h
+	@$(CMAKE_COMMAND) -E touch_nocreate rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_position__struct.h
+
+rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_position__type_support.h: rosidl_generator_c/vision_ai_interfaces/msg/scan_plan.h
+	@$(CMAKE_COMMAND) -E touch_nocreate rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_position__type_support.h
+
+rosidl_generator_c/vision_ai_interfaces/srv/set_gripper_close.h: rosidl_generator_c/vision_ai_interfaces/msg/scan_plan.h
+	@$(CMAKE_COMMAND) -E touch_nocreate rosidl_generator_c/vision_ai_interfaces/srv/set_gripper_close.h
+
+rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_close__functions.h: rosidl_generator_c/vision_ai_interfaces/msg/scan_plan.h
+	@$(CMAKE_COMMAND) -E touch_nocreate rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_close__functions.h
+
+rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_close__struct.h: rosidl_generator_c/vision_ai_interfaces/msg/scan_plan.h
+	@$(CMAKE_COMMAND) -E touch_nocreate rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_close__struct.h
+
+rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_close__type_support.h: rosidl_generator_c/vision_ai_interfaces/msg/scan_plan.h
+	@$(CMAKE_COMMAND) -E touch_nocreate rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_close__type_support.h
+
 rosidl_generator_c/vision_ai_interfaces/msg/detail/scan_plan__functions.c: rosidl_generator_c/vision_ai_interfaces/msg/scan_plan.h
 	@$(CMAKE_COMMAND) -E touch_nocreate rosidl_generator_c/vision_ai_interfaces/msg/detail/scan_plan__functions.c
 
@@ -331,6 +357,12 @@ rosidl_generator_c/vision_ai_interfaces/srv/detail/process_stitching__functions.
 
 rosidl_generator_c/vision_ai_interfaces/srv/detail/process_detection__functions.c: rosidl_generator_c/vision_ai_interfaces/msg/scan_plan.h
 	@$(CMAKE_COMMAND) -E touch_nocreate rosidl_generator_c/vision_ai_interfaces/srv/detail/process_detection__functions.c
+
+rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_position__functions.c: rosidl_generator_c/vision_ai_interfaces/msg/scan_plan.h
+	@$(CMAKE_COMMAND) -E touch_nocreate rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_position__functions.c
+
+rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_close__functions.c: rosidl_generator_c/vision_ai_interfaces/msg/scan_plan.h
+	@$(CMAKE_COMMAND) -E touch_nocreate rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_close__functions.c
 
 CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/rosidl_generator_c/vision_ai_interfaces/msg/detail/scan_plan__functions.c.o: CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/flags.make
 CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/rosidl_generator_c/vision_ai_interfaces/msg/detail/scan_plan__functions.c.o: rosidl_generator_c/vision_ai_interfaces/msg/detail/scan_plan__functions.c
@@ -472,6 +504,34 @@ CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/rosidl_generator_c/visio
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling C source to assembly CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/rosidl_generator_c/vision_ai_interfaces/srv/detail/process_detection__functions.c.s"
 	/usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -S /home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_generator_c/vision_ai_interfaces/srv/detail/process_detection__functions.c -o CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/rosidl_generator_c/vision_ai_interfaces/srv/detail/process_detection__functions.c.s
 
+CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_position__functions.c.o: CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/flags.make
+CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_position__functions.c.o: rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_position__functions.c
+CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_position__functions.c.o: CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/qi/ros2_ws/build/vision_ai_interfaces/CMakeFiles --progress-num=$(CMAKE_PROGRESS_12) "Building C object CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_position__functions.c.o"
+	/usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -MD -MT CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_position__functions.c.o -MF CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_position__functions.c.o.d -o CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_position__functions.c.o -c /home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_position__functions.c
+
+CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_position__functions.c.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing C source to CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_position__functions.c.i"
+	/usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -E /home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_position__functions.c > CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_position__functions.c.i
+
+CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_position__functions.c.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling C source to assembly CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_position__functions.c.s"
+	/usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -S /home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_position__functions.c -o CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_position__functions.c.s
+
+CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_close__functions.c.o: CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/flags.make
+CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_close__functions.c.o: rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_close__functions.c
+CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_close__functions.c.o: CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/qi/ros2_ws/build/vision_ai_interfaces/CMakeFiles --progress-num=$(CMAKE_PROGRESS_13) "Building C object CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_close__functions.c.o"
+	/usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -MD -MT CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_close__functions.c.o -MF CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_close__functions.c.o.d -o CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_close__functions.c.o -c /home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_close__functions.c
+
+CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_close__functions.c.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing C source to CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_close__functions.c.i"
+	/usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -E /home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_close__functions.c > CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_close__functions.c.i
+
+CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_close__functions.c.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling C source to assembly CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_close__functions.c.s"
+	/usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -S /home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_close__functions.c -o CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_close__functions.c.s
+
 # Object files for target vision_ai_interfaces__rosidl_generator_c
 vision_ai_interfaces__rosidl_generator_c_OBJECTS = \
 "CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/rosidl_generator_c/vision_ai_interfaces/msg/detail/scan_plan__functions.c.o" \
@@ -483,7 +543,9 @@ vision_ai_interfaces__rosidl_generator_c_OBJECTS = \
 "CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/rosidl_generator_c/vision_ai_interfaces/srv/detail/plan_scan__functions.c.o" \
 "CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/rosidl_generator_c/vision_ai_interfaces/srv/detail/execute_scan__functions.c.o" \
 "CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/rosidl_generator_c/vision_ai_interfaces/srv/detail/process_stitching__functions.c.o" \
-"CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/rosidl_generator_c/vision_ai_interfaces/srv/detail/process_detection__functions.c.o"
+"CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/rosidl_generator_c/vision_ai_interfaces/srv/detail/process_detection__functions.c.o" \
+"CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_position__functions.c.o" \
+"CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_close__functions.c.o"
 
 # External object files for target vision_ai_interfaces__rosidl_generator_c
 vision_ai_interfaces__rosidl_generator_c_EXTERNAL_OBJECTS =
@@ -498,6 +560,8 @@ libvision_ai_interfaces__rosidl_generator_c.so: CMakeFiles/vision_ai_interfaces_
 libvision_ai_interfaces__rosidl_generator_c.so: CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/rosidl_generator_c/vision_ai_interfaces/srv/detail/execute_scan__functions.c.o
 libvision_ai_interfaces__rosidl_generator_c.so: CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/rosidl_generator_c/vision_ai_interfaces/srv/detail/process_stitching__functions.c.o
 libvision_ai_interfaces__rosidl_generator_c.so: CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/rosidl_generator_c/vision_ai_interfaces/srv/detail/process_detection__functions.c.o
+libvision_ai_interfaces__rosidl_generator_c.so: CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_position__functions.c.o
+libvision_ai_interfaces__rosidl_generator_c.so: CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_close__functions.c.o
 libvision_ai_interfaces__rosidl_generator_c.so: CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/build.make
 libvision_ai_interfaces__rosidl_generator_c.so: /opt/ros/humble/lib/libsensor_msgs__rosidl_generator_c.so
 libvision_ai_interfaces__rosidl_generator_c.so: /opt/ros/humble/lib/libgeometry_msgs__rosidl_generator_c.so
@@ -506,7 +570,7 @@ libvision_ai_interfaces__rosidl_generator_c.so: /opt/ros/humble/lib/libbuiltin_i
 libvision_ai_interfaces__rosidl_generator_c.so: /opt/ros/humble/lib/librosidl_runtime_c.so
 libvision_ai_interfaces__rosidl_generator_c.so: /opt/ros/humble/lib/librcutils.so
 libvision_ai_interfaces__rosidl_generator_c.so: CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --bold --progress-dir=/home/qi/ros2_ws/build/vision_ai_interfaces/CMakeFiles --progress-num=$(CMAKE_PROGRESS_12) "Linking C shared library libvision_ai_interfaces__rosidl_generator_c.so"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --bold --progress-dir=/home/qi/ros2_ws/build/vision_ai_interfaces/CMakeFiles --progress-num=$(CMAKE_PROGRESS_14) "Linking C shared library libvision_ai_interfaces__rosidl_generator_c.so"
 	$(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/link.txt --verbose=$(VERBOSE)
 
 # Rule to build all files generated by this target.
@@ -563,10 +627,20 @@ CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/depend: rosidl_generator
 CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/depend: rosidl_generator_c/vision_ai_interfaces/srv/detail/process_stitching__functions.h
 CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/depend: rosidl_generator_c/vision_ai_interfaces/srv/detail/process_stitching__struct.h
 CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/depend: rosidl_generator_c/vision_ai_interfaces/srv/detail/process_stitching__type_support.h
+CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/depend: rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_close__functions.c
+CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/depend: rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_close__functions.h
+CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/depend: rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_close__struct.h
+CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/depend: rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_close__type_support.h
+CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/depend: rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_position__functions.c
+CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/depend: rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_position__functions.h
+CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/depend: rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_position__struct.h
+CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/depend: rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_position__type_support.h
 CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/depend: rosidl_generator_c/vision_ai_interfaces/srv/execute_scan.h
 CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/depend: rosidl_generator_c/vision_ai_interfaces/srv/plan_scan.h
 CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/depend: rosidl_generator_c/vision_ai_interfaces/srv/process_detection.h
 CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/depend: rosidl_generator_c/vision_ai_interfaces/srv/process_stitching.h
+CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/depend: rosidl_generator_c/vision_ai_interfaces/srv/set_gripper_close.h
+CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/depend: rosidl_generator_c/vision_ai_interfaces/srv/set_gripper_position.h
 	cd /home/qi/ros2_ws/build/vision_ai_interfaces && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /home/qi/ros2_ws/src/vision_ai_interfaces /home/qi/ros2_ws/src/vision_ai_interfaces /home/qi/ros2_ws/build/vision_ai_interfaces /home/qi/ros2_ws/build/vision_ai_interfaces /home/qi/ros2_ws/build/vision_ai_interfaces/CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/DependInfo.cmake --color=$(COLOR)
 .PHONY : CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/depend
 

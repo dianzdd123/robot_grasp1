@@ -42,27 +42,27 @@ if [ "$1" = "full_system" ]; then
     tmux send-keys -t vision_ai:4 'echo "  ros2 service call /execute_scan ..."' Enter
     tmux split-window -h -t vision_ai:4
     tmux send-keys -t vision_ai:4.1 'ros2 topic list | grep -E "(detection|stitching)"' Enter
-    # 🆕 窗口5：跟踪
-    tmux new-window -t vision_ai:5
-    tmux send-keys -t vision_ai:5 'echo "🎯 追踪系统"' Enter
-    tmux send-keys -t vision_ai:5 'echo "启动追踪节点..."' Enter
-    tmux send-keys -t vision_ai:5 'cd ~/ros2_ws && source install/setup.bash' Enter
-    tmux send-keys -t vision_ai:5 'ros2 run vision_ai tracking_node' Enter
-    tmux split-window -h -t vision_ai:5
-    tmux send-keys -t vision_ai:5.1 'echo "🔍 追踪状态监控"' Enter
-    tmux send-keys -t vision_ai:5.1 'echo "可用命令："' Enter
-    tmux send-keys -t vision_ai:5.1 'echo "  ros2 topic echo /tracking/status --once"' Enter
-    tmux send-keys -t vision_ai:5.1 'echo "  ros2 topic echo /xarm/target_pose --once"' Enter
-    tmux send-keys -t vision_ai:5.1 'cd ~/ros2_ws && source install/setup.bash' Enter
-    # 🆕 窗口6：实时追踪可视化
-    tmux new-window -t vision_ai:6
-    tmux send-keys -t vision_ai:6 'echo "📺 实时追踪可视化"' Enter
-    tmux send-keys -t vision_ai:6 'cd ~/ros2_ws && source install/setup.bash' Enter
-    tmux send-keys -t vision_ai:6 'ros2 run rqt_image_view rqt_image_view /tracking/visualization' Enter
-    tmux split-window -h -t vision_ai:6
-    tmux send-keys -t vision_ai:6.1 'echo "📊 追踪状态监控"' Enter
-    tmux send-keys -t vision_ai:6.1 'cd ~/ros2_ws && source install/setup.bash' Enter
-    tmux send-keys -t vision_ai:6.1 'watch -n 1 "ros2 topic echo /tracking/status --once | head -20"' Enter
+    # # 🆕 窗口5：跟踪
+    # tmux new-window -t vision_ai:5
+    # tmux send-keys -t vision_ai:5 'echo "🎯 追踪系统"' Enter
+    # tmux send-keys -t vision_ai:5 'echo "启动追踪节点..."' Enter
+    # tmux send-keys -t vision_ai:5 'cd ~/ros2_ws && source install/setup.bash' Enter
+    # tmux send-keys -t vision_ai:5 'ros2 run vision_ai tracking_node' Enter
+    # tmux split-window -h -t vision_ai:5
+    # tmux send-keys -t vision_ai:5.1 'echo "🔍 追踪状态监控"' Enter
+    # tmux send-keys -t vision_ai:5.1 'echo "可用命令："' Enter
+    # tmux send-keys -t vision_ai:5.1 'echo "  ros2 topic echo /tracking/status --once"' Enter
+    # tmux send-keys -t vision_ai:5.1 'echo "  ros2 topic echo /xarm/target_pose --once"' Enter
+    # tmux send-keys -t vision_ai:5.1 'cd ~/ros2_ws && source install/setup.bash' Enter
+    # # 🆕 窗口6：实时追踪可视化
+    # tmux new-window -t vision_ai:6
+    # tmux send-keys -t vision_ai:6 'echo "📺 实时追踪可视化"' Enter
+    # tmux send-keys -t vision_ai:6 'cd ~/ros2_ws && source install/setup.bash' Enter
+    # tmux send-keys -t vision_ai:6 'ros2 run rqt_image_view rqt_image_view /tracking/visualization' Enter
+    # tmux split-window -h -t vision_ai:6
+    # tmux send-keys -t vision_ai:6.1 'echo "📊 追踪状态监控"' Enter
+    # tmux send-keys -t vision_ai:6.1 'cd ~/ros2_ws && source install/setup.bash' Enter
+    # tmux send-keys -t vision_ai:6.1 'watch -n 1 "ros2 topic echo /tracking/status --once | head -20"' Enter
 
     # # 窗口7：单窗口图像显示
     # tmux new-window -t vision_ai:7

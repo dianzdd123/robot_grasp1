@@ -196,16 +196,16 @@ CMakeFiles/vision_ai_interfaces__rosidl_generator_py.dir/rosidl_generator_py/vis
  /usr/include/python3.10/cpython/pyfpe.h \
  /usr/include/python3.10/tracemalloc.h \
  /usr/lib/gcc/x86_64-linux-gnu/11/include/stdbool.h \
- /usr/include/python3.10/numpy/ndarrayobject.h \
- /usr/include/python3.10/numpy/ndarraytypes.h \
- /usr/include/python3.10/numpy/npy_common.h \
- /usr/include/python3.10/numpy/numpyconfig.h \
- /usr/include/python3.10/numpy/_numpyconfig.h \
- /usr/include/python3.10/numpy/npy_endian.h \
- /usr/include/python3.10/numpy/npy_cpu.h \
- /usr/include/python3.10/numpy/utils.h \
- /usr/include/python3.10/numpy/_neighborhood_iterator_imp.h \
- /usr/include/python3.10/numpy/__multiarray_api.h \
+ /home/qi/miniconda3/envs/rel_env/lib/python3.10/site-packages/numpy/core/include/numpy/ndarrayobject.h \
+ /home/qi/miniconda3/envs/rel_env/lib/python3.10/site-packages/numpy/core/include/numpy/ndarraytypes.h \
+ /home/qi/miniconda3/envs/rel_env/lib/python3.10/site-packages/numpy/core/include/numpy/npy_common.h \
+ /home/qi/miniconda3/envs/rel_env/lib/python3.10/site-packages/numpy/core/include/numpy/numpyconfig.h \
+ /home/qi/miniconda3/envs/rel_env/lib/python3.10/site-packages/numpy/core/include/numpy/_numpyconfig.h \
+ /home/qi/miniconda3/envs/rel_env/lib/python3.10/site-packages/numpy/core/include/numpy/npy_endian.h \
+ /home/qi/miniconda3/envs/rel_env/lib/python3.10/site-packages/numpy/core/include/numpy/npy_cpu.h \
+ /home/qi/miniconda3/envs/rel_env/lib/python3.10/site-packages/numpy/core/include/numpy/utils.h \
+ /home/qi/miniconda3/envs/rel_env/lib/python3.10/site-packages/numpy/core/include/numpy/_neighborhood_iterator_imp.h \
+ /home/qi/miniconda3/envs/rel_env/lib/python3.10/site-packages/numpy/core/include/numpy/__multiarray_api.h \
  /opt/ros/humble/include/rosidl_runtime_c/rosidl_runtime_c/visibility_control.h \
  /home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_generator_c/vision_ai_interfaces/msg/detail/image_data__struct.h \
  /opt/ros/humble/include/rosidl_runtime_c/rosidl_runtime_c/string.h \

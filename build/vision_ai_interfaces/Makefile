@@ -645,6 +645,54 @@ rosidl_generator_c/vision_ai_interfaces/srv/detail/process_stitching__functions.
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/build.make CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/rosidl_generator_c/vision_ai_interfaces/srv/detail/process_stitching__functions.c.s
 .PHONY : rosidl_generator_c/vision_ai_interfaces/srv/detail/process_stitching__functions.c.s
 
+rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_close__functions.o: rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_close__functions.c.o
+.PHONY : rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_close__functions.o
+
+# target to build an object file
+rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_close__functions.c.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/build.make CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_close__functions.c.o
+.PHONY : rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_close__functions.c.o
+
+rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_close__functions.i: rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_close__functions.c.i
+.PHONY : rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_close__functions.i
+
+# target to preprocess a source file
+rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_close__functions.c.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/build.make CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_close__functions.c.i
+.PHONY : rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_close__functions.c.i
+
+rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_close__functions.s: rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_close__functions.c.s
+.PHONY : rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_close__functions.s
+
+# target to generate assembly for a file
+rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_close__functions.c.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/build.make CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_close__functions.c.s
+.PHONY : rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_close__functions.c.s
+
+rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_position__functions.o: rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_position__functions.c.o
+.PHONY : rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_position__functions.o
+
+# target to build an object file
+rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_position__functions.c.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/build.make CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_position__functions.c.o
+.PHONY : rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_position__functions.c.o
+
+rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_position__functions.i: rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_position__functions.c.i
+.PHONY : rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_position__functions.i
+
+# target to preprocess a source file
+rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_position__functions.c.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/build.make CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_position__functions.c.i
+.PHONY : rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_position__functions.c.i
+
+rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_position__functions.s: rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_position__functions.c.s
+.PHONY : rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_position__functions.s
+
+# target to generate assembly for a file
+rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_position__functions.c.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/build.make CMakeFiles/vision_ai_interfaces__rosidl_generator_c.dir/rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_position__functions.c.s
+.PHONY : rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_position__functions.c.s
+
 rosidl_generator_py/vision_ai_interfaces/_vision_ai_interfaces_s.ep.rosidl_typesupport_c.o: rosidl_generator_py/vision_ai_interfaces/_vision_ai_interfaces_s.ep.rosidl_typesupport_c.c.o
 .PHONY : rosidl_generator_py/vision_ai_interfaces/_vision_ai_interfaces_s.ep.rosidl_typesupport_c.o
 
@@ -957,6 +1005,54 @@ rosidl_generator_py/vision_ai_interfaces/srv/_process_stitching_s.c.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/vision_ai_interfaces__rosidl_generator_py.dir/build.make CMakeFiles/vision_ai_interfaces__rosidl_generator_py.dir/rosidl_generator_py/vision_ai_interfaces/srv/_process_stitching_s.c.s
 .PHONY : rosidl_generator_py/vision_ai_interfaces/srv/_process_stitching_s.c.s
 
+rosidl_generator_py/vision_ai_interfaces/srv/_set_gripper_close_s.o: rosidl_generator_py/vision_ai_interfaces/srv/_set_gripper_close_s.c.o
+.PHONY : rosidl_generator_py/vision_ai_interfaces/srv/_set_gripper_close_s.o
+
+# target to build an object file
+rosidl_generator_py/vision_ai_interfaces/srv/_set_gripper_close_s.c.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vision_ai_interfaces__rosidl_generator_py.dir/build.make CMakeFiles/vision_ai_interfaces__rosidl_generator_py.dir/rosidl_generator_py/vision_ai_interfaces/srv/_set_gripper_close_s.c.o
+.PHONY : rosidl_generator_py/vision_ai_interfaces/srv/_set_gripper_close_s.c.o
+
+rosidl_generator_py/vision_ai_interfaces/srv/_set_gripper_close_s.i: rosidl_generator_py/vision_ai_interfaces/srv/_set_gripper_close_s.c.i
+.PHONY : rosidl_generator_py/vision_ai_interfaces/srv/_set_gripper_close_s.i
+
+# target to preprocess a source file
+rosidl_generator_py/vision_ai_interfaces/srv/_set_gripper_close_s.c.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vision_ai_interfaces__rosidl_generator_py.dir/build.make CMakeFiles/vision_ai_interfaces__rosidl_generator_py.dir/rosidl_generator_py/vision_ai_interfaces/srv/_set_gripper_close_s.c.i
+.PHONY : rosidl_generator_py/vision_ai_interfaces/srv/_set_gripper_close_s.c.i
+
+rosidl_generator_py/vision_ai_interfaces/srv/_set_gripper_close_s.s: rosidl_generator_py/vision_ai_interfaces/srv/_set_gripper_close_s.c.s
+.PHONY : rosidl_generator_py/vision_ai_interfaces/srv/_set_gripper_close_s.s
+
+# target to generate assembly for a file
+rosidl_generator_py/vision_ai_interfaces/srv/_set_gripper_close_s.c.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vision_ai_interfaces__rosidl_generator_py.dir/build.make CMakeFiles/vision_ai_interfaces__rosidl_generator_py.dir/rosidl_generator_py/vision_ai_interfaces/srv/_set_gripper_close_s.c.s
+.PHONY : rosidl_generator_py/vision_ai_interfaces/srv/_set_gripper_close_s.c.s
+
+rosidl_generator_py/vision_ai_interfaces/srv/_set_gripper_position_s.o: rosidl_generator_py/vision_ai_interfaces/srv/_set_gripper_position_s.c.o
+.PHONY : rosidl_generator_py/vision_ai_interfaces/srv/_set_gripper_position_s.o
+
+# target to build an object file
+rosidl_generator_py/vision_ai_interfaces/srv/_set_gripper_position_s.c.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vision_ai_interfaces__rosidl_generator_py.dir/build.make CMakeFiles/vision_ai_interfaces__rosidl_generator_py.dir/rosidl_generator_py/vision_ai_interfaces/srv/_set_gripper_position_s.c.o
+.PHONY : rosidl_generator_py/vision_ai_interfaces/srv/_set_gripper_position_s.c.o
+
+rosidl_generator_py/vision_ai_interfaces/srv/_set_gripper_position_s.i: rosidl_generator_py/vision_ai_interfaces/srv/_set_gripper_position_s.c.i
+.PHONY : rosidl_generator_py/vision_ai_interfaces/srv/_set_gripper_position_s.i
+
+# target to preprocess a source file
+rosidl_generator_py/vision_ai_interfaces/srv/_set_gripper_position_s.c.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vision_ai_interfaces__rosidl_generator_py.dir/build.make CMakeFiles/vision_ai_interfaces__rosidl_generator_py.dir/rosidl_generator_py/vision_ai_interfaces/srv/_set_gripper_position_s.c.i
+.PHONY : rosidl_generator_py/vision_ai_interfaces/srv/_set_gripper_position_s.c.i
+
+rosidl_generator_py/vision_ai_interfaces/srv/_set_gripper_position_s.s: rosidl_generator_py/vision_ai_interfaces/srv/_set_gripper_position_s.c.s
+.PHONY : rosidl_generator_py/vision_ai_interfaces/srv/_set_gripper_position_s.s
+
+# target to generate assembly for a file
+rosidl_generator_py/vision_ai_interfaces/srv/_set_gripper_position_s.c.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vision_ai_interfaces__rosidl_generator_py.dir/build.make CMakeFiles/vision_ai_interfaces__rosidl_generator_py.dir/rosidl_generator_py/vision_ai_interfaces/srv/_set_gripper_position_s.c.s
+.PHONY : rosidl_generator_py/vision_ai_interfaces/srv/_set_gripper_position_s.c.s
+
 rosidl_typesupport_c/vision_ai_interfaces/msg/detected_object__type_support.o: rosidl_typesupport_c/vision_ai_interfaces/msg/detected_object__type_support.cpp.o
 .PHONY : rosidl_typesupport_c/vision_ai_interfaces/msg/detected_object__type_support.o
 
@@ -1196,6 +1292,54 @@ rosidl_typesupport_c/vision_ai_interfaces/srv/process_stitching__type_support.s:
 rosidl_typesupport_c/vision_ai_interfaces/srv/process_stitching__type_support.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/build.make CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/rosidl_typesupport_c/vision_ai_interfaces/srv/process_stitching__type_support.cpp.s
 .PHONY : rosidl_typesupport_c/vision_ai_interfaces/srv/process_stitching__type_support.cpp.s
+
+rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_close__type_support.o: rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_close__type_support.cpp.o
+.PHONY : rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_close__type_support.o
+
+# target to build an object file
+rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_close__type_support.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/build.make CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_close__type_support.cpp.o
+.PHONY : rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_close__type_support.cpp.o
+
+rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_close__type_support.i: rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_close__type_support.cpp.i
+.PHONY : rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_close__type_support.i
+
+# target to preprocess a source file
+rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_close__type_support.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/build.make CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_close__type_support.cpp.i
+.PHONY : rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_close__type_support.cpp.i
+
+rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_close__type_support.s: rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_close__type_support.cpp.s
+.PHONY : rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_close__type_support.s
+
+# target to generate assembly for a file
+rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_close__type_support.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/build.make CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_close__type_support.cpp.s
+.PHONY : rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_close__type_support.cpp.s
+
+rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_position__type_support.o: rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_position__type_support.cpp.o
+.PHONY : rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_position__type_support.o
+
+# target to build an object file
+rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_position__type_support.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/build.make CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_position__type_support.cpp.o
+.PHONY : rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_position__type_support.cpp.o
+
+rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_position__type_support.i: rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_position__type_support.cpp.i
+.PHONY : rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_position__type_support.i
+
+# target to preprocess a source file
+rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_position__type_support.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/build.make CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_position__type_support.cpp.i
+.PHONY : rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_position__type_support.cpp.i
+
+rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_position__type_support.s: rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_position__type_support.cpp.s
+.PHONY : rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_position__type_support.s
+
+# target to generate assembly for a file
+rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_position__type_support.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/build.make CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_position__type_support.cpp.s
+.PHONY : rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_position__type_support.cpp.s
 
 rosidl_typesupport_cpp/vision_ai_interfaces/msg/detected_object__type_support.o: rosidl_typesupport_cpp/vision_ai_interfaces/msg/detected_object__type_support.cpp.o
 .PHONY : rosidl_typesupport_cpp/vision_ai_interfaces/msg/detected_object__type_support.o
@@ -1437,6 +1581,54 @@ rosidl_typesupport_cpp/vision_ai_interfaces/srv/process_stitching__type_support.
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/vision_ai_interfaces__rosidl_typesupport_cpp.dir/build.make CMakeFiles/vision_ai_interfaces__rosidl_typesupport_cpp.dir/rosidl_typesupport_cpp/vision_ai_interfaces/srv/process_stitching__type_support.cpp.s
 .PHONY : rosidl_typesupport_cpp/vision_ai_interfaces/srv/process_stitching__type_support.cpp.s
 
+rosidl_typesupport_cpp/vision_ai_interfaces/srv/set_gripper_close__type_support.o: rosidl_typesupport_cpp/vision_ai_interfaces/srv/set_gripper_close__type_support.cpp.o
+.PHONY : rosidl_typesupport_cpp/vision_ai_interfaces/srv/set_gripper_close__type_support.o
+
+# target to build an object file
+rosidl_typesupport_cpp/vision_ai_interfaces/srv/set_gripper_close__type_support.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vision_ai_interfaces__rosidl_typesupport_cpp.dir/build.make CMakeFiles/vision_ai_interfaces__rosidl_typesupport_cpp.dir/rosidl_typesupport_cpp/vision_ai_interfaces/srv/set_gripper_close__type_support.cpp.o
+.PHONY : rosidl_typesupport_cpp/vision_ai_interfaces/srv/set_gripper_close__type_support.cpp.o
+
+rosidl_typesupport_cpp/vision_ai_interfaces/srv/set_gripper_close__type_support.i: rosidl_typesupport_cpp/vision_ai_interfaces/srv/set_gripper_close__type_support.cpp.i
+.PHONY : rosidl_typesupport_cpp/vision_ai_interfaces/srv/set_gripper_close__type_support.i
+
+# target to preprocess a source file
+rosidl_typesupport_cpp/vision_ai_interfaces/srv/set_gripper_close__type_support.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vision_ai_interfaces__rosidl_typesupport_cpp.dir/build.make CMakeFiles/vision_ai_interfaces__rosidl_typesupport_cpp.dir/rosidl_typesupport_cpp/vision_ai_interfaces/srv/set_gripper_close__type_support.cpp.i
+.PHONY : rosidl_typesupport_cpp/vision_ai_interfaces/srv/set_gripper_close__type_support.cpp.i
+
+rosidl_typesupport_cpp/vision_ai_interfaces/srv/set_gripper_close__type_support.s: rosidl_typesupport_cpp/vision_ai_interfaces/srv/set_gripper_close__type_support.cpp.s
+.PHONY : rosidl_typesupport_cpp/vision_ai_interfaces/srv/set_gripper_close__type_support.s
+
+# target to generate assembly for a file
+rosidl_typesupport_cpp/vision_ai_interfaces/srv/set_gripper_close__type_support.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vision_ai_interfaces__rosidl_typesupport_cpp.dir/build.make CMakeFiles/vision_ai_interfaces__rosidl_typesupport_cpp.dir/rosidl_typesupport_cpp/vision_ai_interfaces/srv/set_gripper_close__type_support.cpp.s
+.PHONY : rosidl_typesupport_cpp/vision_ai_interfaces/srv/set_gripper_close__type_support.cpp.s
+
+rosidl_typesupport_cpp/vision_ai_interfaces/srv/set_gripper_position__type_support.o: rosidl_typesupport_cpp/vision_ai_interfaces/srv/set_gripper_position__type_support.cpp.o
+.PHONY : rosidl_typesupport_cpp/vision_ai_interfaces/srv/set_gripper_position__type_support.o
+
+# target to build an object file
+rosidl_typesupport_cpp/vision_ai_interfaces/srv/set_gripper_position__type_support.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vision_ai_interfaces__rosidl_typesupport_cpp.dir/build.make CMakeFiles/vision_ai_interfaces__rosidl_typesupport_cpp.dir/rosidl_typesupport_cpp/vision_ai_interfaces/srv/set_gripper_position__type_support.cpp.o
+.PHONY : rosidl_typesupport_cpp/vision_ai_interfaces/srv/set_gripper_position__type_support.cpp.o
+
+rosidl_typesupport_cpp/vision_ai_interfaces/srv/set_gripper_position__type_support.i: rosidl_typesupport_cpp/vision_ai_interfaces/srv/set_gripper_position__type_support.cpp.i
+.PHONY : rosidl_typesupport_cpp/vision_ai_interfaces/srv/set_gripper_position__type_support.i
+
+# target to preprocess a source file
+rosidl_typesupport_cpp/vision_ai_interfaces/srv/set_gripper_position__type_support.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vision_ai_interfaces__rosidl_typesupport_cpp.dir/build.make CMakeFiles/vision_ai_interfaces__rosidl_typesupport_cpp.dir/rosidl_typesupport_cpp/vision_ai_interfaces/srv/set_gripper_position__type_support.cpp.i
+.PHONY : rosidl_typesupport_cpp/vision_ai_interfaces/srv/set_gripper_position__type_support.cpp.i
+
+rosidl_typesupport_cpp/vision_ai_interfaces/srv/set_gripper_position__type_support.s: rosidl_typesupport_cpp/vision_ai_interfaces/srv/set_gripper_position__type_support.cpp.s
+.PHONY : rosidl_typesupport_cpp/vision_ai_interfaces/srv/set_gripper_position__type_support.s
+
+# target to generate assembly for a file
+rosidl_typesupport_cpp/vision_ai_interfaces/srv/set_gripper_position__type_support.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vision_ai_interfaces__rosidl_typesupport_cpp.dir/build.make CMakeFiles/vision_ai_interfaces__rosidl_typesupport_cpp.dir/rosidl_typesupport_cpp/vision_ai_interfaces/srv/set_gripper_position__type_support.cpp.s
+.PHONY : rosidl_typesupport_cpp/vision_ai_interfaces/srv/set_gripper_position__type_support.cpp.s
+
 rosidl_typesupport_fastrtps_c/vision_ai_interfaces/msg/detail/detected_object__type_support_c.o: rosidl_typesupport_fastrtps_c/vision_ai_interfaces/msg/detail/detected_object__type_support_c.cpp.o
 .PHONY : rosidl_typesupport_fastrtps_c/vision_ai_interfaces/msg/detail/detected_object__type_support_c.o
 
@@ -1676,6 +1868,54 @@ rosidl_typesupport_fastrtps_c/vision_ai_interfaces/srv/detail/process_stitching_
 rosidl_typesupport_fastrtps_c/vision_ai_interfaces/srv/detail/process_stitching__type_support_c.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/vision_ai_interfaces__rosidl_typesupport_fastrtps_c.dir/build.make CMakeFiles/vision_ai_interfaces__rosidl_typesupport_fastrtps_c.dir/rosidl_typesupport_fastrtps_c/vision_ai_interfaces/srv/detail/process_stitching__type_support_c.cpp.s
 .PHONY : rosidl_typesupport_fastrtps_c/vision_ai_interfaces/srv/detail/process_stitching__type_support_c.cpp.s
+
+rosidl_typesupport_fastrtps_c/vision_ai_interfaces/srv/detail/set_gripper_close__type_support_c.o: rosidl_typesupport_fastrtps_c/vision_ai_interfaces/srv/detail/set_gripper_close__type_support_c.cpp.o
+.PHONY : rosidl_typesupport_fastrtps_c/vision_ai_interfaces/srv/detail/set_gripper_close__type_support_c.o
+
+# target to build an object file
+rosidl_typesupport_fastrtps_c/vision_ai_interfaces/srv/detail/set_gripper_close__type_support_c.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vision_ai_interfaces__rosidl_typesupport_fastrtps_c.dir/build.make CMakeFiles/vision_ai_interfaces__rosidl_typesupport_fastrtps_c.dir/rosidl_typesupport_fastrtps_c/vision_ai_interfaces/srv/detail/set_gripper_close__type_support_c.cpp.o
+.PHONY : rosidl_typesupport_fastrtps_c/vision_ai_interfaces/srv/detail/set_gripper_close__type_support_c.cpp.o
+
+rosidl_typesupport_fastrtps_c/vision_ai_interfaces/srv/detail/set_gripper_close__type_support_c.i: rosidl_typesupport_fastrtps_c/vision_ai_interfaces/srv/detail/set_gripper_close__type_support_c.cpp.i
+.PHONY : rosidl_typesupport_fastrtps_c/vision_ai_interfaces/srv/detail/set_gripper_close__type_support_c.i
+
+# target to preprocess a source file
+rosidl_typesupport_fastrtps_c/vision_ai_interfaces/srv/detail/set_gripper_close__type_support_c.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vision_ai_interfaces__rosidl_typesupport_fastrtps_c.dir/build.make CMakeFiles/vision_ai_interfaces__rosidl_typesupport_fastrtps_c.dir/rosidl_typesupport_fastrtps_c/vision_ai_interfaces/srv/detail/set_gripper_close__type_support_c.cpp.i
+.PHONY : rosidl_typesupport_fastrtps_c/vision_ai_interfaces/srv/detail/set_gripper_close__type_support_c.cpp.i
+
+rosidl_typesupport_fastrtps_c/vision_ai_interfaces/srv/detail/set_gripper_close__type_support_c.s: rosidl_typesupport_fastrtps_c/vision_ai_interfaces/srv/detail/set_gripper_close__type_support_c.cpp.s
+.PHONY : rosidl_typesupport_fastrtps_c/vision_ai_interfaces/srv/detail/set_gripper_close__type_support_c.s
+
+# target to generate assembly for a file
+rosidl_typesupport_fastrtps_c/vision_ai_interfaces/srv/detail/set_gripper_close__type_support_c.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vision_ai_interfaces__rosidl_typesupport_fastrtps_c.dir/build.make CMakeFiles/vision_ai_interfaces__rosidl_typesupport_fastrtps_c.dir/rosidl_typesupport_fastrtps_c/vision_ai_interfaces/srv/detail/set_gripper_close__type_support_c.cpp.s
+.PHONY : rosidl_typesupport_fastrtps_c/vision_ai_interfaces/srv/detail/set_gripper_close__type_support_c.cpp.s
+
+rosidl_typesupport_fastrtps_c/vision_ai_interfaces/srv/detail/set_gripper_position__type_support_c.o: rosidl_typesupport_fastrtps_c/vision_ai_interfaces/srv/detail/set_gripper_position__type_support_c.cpp.o
+.PHONY : rosidl_typesupport_fastrtps_c/vision_ai_interfaces/srv/detail/set_gripper_position__type_support_c.o
+
+# target to build an object file
+rosidl_typesupport_fastrtps_c/vision_ai_interfaces/srv/detail/set_gripper_position__type_support_c.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vision_ai_interfaces__rosidl_typesupport_fastrtps_c.dir/build.make CMakeFiles/vision_ai_interfaces__rosidl_typesupport_fastrtps_c.dir/rosidl_typesupport_fastrtps_c/vision_ai_interfaces/srv/detail/set_gripper_position__type_support_c.cpp.o
+.PHONY : rosidl_typesupport_fastrtps_c/vision_ai_interfaces/srv/detail/set_gripper_position__type_support_c.cpp.o
+
+rosidl_typesupport_fastrtps_c/vision_ai_interfaces/srv/detail/set_gripper_position__type_support_c.i: rosidl_typesupport_fastrtps_c/vision_ai_interfaces/srv/detail/set_gripper_position__type_support_c.cpp.i
+.PHONY : rosidl_typesupport_fastrtps_c/vision_ai_interfaces/srv/detail/set_gripper_position__type_support_c.i
+
+# target to preprocess a source file
+rosidl_typesupport_fastrtps_c/vision_ai_interfaces/srv/detail/set_gripper_position__type_support_c.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vision_ai_interfaces__rosidl_typesupport_fastrtps_c.dir/build.make CMakeFiles/vision_ai_interfaces__rosidl_typesupport_fastrtps_c.dir/rosidl_typesupport_fastrtps_c/vision_ai_interfaces/srv/detail/set_gripper_position__type_support_c.cpp.i
+.PHONY : rosidl_typesupport_fastrtps_c/vision_ai_interfaces/srv/detail/set_gripper_position__type_support_c.cpp.i
+
+rosidl_typesupport_fastrtps_c/vision_ai_interfaces/srv/detail/set_gripper_position__type_support_c.s: rosidl_typesupport_fastrtps_c/vision_ai_interfaces/srv/detail/set_gripper_position__type_support_c.cpp.s
+.PHONY : rosidl_typesupport_fastrtps_c/vision_ai_interfaces/srv/detail/set_gripper_position__type_support_c.s
+
+# target to generate assembly for a file
+rosidl_typesupport_fastrtps_c/vision_ai_interfaces/srv/detail/set_gripper_position__type_support_c.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vision_ai_interfaces__rosidl_typesupport_fastrtps_c.dir/build.make CMakeFiles/vision_ai_interfaces__rosidl_typesupport_fastrtps_c.dir/rosidl_typesupport_fastrtps_c/vision_ai_interfaces/srv/detail/set_gripper_position__type_support_c.cpp.s
+.PHONY : rosidl_typesupport_fastrtps_c/vision_ai_interfaces/srv/detail/set_gripper_position__type_support_c.cpp.s
 
 rosidl_typesupport_fastrtps_cpp/vision_ai_interfaces/msg/detail/dds_fastrtps/detected_object__type_support.o: rosidl_typesupport_fastrtps_cpp/vision_ai_interfaces/msg/detail/dds_fastrtps/detected_object__type_support.cpp.o
 .PHONY : rosidl_typesupport_fastrtps_cpp/vision_ai_interfaces/msg/detail/dds_fastrtps/detected_object__type_support.o
@@ -1917,6 +2157,54 @@ rosidl_typesupport_fastrtps_cpp/vision_ai_interfaces/srv/detail/dds_fastrtps/pro
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/vision_ai_interfaces__rosidl_typesupport_fastrtps_cpp.dir/build.make CMakeFiles/vision_ai_interfaces__rosidl_typesupport_fastrtps_cpp.dir/rosidl_typesupport_fastrtps_cpp/vision_ai_interfaces/srv/detail/dds_fastrtps/process_stitching__type_support.cpp.s
 .PHONY : rosidl_typesupport_fastrtps_cpp/vision_ai_interfaces/srv/detail/dds_fastrtps/process_stitching__type_support.cpp.s
 
+rosidl_typesupport_fastrtps_cpp/vision_ai_interfaces/srv/detail/dds_fastrtps/set_gripper_close__type_support.o: rosidl_typesupport_fastrtps_cpp/vision_ai_interfaces/srv/detail/dds_fastrtps/set_gripper_close__type_support.cpp.o
+.PHONY : rosidl_typesupport_fastrtps_cpp/vision_ai_interfaces/srv/detail/dds_fastrtps/set_gripper_close__type_support.o
+
+# target to build an object file
+rosidl_typesupport_fastrtps_cpp/vision_ai_interfaces/srv/detail/dds_fastrtps/set_gripper_close__type_support.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vision_ai_interfaces__rosidl_typesupport_fastrtps_cpp.dir/build.make CMakeFiles/vision_ai_interfaces__rosidl_typesupport_fastrtps_cpp.dir/rosidl_typesupport_fastrtps_cpp/vision_ai_interfaces/srv/detail/dds_fastrtps/set_gripper_close__type_support.cpp.o
+.PHONY : rosidl_typesupport_fastrtps_cpp/vision_ai_interfaces/srv/detail/dds_fastrtps/set_gripper_close__type_support.cpp.o
+
+rosidl_typesupport_fastrtps_cpp/vision_ai_interfaces/srv/detail/dds_fastrtps/set_gripper_close__type_support.i: rosidl_typesupport_fastrtps_cpp/vision_ai_interfaces/srv/detail/dds_fastrtps/set_gripper_close__type_support.cpp.i
+.PHONY : rosidl_typesupport_fastrtps_cpp/vision_ai_interfaces/srv/detail/dds_fastrtps/set_gripper_close__type_support.i
+
+# target to preprocess a source file
+rosidl_typesupport_fastrtps_cpp/vision_ai_interfaces/srv/detail/dds_fastrtps/set_gripper_close__type_support.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vision_ai_interfaces__rosidl_typesupport_fastrtps_cpp.dir/build.make CMakeFiles/vision_ai_interfaces__rosidl_typesupport_fastrtps_cpp.dir/rosidl_typesupport_fastrtps_cpp/vision_ai_interfaces/srv/detail/dds_fastrtps/set_gripper_close__type_support.cpp.i
+.PHONY : rosidl_typesupport_fastrtps_cpp/vision_ai_interfaces/srv/detail/dds_fastrtps/set_gripper_close__type_support.cpp.i
+
+rosidl_typesupport_fastrtps_cpp/vision_ai_interfaces/srv/detail/dds_fastrtps/set_gripper_close__type_support.s: rosidl_typesupport_fastrtps_cpp/vision_ai_interfaces/srv/detail/dds_fastrtps/set_gripper_close__type_support.cpp.s
+.PHONY : rosidl_typesupport_fastrtps_cpp/vision_ai_interfaces/srv/detail/dds_fastrtps/set_gripper_close__type_support.s
+
+# target to generate assembly for a file
+rosidl_typesupport_fastrtps_cpp/vision_ai_interfaces/srv/detail/dds_fastrtps/set_gripper_close__type_support.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vision_ai_interfaces__rosidl_typesupport_fastrtps_cpp.dir/build.make CMakeFiles/vision_ai_interfaces__rosidl_typesupport_fastrtps_cpp.dir/rosidl_typesupport_fastrtps_cpp/vision_ai_interfaces/srv/detail/dds_fastrtps/set_gripper_close__type_support.cpp.s
+.PHONY : rosidl_typesupport_fastrtps_cpp/vision_ai_interfaces/srv/detail/dds_fastrtps/set_gripper_close__type_support.cpp.s
+
+rosidl_typesupport_fastrtps_cpp/vision_ai_interfaces/srv/detail/dds_fastrtps/set_gripper_position__type_support.o: rosidl_typesupport_fastrtps_cpp/vision_ai_interfaces/srv/detail/dds_fastrtps/set_gripper_position__type_support.cpp.o
+.PHONY : rosidl_typesupport_fastrtps_cpp/vision_ai_interfaces/srv/detail/dds_fastrtps/set_gripper_position__type_support.o
+
+# target to build an object file
+rosidl_typesupport_fastrtps_cpp/vision_ai_interfaces/srv/detail/dds_fastrtps/set_gripper_position__type_support.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vision_ai_interfaces__rosidl_typesupport_fastrtps_cpp.dir/build.make CMakeFiles/vision_ai_interfaces__rosidl_typesupport_fastrtps_cpp.dir/rosidl_typesupport_fastrtps_cpp/vision_ai_interfaces/srv/detail/dds_fastrtps/set_gripper_position__type_support.cpp.o
+.PHONY : rosidl_typesupport_fastrtps_cpp/vision_ai_interfaces/srv/detail/dds_fastrtps/set_gripper_position__type_support.cpp.o
+
+rosidl_typesupport_fastrtps_cpp/vision_ai_interfaces/srv/detail/dds_fastrtps/set_gripper_position__type_support.i: rosidl_typesupport_fastrtps_cpp/vision_ai_interfaces/srv/detail/dds_fastrtps/set_gripper_position__type_support.cpp.i
+.PHONY : rosidl_typesupport_fastrtps_cpp/vision_ai_interfaces/srv/detail/dds_fastrtps/set_gripper_position__type_support.i
+
+# target to preprocess a source file
+rosidl_typesupport_fastrtps_cpp/vision_ai_interfaces/srv/detail/dds_fastrtps/set_gripper_position__type_support.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vision_ai_interfaces__rosidl_typesupport_fastrtps_cpp.dir/build.make CMakeFiles/vision_ai_interfaces__rosidl_typesupport_fastrtps_cpp.dir/rosidl_typesupport_fastrtps_cpp/vision_ai_interfaces/srv/detail/dds_fastrtps/set_gripper_position__type_support.cpp.i
+.PHONY : rosidl_typesupport_fastrtps_cpp/vision_ai_interfaces/srv/detail/dds_fastrtps/set_gripper_position__type_support.cpp.i
+
+rosidl_typesupport_fastrtps_cpp/vision_ai_interfaces/srv/detail/dds_fastrtps/set_gripper_position__type_support.s: rosidl_typesupport_fastrtps_cpp/vision_ai_interfaces/srv/detail/dds_fastrtps/set_gripper_position__type_support.cpp.s
+.PHONY : rosidl_typesupport_fastrtps_cpp/vision_ai_interfaces/srv/detail/dds_fastrtps/set_gripper_position__type_support.s
+
+# target to generate assembly for a file
+rosidl_typesupport_fastrtps_cpp/vision_ai_interfaces/srv/detail/dds_fastrtps/set_gripper_position__type_support.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vision_ai_interfaces__rosidl_typesupport_fastrtps_cpp.dir/build.make CMakeFiles/vision_ai_interfaces__rosidl_typesupport_fastrtps_cpp.dir/rosidl_typesupport_fastrtps_cpp/vision_ai_interfaces/srv/detail/dds_fastrtps/set_gripper_position__type_support.cpp.s
+.PHONY : rosidl_typesupport_fastrtps_cpp/vision_ai_interfaces/srv/detail/dds_fastrtps/set_gripper_position__type_support.cpp.s
+
 rosidl_typesupport_introspection_c/vision_ai_interfaces/msg/detail/detected_object__type_support.o: rosidl_typesupport_introspection_c/vision_ai_interfaces/msg/detail/detected_object__type_support.c.o
 .PHONY : rosidl_typesupport_introspection_c/vision_ai_interfaces/msg/detail/detected_object__type_support.o
 
@@ -2156,6 +2444,54 @@ rosidl_typesupport_introspection_c/vision_ai_interfaces/srv/detail/process_stitc
 rosidl_typesupport_introspection_c/vision_ai_interfaces/srv/detail/process_stitching__type_support.c.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/vision_ai_interfaces__rosidl_typesupport_introspection_c.dir/build.make CMakeFiles/vision_ai_interfaces__rosidl_typesupport_introspection_c.dir/rosidl_typesupport_introspection_c/vision_ai_interfaces/srv/detail/process_stitching__type_support.c.s
 .PHONY : rosidl_typesupport_introspection_c/vision_ai_interfaces/srv/detail/process_stitching__type_support.c.s
+
+rosidl_typesupport_introspection_c/vision_ai_interfaces/srv/detail/set_gripper_close__type_support.o: rosidl_typesupport_introspection_c/vision_ai_interfaces/srv/detail/set_gripper_close__type_support.c.o
+.PHONY : rosidl_typesupport_introspection_c/vision_ai_interfaces/srv/detail/set_gripper_close__type_support.o
+
+# target to build an object file
+rosidl_typesupport_introspection_c/vision_ai_interfaces/srv/detail/set_gripper_close__type_support.c.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vision_ai_interfaces__rosidl_typesupport_introspection_c.dir/build.make CMakeFiles/vision_ai_interfaces__rosidl_typesupport_introspection_c.dir/rosidl_typesupport_introspection_c/vision_ai_interfaces/srv/detail/set_gripper_close__type_support.c.o
+.PHONY : rosidl_typesupport_introspection_c/vision_ai_interfaces/srv/detail/set_gripper_close__type_support.c.o
+
+rosidl_typesupport_introspection_c/vision_ai_interfaces/srv/detail/set_gripper_close__type_support.i: rosidl_typesupport_introspection_c/vision_ai_interfaces/srv/detail/set_gripper_close__type_support.c.i
+.PHONY : rosidl_typesupport_introspection_c/vision_ai_interfaces/srv/detail/set_gripper_close__type_support.i
+
+# target to preprocess a source file
+rosidl_typesupport_introspection_c/vision_ai_interfaces/srv/detail/set_gripper_close__type_support.c.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vision_ai_interfaces__rosidl_typesupport_introspection_c.dir/build.make CMakeFiles/vision_ai_interfaces__rosidl_typesupport_introspection_c.dir/rosidl_typesupport_introspection_c/vision_ai_interfaces/srv/detail/set_gripper_close__type_support.c.i
+.PHONY : rosidl_typesupport_introspection_c/vision_ai_interfaces/srv/detail/set_gripper_close__type_support.c.i
+
+rosidl_typesupport_introspection_c/vision_ai_interfaces/srv/detail/set_gripper_close__type_support.s: rosidl_typesupport_introspection_c/vision_ai_interfaces/srv/detail/set_gripper_close__type_support.c.s
+.PHONY : rosidl_typesupport_introspection_c/vision_ai_interfaces/srv/detail/set_gripper_close__type_support.s
+
+# target to generate assembly for a file
+rosidl_typesupport_introspection_c/vision_ai_interfaces/srv/detail/set_gripper_close__type_support.c.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vision_ai_interfaces__rosidl_typesupport_introspection_c.dir/build.make CMakeFiles/vision_ai_interfaces__rosidl_typesupport_introspection_c.dir/rosidl_typesupport_introspection_c/vision_ai_interfaces/srv/detail/set_gripper_close__type_support.c.s
+.PHONY : rosidl_typesupport_introspection_c/vision_ai_interfaces/srv/detail/set_gripper_close__type_support.c.s
+
+rosidl_typesupport_introspection_c/vision_ai_interfaces/srv/detail/set_gripper_position__type_support.o: rosidl_typesupport_introspection_c/vision_ai_interfaces/srv/detail/set_gripper_position__type_support.c.o
+.PHONY : rosidl_typesupport_introspection_c/vision_ai_interfaces/srv/detail/set_gripper_position__type_support.o
+
+# target to build an object file
+rosidl_typesupport_introspection_c/vision_ai_interfaces/srv/detail/set_gripper_position__type_support.c.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vision_ai_interfaces__rosidl_typesupport_introspection_c.dir/build.make CMakeFiles/vision_ai_interfaces__rosidl_typesupport_introspection_c.dir/rosidl_typesupport_introspection_c/vision_ai_interfaces/srv/detail/set_gripper_position__type_support.c.o
+.PHONY : rosidl_typesupport_introspection_c/vision_ai_interfaces/srv/detail/set_gripper_position__type_support.c.o
+
+rosidl_typesupport_introspection_c/vision_ai_interfaces/srv/detail/set_gripper_position__type_support.i: rosidl_typesupport_introspection_c/vision_ai_interfaces/srv/detail/set_gripper_position__type_support.c.i
+.PHONY : rosidl_typesupport_introspection_c/vision_ai_interfaces/srv/detail/set_gripper_position__type_support.i
+
+# target to preprocess a source file
+rosidl_typesupport_introspection_c/vision_ai_interfaces/srv/detail/set_gripper_position__type_support.c.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vision_ai_interfaces__rosidl_typesupport_introspection_c.dir/build.make CMakeFiles/vision_ai_interfaces__rosidl_typesupport_introspection_c.dir/rosidl_typesupport_introspection_c/vision_ai_interfaces/srv/detail/set_gripper_position__type_support.c.i
+.PHONY : rosidl_typesupport_introspection_c/vision_ai_interfaces/srv/detail/set_gripper_position__type_support.c.i
+
+rosidl_typesupport_introspection_c/vision_ai_interfaces/srv/detail/set_gripper_position__type_support.s: rosidl_typesupport_introspection_c/vision_ai_interfaces/srv/detail/set_gripper_position__type_support.c.s
+.PHONY : rosidl_typesupport_introspection_c/vision_ai_interfaces/srv/detail/set_gripper_position__type_support.s
+
+# target to generate assembly for a file
+rosidl_typesupport_introspection_c/vision_ai_interfaces/srv/detail/set_gripper_position__type_support.c.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vision_ai_interfaces__rosidl_typesupport_introspection_c.dir/build.make CMakeFiles/vision_ai_interfaces__rosidl_typesupport_introspection_c.dir/rosidl_typesupport_introspection_c/vision_ai_interfaces/srv/detail/set_gripper_position__type_support.c.s
+.PHONY : rosidl_typesupport_introspection_c/vision_ai_interfaces/srv/detail/set_gripper_position__type_support.c.s
 
 rosidl_typesupport_introspection_cpp/vision_ai_interfaces/msg/detail/detected_object__type_support.o: rosidl_typesupport_introspection_cpp/vision_ai_interfaces/msg/detail/detected_object__type_support.cpp.o
 .PHONY : rosidl_typesupport_introspection_cpp/vision_ai_interfaces/msg/detail/detected_object__type_support.o
@@ -2397,6 +2733,54 @@ rosidl_typesupport_introspection_cpp/vision_ai_interfaces/srv/detail/process_sti
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/vision_ai_interfaces__rosidl_typesupport_introspection_cpp.dir/build.make CMakeFiles/vision_ai_interfaces__rosidl_typesupport_introspection_cpp.dir/rosidl_typesupport_introspection_cpp/vision_ai_interfaces/srv/detail/process_stitching__type_support.cpp.s
 .PHONY : rosidl_typesupport_introspection_cpp/vision_ai_interfaces/srv/detail/process_stitching__type_support.cpp.s
 
+rosidl_typesupport_introspection_cpp/vision_ai_interfaces/srv/detail/set_gripper_close__type_support.o: rosidl_typesupport_introspection_cpp/vision_ai_interfaces/srv/detail/set_gripper_close__type_support.cpp.o
+.PHONY : rosidl_typesupport_introspection_cpp/vision_ai_interfaces/srv/detail/set_gripper_close__type_support.o
+
+# target to build an object file
+rosidl_typesupport_introspection_cpp/vision_ai_interfaces/srv/detail/set_gripper_close__type_support.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vision_ai_interfaces__rosidl_typesupport_introspection_cpp.dir/build.make CMakeFiles/vision_ai_interfaces__rosidl_typesupport_introspection_cpp.dir/rosidl_typesupport_introspection_cpp/vision_ai_interfaces/srv/detail/set_gripper_close__type_support.cpp.o
+.PHONY : rosidl_typesupport_introspection_cpp/vision_ai_interfaces/srv/detail/set_gripper_close__type_support.cpp.o
+
+rosidl_typesupport_introspection_cpp/vision_ai_interfaces/srv/detail/set_gripper_close__type_support.i: rosidl_typesupport_introspection_cpp/vision_ai_interfaces/srv/detail/set_gripper_close__type_support.cpp.i
+.PHONY : rosidl_typesupport_introspection_cpp/vision_ai_interfaces/srv/detail/set_gripper_close__type_support.i
+
+# target to preprocess a source file
+rosidl_typesupport_introspection_cpp/vision_ai_interfaces/srv/detail/set_gripper_close__type_support.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vision_ai_interfaces__rosidl_typesupport_introspection_cpp.dir/build.make CMakeFiles/vision_ai_interfaces__rosidl_typesupport_introspection_cpp.dir/rosidl_typesupport_introspection_cpp/vision_ai_interfaces/srv/detail/set_gripper_close__type_support.cpp.i
+.PHONY : rosidl_typesupport_introspection_cpp/vision_ai_interfaces/srv/detail/set_gripper_close__type_support.cpp.i
+
+rosidl_typesupport_introspection_cpp/vision_ai_interfaces/srv/detail/set_gripper_close__type_support.s: rosidl_typesupport_introspection_cpp/vision_ai_interfaces/srv/detail/set_gripper_close__type_support.cpp.s
+.PHONY : rosidl_typesupport_introspection_cpp/vision_ai_interfaces/srv/detail/set_gripper_close__type_support.s
+
+# target to generate assembly for a file
+rosidl_typesupport_introspection_cpp/vision_ai_interfaces/srv/detail/set_gripper_close__type_support.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vision_ai_interfaces__rosidl_typesupport_introspection_cpp.dir/build.make CMakeFiles/vision_ai_interfaces__rosidl_typesupport_introspection_cpp.dir/rosidl_typesupport_introspection_cpp/vision_ai_interfaces/srv/detail/set_gripper_close__type_support.cpp.s
+.PHONY : rosidl_typesupport_introspection_cpp/vision_ai_interfaces/srv/detail/set_gripper_close__type_support.cpp.s
+
+rosidl_typesupport_introspection_cpp/vision_ai_interfaces/srv/detail/set_gripper_position__type_support.o: rosidl_typesupport_introspection_cpp/vision_ai_interfaces/srv/detail/set_gripper_position__type_support.cpp.o
+.PHONY : rosidl_typesupport_introspection_cpp/vision_ai_interfaces/srv/detail/set_gripper_position__type_support.o
+
+# target to build an object file
+rosidl_typesupport_introspection_cpp/vision_ai_interfaces/srv/detail/set_gripper_position__type_support.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vision_ai_interfaces__rosidl_typesupport_introspection_cpp.dir/build.make CMakeFiles/vision_ai_interfaces__rosidl_typesupport_introspection_cpp.dir/rosidl_typesupport_introspection_cpp/vision_ai_interfaces/srv/detail/set_gripper_position__type_support.cpp.o
+.PHONY : rosidl_typesupport_introspection_cpp/vision_ai_interfaces/srv/detail/set_gripper_position__type_support.cpp.o
+
+rosidl_typesupport_introspection_cpp/vision_ai_interfaces/srv/detail/set_gripper_position__type_support.i: rosidl_typesupport_introspection_cpp/vision_ai_interfaces/srv/detail/set_gripper_position__type_support.cpp.i
+.PHONY : rosidl_typesupport_introspection_cpp/vision_ai_interfaces/srv/detail/set_gripper_position__type_support.i
+
+# target to preprocess a source file
+rosidl_typesupport_introspection_cpp/vision_ai_interfaces/srv/detail/set_gripper_position__type_support.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vision_ai_interfaces__rosidl_typesupport_introspection_cpp.dir/build.make CMakeFiles/vision_ai_interfaces__rosidl_typesupport_introspection_cpp.dir/rosidl_typesupport_introspection_cpp/vision_ai_interfaces/srv/detail/set_gripper_position__type_support.cpp.i
+.PHONY : rosidl_typesupport_introspection_cpp/vision_ai_interfaces/srv/detail/set_gripper_position__type_support.cpp.i
+
+rosidl_typesupport_introspection_cpp/vision_ai_interfaces/srv/detail/set_gripper_position__type_support.s: rosidl_typesupport_introspection_cpp/vision_ai_interfaces/srv/detail/set_gripper_position__type_support.cpp.s
+.PHONY : rosidl_typesupport_introspection_cpp/vision_ai_interfaces/srv/detail/set_gripper_position__type_support.s
+
+# target to generate assembly for a file
+rosidl_typesupport_introspection_cpp/vision_ai_interfaces/srv/detail/set_gripper_position__type_support.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/vision_ai_interfaces__rosidl_typesupport_introspection_cpp.dir/build.make CMakeFiles/vision_ai_interfaces__rosidl_typesupport_introspection_cpp.dir/rosidl_typesupport_introspection_cpp/vision_ai_interfaces/srv/detail/set_gripper_position__type_support.cpp.s
+.PHONY : rosidl_typesupport_introspection_cpp/vision_ai_interfaces/srv/detail/set_gripper_position__type_support.cpp.s
+
 # Help Target
 help:
 	@echo "The following are some of the valid targets for this Makefile:"
@@ -2458,6 +2842,12 @@ help:
 	@echo "... rosidl_generator_c/vision_ai_interfaces/srv/detail/process_stitching__functions.o"
 	@echo "... rosidl_generator_c/vision_ai_interfaces/srv/detail/process_stitching__functions.i"
 	@echo "... rosidl_generator_c/vision_ai_interfaces/srv/detail/process_stitching__functions.s"
+	@echo "... rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_close__functions.o"
+	@echo "... rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_close__functions.i"
+	@echo "... rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_close__functions.s"
+	@echo "... rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_position__functions.o"
+	@echo "... rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_position__functions.i"
+	@echo "... rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_position__functions.s"
 	@echo "... rosidl_generator_py/vision_ai_interfaces/_vision_ai_interfaces_s.ep.rosidl_typesupport_c.o"
 	@echo "... rosidl_generator_py/vision_ai_interfaces/_vision_ai_interfaces_s.ep.rosidl_typesupport_c.i"
 	@echo "... rosidl_generator_py/vision_ai_interfaces/_vision_ai_interfaces_s.ep.rosidl_typesupport_c.s"
@@ -2497,6 +2887,12 @@ help:
 	@echo "... rosidl_generator_py/vision_ai_interfaces/srv/_process_stitching_s.o"
 	@echo "... rosidl_generator_py/vision_ai_interfaces/srv/_process_stitching_s.i"
 	@echo "... rosidl_generator_py/vision_ai_interfaces/srv/_process_stitching_s.s"
+	@echo "... rosidl_generator_py/vision_ai_interfaces/srv/_set_gripper_close_s.o"
+	@echo "... rosidl_generator_py/vision_ai_interfaces/srv/_set_gripper_close_s.i"
+	@echo "... rosidl_generator_py/vision_ai_interfaces/srv/_set_gripper_close_s.s"
+	@echo "... rosidl_generator_py/vision_ai_interfaces/srv/_set_gripper_position_s.o"
+	@echo "... rosidl_generator_py/vision_ai_interfaces/srv/_set_gripper_position_s.i"
+	@echo "... rosidl_generator_py/vision_ai_interfaces/srv/_set_gripper_position_s.s"
 	@echo "... rosidl_typesupport_c/vision_ai_interfaces/msg/detected_object__type_support.o"
 	@echo "... rosidl_typesupport_c/vision_ai_interfaces/msg/detected_object__type_support.i"
 	@echo "... rosidl_typesupport_c/vision_ai_interfaces/msg/detected_object__type_support.s"
@@ -2527,6 +2923,12 @@ help:
 	@echo "... rosidl_typesupport_c/vision_ai_interfaces/srv/process_stitching__type_support.o"
 	@echo "... rosidl_typesupport_c/vision_ai_interfaces/srv/process_stitching__type_support.i"
 	@echo "... rosidl_typesupport_c/vision_ai_interfaces/srv/process_stitching__type_support.s"
+	@echo "... rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_close__type_support.o"
+	@echo "... rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_close__type_support.i"
+	@echo "... rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_close__type_support.s"
+	@echo "... rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_position__type_support.o"
+	@echo "... rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_position__type_support.i"
+	@echo "... rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_position__type_support.s"
 	@echo "... rosidl_typesupport_cpp/vision_ai_interfaces/msg/detected_object__type_support.o"
 	@echo "... rosidl_typesupport_cpp/vision_ai_interfaces/msg/detected_object__type_support.i"
 	@echo "... rosidl_typesupport_cpp/vision_ai_interfaces/msg/detected_object__type_support.s"
@@ -2557,6 +2959,12 @@ help:
 	@echo "... rosidl_typesupport_cpp/vision_ai_interfaces/srv/process_stitching__type_support.o"
 	@echo "... rosidl_typesupport_cpp/vision_ai_interfaces/srv/process_stitching__type_support.i"
 	@echo "... rosidl_typesupport_cpp/vision_ai_interfaces/srv/process_stitching__type_support.s"
+	@echo "... rosidl_typesupport_cpp/vision_ai_interfaces/srv/set_gripper_close__type_support.o"
+	@echo "... rosidl_typesupport_cpp/vision_ai_interfaces/srv/set_gripper_close__type_support.i"
+	@echo "... rosidl_typesupport_cpp/vision_ai_interfaces/srv/set_gripper_close__type_support.s"
+	@echo "... rosidl_typesupport_cpp/vision_ai_interfaces/srv/set_gripper_position__type_support.o"
+	@echo "... rosidl_typesupport_cpp/vision_ai_interfaces/srv/set_gripper_position__type_support.i"
+	@echo "... rosidl_typesupport_cpp/vision_ai_interfaces/srv/set_gripper_position__type_support.s"
 	@echo "... rosidl_typesupport_fastrtps_c/vision_ai_interfaces/msg/detail/detected_object__type_support_c.o"
 	@echo "... rosidl_typesupport_fastrtps_c/vision_ai_interfaces/msg/detail/detected_object__type_support_c.i"
 	@echo "... rosidl_typesupport_fastrtps_c/vision_ai_interfaces/msg/detail/detected_object__type_support_c.s"
@@ -2587,6 +2995,12 @@ help:
 	@echo "... rosidl_typesupport_fastrtps_c/vision_ai_interfaces/srv/detail/process_stitching__type_support_c.o"
 	@echo "... rosidl_typesupport_fastrtps_c/vision_ai_interfaces/srv/detail/process_stitching__type_support_c.i"
 	@echo "... rosidl_typesupport_fastrtps_c/vision_ai_interfaces/srv/detail/process_stitching__type_support_c.s"
+	@echo "... rosidl_typesupport_fastrtps_c/vision_ai_interfaces/srv/detail/set_gripper_close__type_support_c.o"
+	@echo "... rosidl_typesupport_fastrtps_c/vision_ai_interfaces/srv/detail/set_gripper_close__type_support_c.i"
+	@echo "... rosidl_typesupport_fastrtps_c/vision_ai_interfaces/srv/detail/set_gripper_close__type_support_c.s"
+	@echo "... rosidl_typesupport_fastrtps_c/vision_ai_interfaces/srv/detail/set_gripper_position__type_support_c.o"
+	@echo "... rosidl_typesupport_fastrtps_c/vision_ai_interfaces/srv/detail/set_gripper_position__type_support_c.i"
+	@echo "... rosidl_typesupport_fastrtps_c/vision_ai_interfaces/srv/detail/set_gripper_position__type_support_c.s"
 	@echo "... rosidl_typesupport_fastrtps_cpp/vision_ai_interfaces/msg/detail/dds_fastrtps/detected_object__type_support.o"
 	@echo "... rosidl_typesupport_fastrtps_cpp/vision_ai_interfaces/msg/detail/dds_fastrtps/detected_object__type_support.i"
 	@echo "... rosidl_typesupport_fastrtps_cpp/vision_ai_interfaces/msg/detail/dds_fastrtps/detected_object__type_support.s"
@@ -2617,6 +3031,12 @@ help:
 	@echo "... rosidl_typesupport_fastrtps_cpp/vision_ai_interfaces/srv/detail/dds_fastrtps/process_stitching__type_support.o"
 	@echo "... rosidl_typesupport_fastrtps_cpp/vision_ai_interfaces/srv/detail/dds_fastrtps/process_stitching__type_support.i"
 	@echo "... rosidl_typesupport_fastrtps_cpp/vision_ai_interfaces/srv/detail/dds_fastrtps/process_stitching__type_support.s"
+	@echo "... rosidl_typesupport_fastrtps_cpp/vision_ai_interfaces/srv/detail/dds_fastrtps/set_gripper_close__type_support.o"
+	@echo "... rosidl_typesupport_fastrtps_cpp/vision_ai_interfaces/srv/detail/dds_fastrtps/set_gripper_close__type_support.i"
+	@echo "... rosidl_typesupport_fastrtps_cpp/vision_ai_interfaces/srv/detail/dds_fastrtps/set_gripper_close__type_support.s"
+	@echo "... rosidl_typesupport_fastrtps_cpp/vision_ai_interfaces/srv/detail/dds_fastrtps/set_gripper_position__type_support.o"
+	@echo "... rosidl_typesupport_fastrtps_cpp/vision_ai_interfaces/srv/detail/dds_fastrtps/set_gripper_position__type_support.i"
+	@echo "... rosidl_typesupport_fastrtps_cpp/vision_ai_interfaces/srv/detail/dds_fastrtps/set_gripper_position__type_support.s"
 	@echo "... rosidl_typesupport_introspection_c/vision_ai_interfaces/msg/detail/detected_object__type_support.o"
 	@echo "... rosidl_typesupport_introspection_c/vision_ai_interfaces/msg/detail/detected_object__type_support.i"
 	@echo "... rosidl_typesupport_introspection_c/vision_ai_interfaces/msg/detail/detected_object__type_support.s"
@@ -2647,6 +3067,12 @@ help:
 	@echo "... rosidl_typesupport_introspection_c/vision_ai_interfaces/srv/detail/process_stitching__type_support.o"
 	@echo "... rosidl_typesupport_introspection_c/vision_ai_interfaces/srv/detail/process_stitching__type_support.i"
 	@echo "... rosidl_typesupport_introspection_c/vision_ai_interfaces/srv/detail/process_stitching__type_support.s"
+	@echo "... rosidl_typesupport_introspection_c/vision_ai_interfaces/srv/detail/set_gripper_close__type_support.o"
+	@echo "... rosidl_typesupport_introspection_c/vision_ai_interfaces/srv/detail/set_gripper_close__type_support.i"
+	@echo "... rosidl_typesupport_introspection_c/vision_ai_interfaces/srv/detail/set_gripper_close__type_support.s"
+	@echo "... rosidl_typesupport_introspection_c/vision_ai_interfaces/srv/detail/set_gripper_position__type_support.o"
+	@echo "... rosidl_typesupport_introspection_c/vision_ai_interfaces/srv/detail/set_gripper_position__type_support.i"
+	@echo "... rosidl_typesupport_introspection_c/vision_ai_interfaces/srv/detail/set_gripper_position__type_support.s"
 	@echo "... rosidl_typesupport_introspection_cpp/vision_ai_interfaces/msg/detail/detected_object__type_support.o"
 	@echo "... rosidl_typesupport_introspection_cpp/vision_ai_interfaces/msg/detail/detected_object__type_support.i"
 	@echo "... rosidl_typesupport_introspection_cpp/vision_ai_interfaces/msg/detail/detected_object__type_support.s"
@@ -2677,6 +3103,12 @@ help:
 	@echo "... rosidl_typesupport_introspection_cpp/vision_ai_interfaces/srv/detail/process_stitching__type_support.o"
 	@echo "... rosidl_typesupport_introspection_cpp/vision_ai_interfaces/srv/detail/process_stitching__type_support.i"
 	@echo "... rosidl_typesupport_introspection_cpp/vision_ai_interfaces/srv/detail/process_stitching__type_support.s"
+	@echo "... rosidl_typesupport_introspection_cpp/vision_ai_interfaces/srv/detail/set_gripper_close__type_support.o"
+	@echo "... rosidl_typesupport_introspection_cpp/vision_ai_interfaces/srv/detail/set_gripper_close__type_support.i"
+	@echo "... rosidl_typesupport_introspection_cpp/vision_ai_interfaces/srv/detail/set_gripper_close__type_support.s"
+	@echo "... rosidl_typesupport_introspection_cpp/vision_ai_interfaces/srv/detail/set_gripper_position__type_support.o"
+	@echo "... rosidl_typesupport_introspection_cpp/vision_ai_interfaces/srv/detail/set_gripper_position__type_support.i"
+	@echo "... rosidl_typesupport_introspection_cpp/vision_ai_interfaces/srv/detail/set_gripper_position__type_support.s"
 .PHONY : help
 
 

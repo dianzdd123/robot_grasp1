@@ -41,6 +41,8 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/ExecuteScan.srv"
   "srv/ProcessStitching.srv"
   "srv/ProcessDetection.srv"
+  "srv/SetGripperPosition.srv"
+  "srv/SetGripperClose.srv"
   DEPENDENCIES geometry_msgs std_msgs sensor_msgs builtin_interfaces
 )
 

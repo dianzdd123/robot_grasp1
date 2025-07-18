@@ -1,0 +1,164 @@
+cd ~/ros2_ws && source install/setup.bash
+ros2 run vision_ai smart_stitcher_node
+qi@wpq:~/ros2_ws$ cd ~/ros2_ws && source install/setup.bash
+qi@wpq:~/ros2_ws$ ros2 run vision_ai smart_stitcher_node
+[INFO] [1752774757.357325996] [smart_stitcher_node]: ✅ 深度对齐映射表创建完成
+[INFO] [1752774757.359081103] [smart_stitcher_node]: 智能拼接节点已启动 (修复内参+深度对齐)
+[INFO] [1752774757.359656597] [smart_stitcher_node]: 彩色相机FOV: 70.1° × 43.2°
+[INFO] [1752774757.360178239] [smart_stitcher_node]: 彩色相机主点: (624.1, 320.7)
+[INFO] [1752774757.360696587] [smart_stitcher_node]: 深度相机主点: (638.8, 351.8)
+[INFO] [1752774800.645340815] [smart_stitcher_node]: 收到拼接请求: 1 张图像
+[INFO] [1752774800.645605595] [smart_stitcher_node]: 🎨 处理Waypoint 0 图像转换...
+[INFO] [1752774800.753862085] [smart_stitcher_node]: 🔍 Waypoint 0 完整信息:
+[INFO] [1752774800.754540318] [smart_stitcher_node]:   - 位置: (-7.5, -245.0, 416.7)
+[INFO] [1752774800.755042382] [smart_stitcher_node]:   - 姿态: Roll=180.0°, Pitch=0.0°, Yaw=-90.0°
+[INFO] [1752774800.755432796] [smart_stitcher_node]:   - 深度对齐: ❌
+[INFO] [1752774800.755840154] [smart_stitcher_node]: 处理单点扫描 (含深度对齐)
+[INFO] [1752774800.778087766] [smart_stitcher_node]: 🆕 创建单点映射信息: Waypoint 0, 尺寸 578×1026
+[INFO] [1752774800.779056177] [smart_stitcher_node]: ✅ 单点映射信息已保存: waypoint_0 -> 578×1026 像素, 深度对齐: ❌
+[INFO] [1752774800.787535070] [smart_stitcher_node]: 单点处理完成: scan_output_20250717_185252/single_point_result_20250717_185320.jpg
+[INFO] [1752774800.789695099] [smart_stitcher_node]: 📢 发布拼接完成信号: scan_output_20250717_185252
+[INFO] [1752774800.949671405] [smart_stitcher_node]: 📸 发布参考图像 (含深度对齐信息)
+[INFO] [1752774800.949986916] [smart_stitcher_node]: 📏 深度数据不可用，跳过深度发布
+
+
+
+cd ~/ros2_ws && source install/setup.bash
+ros2 run vision_ai detection_node
+qi@wpq:~/ros2_ws$ cd ~/ros2_ws && source install/setup.bash
+qi@wpq:~/ros2_ws$ ros2 run vision_ai detection_node
+[YOLO] 模型加载成功: /home/qi/下载/best2.pt
+[YOLO] 置信度阈值: 0.7
+[FACTORY] YOLO检测器创建成功
+[SAM2] 模型加载成功
+[SAM2] 设备: cuda
+[SAM2] 配置: sam2_hiera_l.yaml
+[SAM2] 检查点: /home/qi/ros2_ws/src/vision_ai/models/sam2/sam2_hiera_large.pt
+[FACTORY] SAM2分割器创建成功
+[PIPELINE] 模型初始化成功
+[PIPELINE] 特征提取器初始化完成
+[PIPELINE] 检测管道初始化完成
+[PIPELINE] 输出目录: detection_output_20250717_185239
+[INFO] [1752774763.231954778] [detection_node]: ✅ 检测管道初始化成功
+[INFO] [1752774763.248060128] [detection_node]: ✅ Detection node 深度对齐映射表创建完成
+[INFO] [1752774763.248342768] [detection_node]: 🔍 Detection node (bypass cv_bridge) started, waiting for stitching complete signal...
+[INFO] [1752774763.248563434] [detection_node]: 🔍 绕过cv_bridge的检测节点运行中...
+[INFO] [1752774800.790180759] [detection_node]: 🎯 Received stitching complete signal: scan_output_20250717_185252
+[INFO] [1752774800.790611247] [detection_node]: 🔄 开始加载融合映射信息...
+[INFO] [1752774800.791053216] [detection_node]: ✅ 单点扫描映射信息加载成功:
+[INFO] [1752774800.791404659] [detection_node]:   - 扫描类型: 单点扫描
+[INFO] [1752774800.791750384] [detection_node]:   - 主waypoint: 0
+[INFO] [1752774800.792097838] [detection_node]:   - 画布尺寸: (578, 1026)
+[INFO] [1752774800.792431421] [detection_node]:   - 涉及waypoint数: 1
+[INFO] [1752774800.792776236] [detection_node]:   - Waypoint 0:
+[INFO] [1752774800.793107381] [detection_node]:     * 贡献像素: 593028
+[INFO] [1752774800.793456603] [detection_node]:     * 彩色文件: scan_output_20250717_185252/color_waypoint_001.jpg
+[INFO] [1752774800.793820746] [detection_node]:     * 深度文件: scan_output_20250717_185252/depth_raw_waypoint_001.npy
+[INFO] [1752774800.794184085] [detection_node]:     * 深度文件存在: True
+[INFO] [1752774800.795747000] [detection_node]:     * 深度数据形状: (720, 1280)
+[INFO] [1752774800.796848448] [detection_node]:     * 深度范围: 0.000 - 381.000
+[INFO] [1752774800.797233254] [detection_node]: ✅ 映射信息加载和验证完成
+[INFO] [1752774800.805031460] [detection_node]: 融合图像加载成功: (720, 1280, 3)
+[INFO] [1752774800.805449727] [detection_node]: 🧪 开始模拟检测映射测试...
+[INFO] [1752774800.805784561] [detection_node]: 📦 测试检测框: [320, 180, 960, 540]
+[INFO] [1752774800.806982550] [detection_node]: ✅ 模拟映射分析成功:
+[INFO] [1752774800.807297914] [detection_node]:   - 主要来源: Waypoint None
+[INFO] [1752774800.807629742] [detection_node]:   - 覆盖率: 0.0%
+[INFO] [1752774800.807942231] [detection_node]:   - 阈值达成: False
+[INFO] [1752774800.808924347] [detection_node]: 🚀 开始基于映射的检测处理...
+[PIPELINE] 开始处理参考图像...
+
+0: 384x640 1 banana, 1 corn, 1 potato, 1 redpepper, 52.0ms
+Speed: 2.1ms preprocess, 52.0ms inference, 104.6ms postprocess per image at shape (1, 3, 384, 640)
+[YOLO] 检测到 4 个目标 (置信度 >= 0.7)
+[PIPELINE] YOLO检测到 4 个目标
+[SAM2] 完成 4 个目标的分割
+[PIPELINE] SAM2分割完成
+[PIPELINE] 可视化图像已保存: scan_output_20250717_185252/detection_results/detection_visualization.jpg
+[PIPELINE] matplotlib图像已保存: scan_output_20250717_185252/detection_results/detection_plot.png
+[PIPELINE] ✅ matplotlib显示成功
+[PIPELINE] ✅ 可视化处理完成
+[PIPELINE] 可视化图像已保存: scan_output_20250717_185252/detection_results/detection_visualization.jpg
+[PIPELINE] 检测结果已保存到: scan_output_20250717_185252/detection_results/detection_results.json
+[PIPELINE] 检测摘要已保存到: scan_output_20250717_185252/detection_results/detection_summary.txt
+[PIPELINE] 参考图像处理完成，检测到 4 个有效目标
+[INFO] [1752774803.473351546] [detection_node]: 🧬 开始增强对象 1/4: redpepper_0
+[INFO] [1752774803.473902823] [detection_node]: 🔍 单点扫描，使用Waypoint 0
+[INFO] [1752774803.487457203] [detection_node]: 深度对齐完成: 质量=51.02%
+[INFO] [1752774803.487785670] [detection_node]: ✅ 使用实时对齐深度数据
+[INFO] [1752774803.488050551] [detection_node]: 🔍 计算高度 (对齐深度): bbox=[596,21,853,266], center=[724,143]
+[INFO] [1752774803.806047800] [detection_node]: 📊 高度计算结果 (对齐深度): 2 个有效值
+[INFO] [1752774803.806430488] [detection_node]:   - bbox内对比: 60.0mm
+[INFO] [1752774803.806704300] [detection_node]:   - 扩展背景: 63.0mm
+[INFO] [1752774803.806998529] [detection_node]: ✅ 使用平均值: 61.5mm
+[ERROR] [1752774803.935372855] [detection_node]: 3D空间特征计算失败 (对齐深度): only integers, slices (`:`), ellipsis (`...`), numpy.newaxis (`None`) and integer or boolean arrays are valid indices
+[INFO] [1752774803.935741004] [detection_node]: ✅ 对象 redpepper_0 深度增强完成: 高度=61.49999999999997mm
+[INFO] [1752774803.936013729] [detection_node]: 🧬 开始增强对象 2/4: potato_0
+[INFO] [1752774803.936279204] [detection_node]: 🔍 单点扫描，使用Waypoint 0
+[INFO] [1752774803.939189567] [detection_node]: 深度对齐完成: 质量=51.02%
+[INFO] [1752774803.939487386] [detection_node]: ✅ 使用实时对齐深度数据
+[INFO] [1752774803.939752808] [detection_node]: 🔍 计算高度 (对齐深度): bbox=[255,181,536,392], center=[395,286]
+[INFO] [1752774804.287031034] [detection_node]: 📊 高度计算结果 (对齐深度): 0 个有效值
+[WARN] [1752774804.287407515] [detection_node]: 所有高度计算方法都失败，使用默认值
+[ERROR] [1752774804.454261262] [detection_node]: 3D空间特征计算失败 (对齐深度): only integers, slices (`:`), ellipsis (`...`), numpy.newaxis (`None`) and integer or boolean arrays are valid indices
+[INFO] [1752774804.454639871] [detection_node]: ✅ 对象 potato_0 深度增强完成: 高度=30.0mm
+[INFO] [1752774804.454955723] [detection_node]: 🧬 开始增强对象 3/4: corn_0
+[INFO] [1752774804.455215383] [detection_node]: 🔍 单点扫描，使用Waypoint 0
+[INFO] [1752774804.458063322] [detection_node]: 深度对齐完成: 质量=51.02%
+[INFO] [1752774804.458347907] [detection_node]: ✅ 使用实时对齐深度数据
+[INFO] [1752774804.458611353] [detection_node]: 🔍 计算高度 (对齐深度): bbox=[568,326,878,647], center=[723,486]
+[INFO] [1752774804.978988890] [detection_node]: 📊 高度计算结果 (对齐深度): 2 个有效值
+[INFO] [1752774804.979336644] [detection_node]:   - bbox内对比: 30.0mm
+[INFO] [1752774804.979604401] [detection_node]:   - 扩展背景: 25.0mm
+[INFO] [1752774804.979931303] [detection_node]: ✅ 使用平均值: 27.5mm
+[ERROR] [1752774805.155406882] [detection_node]: 3D空间特征计算失败 (对齐深度): only integers, slices (`:`), ellipsis (`...`), numpy.newaxis (`None`) and integer or boolean arrays are valid indices
+[INFO] [1752774805.155748708] [detection_node]: ✅ 对象 corn_0 深度增强完成: 高度=27.49999999999997mm
+[INFO] [1752774805.156008419] [detection_node]: 🧬 开始增强对象 4/4: banana_0
+[INFO] [1752774805.156268699] [detection_node]: 🔍 单点扫描，使用Waypoint 0
+[INFO] [1752774805.159294551] [detection_node]: 深度对齐完成: 质量=51.02%
+[INFO] [1752774805.159581377] [detection_node]: ✅ 使用实时对齐深度数据
+[INFO] [1752774805.159848709] [detection_node]: 🔍 计算高度 (对齐深度): bbox=[850,63,1106,622], center=[978,342]
+[INFO] [1752774805.892875183] [detection_node]: 📊 高度计算结果 (对齐深度): 2 个有效值
+[INFO] [1752774805.893196974] [detection_node]:   - 扩展背景: 6.0mm
+[INFO] [1752774805.893447657] [detection_node]:   - 中心点对比: 32.0mm
+[INFO] [1752774805.893764660] [detection_node]: ✅ 使用中位数: 19.0mm
+[ERROR] [1752774806.137736984] [detection_node]: 3D空间特征计算失败 (对齐深度): only integers, slices (`:`), ellipsis (`...`), numpy.newaxis (`None`) and integer or boolean arrays are valid indices
+[INFO] [1752774806.138091080] [detection_node]: ✅ 对象 banana_0 深度增强完成: 高度=18.99999999999999mm
+[INFO] [1752774806.138363650] [detection_node]: ✅ 检测完成，发现 4 个目标
+[INFO] [1752774806.138645547] [detection_node]: 🧬 深度信息增强完成
+[INFO] [1752774806.155437005] [detection_node]: 💾 Masks saved to: scan_output_20250717_185252/detection_results/object_masks.json
+[INFO] [1752774806.157044766] [detection_node]: 💾 最终检测结果已保存并覆盖: scan_output_20250717_185252/detection_results/detection_results.json
+[INFO] [1752774806.157283701] [detection_node]: 📤 Detection result published with mask and 3D coordinates
+[INFO] [1752774806.380350660] [detection_node]: 🖼️ 可视化图像已发布
+[INFO] [1752774806.380683201] [detection_node]:
+============================================================
+[INFO] [1752774806.380947345] [detection_node]: Detection Results Summary
+[INFO] [1752774806.381199324] [detection_node]: ============================================================
+[INFO] [1752774806.381458346] [detection_node]: Detected 4 objects:
+[INFO] [1752774806.381741324] [detection_node]:  1. Red redpepper (medium height) in top center [h=61.5mm] (ID: redpepper_0, Conf: 0.961)
+[INFO] [1752774806.381989981] [detection_node]:  2. Orange potato (low) in center left [h=30.0mm] (ID: potato_0, Conf: 0.961)
+[INFO] [1752774806.382238655] [detection_node]:  3. Orange corn (low) in bottom center [h=27.5mm] (ID: corn_0, Conf: 0.928)
+[INFO] [1752774806.382484741] [detection_node]:  4. Orange banana (flat) in center right [h=19.0mm] (ID: banana_0, Conf: 0.874)
+[INFO] [1752774806.382770981] [detection_node]: ============================================================
+[INFO] [1752774806.383019495] [detection_node]: 🎯 启动目标选择流程...
+
+==================================================
+Select Tracking Targets
+==================================================
+
+Detected objects:
+ 1. Red redpepper (medium height) in top center [h=61.5mm] (ID: redpepper_0, Conf: 0.961)
+ 2. Orange potato (low) in center left [h=30.0mm] (ID: potato_0, Conf: 0.961)
+ 3. Orange corn (low) in bottom center [h=27.5mm] (ID: corn_0, Conf: 0.928)
+ 4. Orange banana (flat) in center right [h=19.0mm] (ID: banana_0, Conf: 0.874)
+
+Please select objects to track:
+Format: Enter numbers separated by commas (e.g., 1,3,5)
+
+Your selection: 1
+
+Selected tracking targets:
+  - Red redpepper (medium height) in top center [h=61.5mm] (ID: redpepper_0)
+[PIPELINE] 追踪选择已保存到: scan_output_20250717_185252/detection_results/tracking_selection.txt
+[INFO] [1752774839.779907177] [detection_node]: ✅ Detection complete signal published
+[INFO] [1752774839.782057347] [detection_node]: 📸 收到参考图像（备用）

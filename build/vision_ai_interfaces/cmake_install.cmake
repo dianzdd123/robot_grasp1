@@ -401,6 +401,14 @@ if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_
 endif()
 
 if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)
+  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/share/vision_ai_interfaces/srv" TYPE FILE FILES "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_adapter/vision_ai_interfaces/srv/SetGripperPosition.idl")
+endif()
+
+if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)
+  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/share/vision_ai_interfaces/srv" TYPE FILE FILES "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_adapter/vision_ai_interfaces/srv/SetGripperClose.idl")
+endif()
+
+if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)
   file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/share/vision_ai_interfaces/msg" TYPE FILE FILES "/home/qi/ros2_ws/src/vision_ai_interfaces/msg/ScanPlan.msg")
 endif()
 
@@ -470,6 +478,30 @@ endif()
 
 if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)
   file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/share/vision_ai_interfaces/srv" TYPE FILE FILES "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_cmake/srv/ProcessDetection_Response.msg")
+endif()
+
+if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)
+  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/share/vision_ai_interfaces/srv" TYPE FILE FILES "/home/qi/ros2_ws/src/vision_ai_interfaces/srv/SetGripperPosition.srv")
+endif()
+
+if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)
+  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/share/vision_ai_interfaces/srv" TYPE FILE FILES "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_cmake/srv/SetGripperPosition_Request.msg")
+endif()
+
+if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)
+  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/share/vision_ai_interfaces/srv" TYPE FILE FILES "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_cmake/srv/SetGripperPosition_Response.msg")
+endif()
+
+if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)
+  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/share/vision_ai_interfaces/srv" TYPE FILE FILES "/home/qi/ros2_ws/src/vision_ai_interfaces/srv/SetGripperClose.srv")
+endif()
+
+if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)
+  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/share/vision_ai_interfaces/srv" TYPE FILE FILES "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_cmake/srv/SetGripperClose_Request.msg")
+endif()
+
+if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)
+  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/share/vision_ai_interfaces/srv" TYPE FILE FILES "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_cmake/srv/SetGripperClose_Response.msg")
 endif()
 
 if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)

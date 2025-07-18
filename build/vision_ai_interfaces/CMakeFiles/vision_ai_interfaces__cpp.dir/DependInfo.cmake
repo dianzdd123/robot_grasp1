@@ -57,10 +57,20 @@ set(CMAKE_MULTIPLE_OUTPUT_PAIRS
   "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_generator_cpp/vision_ai_interfaces/srv/detail/process_stitching__struct.hpp" "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_generator_cpp/vision_ai_interfaces/msg/scan_plan.hpp"
   "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_generator_cpp/vision_ai_interfaces/srv/detail/process_stitching__traits.hpp" "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_generator_cpp/vision_ai_interfaces/msg/scan_plan.hpp"
   "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_generator_cpp/vision_ai_interfaces/srv/detail/process_stitching__type_support.hpp" "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_generator_cpp/vision_ai_interfaces/msg/scan_plan.hpp"
+  "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_generator_cpp/vision_ai_interfaces/srv/detail/set_gripper_close__builder.hpp" "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_generator_cpp/vision_ai_interfaces/msg/scan_plan.hpp"
+  "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_generator_cpp/vision_ai_interfaces/srv/detail/set_gripper_close__struct.hpp" "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_generator_cpp/vision_ai_interfaces/msg/scan_plan.hpp"
+  "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_generator_cpp/vision_ai_interfaces/srv/detail/set_gripper_close__traits.hpp" "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_generator_cpp/vision_ai_interfaces/msg/scan_plan.hpp"
+  "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_generator_cpp/vision_ai_interfaces/srv/detail/set_gripper_close__type_support.hpp" "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_generator_cpp/vision_ai_interfaces/msg/scan_plan.hpp"
+  "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_generator_cpp/vision_ai_interfaces/srv/detail/set_gripper_position__builder.hpp" "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_generator_cpp/vision_ai_interfaces/msg/scan_plan.hpp"
+  "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_generator_cpp/vision_ai_interfaces/srv/detail/set_gripper_position__struct.hpp" "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_generator_cpp/vision_ai_interfaces/msg/scan_plan.hpp"
+  "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_generator_cpp/vision_ai_interfaces/srv/detail/set_gripper_position__traits.hpp" "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_generator_cpp/vision_ai_interfaces/msg/scan_plan.hpp"
+  "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_generator_cpp/vision_ai_interfaces/srv/detail/set_gripper_position__type_support.hpp" "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_generator_cpp/vision_ai_interfaces/msg/scan_plan.hpp"
   "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_generator_cpp/vision_ai_interfaces/srv/execute_scan.hpp" "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_generator_cpp/vision_ai_interfaces/msg/scan_plan.hpp"
   "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_generator_cpp/vision_ai_interfaces/srv/plan_scan.hpp" "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_generator_cpp/vision_ai_interfaces/msg/scan_plan.hpp"
   "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_generator_cpp/vision_ai_interfaces/srv/process_detection.hpp" "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_generator_cpp/vision_ai_interfaces/msg/scan_plan.hpp"
   "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_generator_cpp/vision_ai_interfaces/srv/process_stitching.hpp" "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_generator_cpp/vision_ai_interfaces/msg/scan_plan.hpp"
+  "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_generator_cpp/vision_ai_interfaces/srv/set_gripper_close.hpp" "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_generator_cpp/vision_ai_interfaces/msg/scan_plan.hpp"
+  "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_generator_cpp/vision_ai_interfaces/srv/set_gripper_position.hpp" "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_generator_cpp/vision_ai_interfaces/msg/scan_plan.hpp"
   )
 
 

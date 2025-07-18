@@ -24,6 +24,10 @@ file(REMOVE_RECURSE
   "../rosidl_generator_py/vision_ai_interfaces/srv/_process_detection_s.c"
   "../rosidl_generator_py/vision_ai_interfaces/srv/_process_stitching.py"
   "../rosidl_generator_py/vision_ai_interfaces/srv/_process_stitching_s.c"
+  "../rosidl_generator_py/vision_ai_interfaces/srv/_set_gripper_close.py"
+  "../rosidl_generator_py/vision_ai_interfaces/srv/_set_gripper_close_s.c"
+  "../rosidl_generator_py/vision_ai_interfaces/srv/_set_gripper_position.py"
+  "../rosidl_generator_py/vision_ai_interfaces/srv/_set_gripper_position_s.c"
   "CMakeFiles/vision_ai_interfaces__py"
 )
 

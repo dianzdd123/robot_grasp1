@@ -1,0 +1,19 @@
+{
+  "scan_type": "single_point",
+  "total_mapped_pixels": 593028,
+  "canvas_size": [
+    578,
+    1026
+  ],
+  "waypoint_contributions": {
+    "0": {
+      "pixel_count": 593028,
+      "coverage_percentage": 100.0,
+      "waypoint_index": 0,
+      "source_files": {
+        "color": "scan_output_20250718_151346/color_waypoint_001.jpg",
+        "depth": "scan_output_20250718_151346/depth_raw_waypoint_001.npy"
+      }
+    }
+  }
+}

@@ -8,3 +8,5 @@
 /home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_adapter/vision_ai_interfaces:srv/ExecuteScan.idl
 /home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_adapter/vision_ai_interfaces:srv/ProcessStitching.idl
 /home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_adapter/vision_ai_interfaces:srv/ProcessDetection.idl
+/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_adapter/vision_ai_interfaces:srv/SetGripperPosition.idl
+/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_adapter/vision_ai_interfaces:srv/SetGripperClose.idl

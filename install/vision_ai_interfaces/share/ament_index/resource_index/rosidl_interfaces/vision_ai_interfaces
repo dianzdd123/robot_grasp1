@@ -26,3 +26,11 @@ srv/ProcessStitching.idl
 srv/ProcessStitching.srv
 srv/ProcessStitching_Request.msg
 srv/ProcessStitching_Response.msg
+srv/SetGripperClose.idl
+srv/SetGripperClose.srv
+srv/SetGripperClose_Request.msg
+srv/SetGripperClose_Response.msg
+srv/SetGripperPosition.idl
+srv/SetGripperPosition.srv
+srv/SetGripperPosition_Request.msg
+srv/SetGripperPosition_Response.msg

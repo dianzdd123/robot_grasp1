@@ -1,0 +1,33 @@
+Detection Results Summary
+==================================================
+
+Total Objects Detected: 5
+Detection Time: 2025-07-18 15:11:30
+
+Detected Objects:
+------------------------------
+ 1. Yellow banana in bottom right corner
+    ID: banana_0
+    Confidence: 0.961
+    Region: bottom-right
+
+ 2. Orange corn in top right corner
+    ID: corn_0
+    Confidence: 0.959
+    Region: top-right
+
+ 3. Orange potato in center area
+    ID: potato_0
+    Confidence: 0.959
+    Region: center
+
+ 4. Red redpepper in bottom center
+    ID: redpepper_0
+    Confidence: 0.954
+    Region: bottom-center
+
+ 5. Yellow banana in bottom right corner
+    ID: banana_1
+    Confidence: 0.871
+    Region: bottom-right
+

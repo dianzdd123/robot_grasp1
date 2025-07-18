@@ -626,14 +626,14 @@ class BypassCvBridgeDetectionNode(Node):
             # 相机内参（如果你有动态配置可替换）
             fx, fy = 912.7, 910.3
             cx, cy = 640, 360
-            z = depth_val
-            x = (src_x - cx) * z / fx
-            y = (src_y - cy) * z / fy
+            z = depth_val * 1000
+            x = (src_x - cx) * z / fx * 1000
+            y = (src_y - cy) * z / fy * 1000
 
             # 世界坐标转换
             cam_pos = np.array(waypoint_data['world_pos'])  # (x, y, z)
             rpy_deg = [abs(waypoint_data['roll'])-180, waypoint_data['pitch'], waypoint_data['yaw']]
-            cam_to_obj = np.array([(y + 65), (x - 30), -(z)])  # 轴调换+偏移
+            cam_to_obj = np.array([(y + 70), (x - 40), -(z)])  # 轴调换+偏移
             
             R_wc = R.from_euler('XYZ', rpy_deg, degrees=True).as_matrix()
             world_xyz = R_wc @ cam_to_obj + cam_pos
@@ -657,47 +657,6 @@ class BypassCvBridgeDetectionNode(Node):
             self.get_logger().error(f'3D空间特征计算失败: {e}')
             return {}
 
-    def _calculate_3d_spatial(self, mask, depth_data, waypoint_data, bbox):
-        """计算3D空间特征（结合test_rel.py的坐标转换逻辑）"""
-        try:
-            # 计算对象的3D中心点
-            center_3d = self._calculate_object_3d_center(mask, depth_data)
-            
-            if center_3d is None:
-                return {}
-            
-            cam_x, cam_y, cam_z = center_3d
-            
-            # 使用waypoint的位姿信息进行坐标转换
-            world_pos = waypoint_data.get('world_pos', (0, 0,0))
-            roll_deg = waypoint_data.get('roll', 0)
-            pitch_deg = waypoint_data.get('pitch',0)
-            yaw_deg = waypoint_data.get('yaw', 0)
-            # 简化的世界坐标转换（基于test_rel.py的逻辑）
-            # 注意：这里需要机械臂的当前位置信息，暂时使用waypoint位置
-
-            world_x = world_pos[0] + cam_y * 1000 + 65  # 坐标轴重排 + 偏移
-            world_y = world_pos[1] + cam_x * 1000 - 30
-            world_z = 350 - cam_z * 1000  # 假设相机高度350mm
-            
-            # 计算对象的空间属性
-            bbox_area = (bbox[2] - bbox[0]) * (bbox[3] - bbox[1])
-            mask_area = np.sum(mask > 0)
-            coverage_ratio = mask_area / bbox_area if bbox_area > 0 else 0
-            
-            return {
-                'centroid_3d_camera': (cam_x, cam_y, cam_z),
-                'world_coordinates': (world_x, world_y, world_z),
-                'distance_to_camera': cam_z,
-                'mask_area_pixels': int(mask_area),
-                'bbox_area_pixels': int(bbox_area),
-                'mask_coverage_ratio': float(coverage_ratio),
-                'estimated_real_area_mm2': float(mask_area * (cam_z * 1000) ** 2 / 1000000),  # 粗略估算
-            }
-            
-        except Exception as e:
-            self.get_logger().error(f'3D空间特征计算失败: {e}')
-            return {}
         
     def _calculate_3d_spatial_features_sin(self, mask, depth_data, waypoint_data, bbox):
         """使用完整位姿计算夹爪目标坐标"""
@@ -716,8 +675,8 @@ class BypassCvBridgeDetectionNode(Node):
         cam_x, cam_y, cam_z = center_3d
         # 🆕 使用完整的test_rel变换（包含夹爪偏移）
         camera_point_reordered = np.array([
-            (camera_point[1] + 65),   # y_c + 65
-            (camera_point[0] - 30),   # x_c - 30  
+            (camera_point[1] + 70),   # y_c + 65
+            (camera_point[0] - 40),   # x_c - 30  
             -(camera_point[2])  # -(z_c - 100)
         ])
         
@@ -735,6 +694,7 @@ class BypassCvBridgeDetectionNode(Node):
         return {
                 'centroid_3d_camera': (cam_x, cam_y, cam_z),
                 'world_coordinates': (world_x, world_y, world_z),
+                'scan_detail':(cam_orientation),
                 'distance_to_camera': cam_z,
                 'mask_area_pixels': int(mask_area),
                 'bbox_area_pixels': int(bbox_area),
@@ -820,7 +780,7 @@ class BypassCvBridgeDetectionNode(Node):
                 if depth_val > 0.01:  # 有效深度
                     # 简化的像素到3D点转换（假设标准相机内参）
                     fx, fy = 912.7, 910.3  # 相机内参
-                    cx, cy = 640, 360
+                    cx, cy = 640, 320
                     
                     cam_x = (x - cx) * depth_val / fx
                     cam_y = (y - cy) * depth_val / fy
@@ -870,9 +830,9 @@ class BypassCvBridgeDetectionNode(Node):
             if height_mm is not None:
                 if height_mm < 20:
                     description_parts.append("(flat)")
-                elif height_mm < 50:
+                elif height_mm < 80:
                     description_parts.append("(low)")
-                elif height_mm < 100:
+                elif height_mm < 120:
                     description_parts.append("(medium height)")
                 else:
                     description_parts.append("(tall)")
@@ -1170,7 +1130,7 @@ class BypassCvBridgeDetectionNode(Node):
             self.processing_active = False
         
     def _publish_detection_result_json(self, result):
-        """发布检测结果 - 确保 tracking 兼容"""
+        """发布检测结果 - 保存mask和3D坐标用于静态抓取"""
         try:
             result_data = {
                 'detection_count': result['detection_count'],
@@ -1181,7 +1141,42 @@ class BypassCvBridgeDetectionNode(Node):
             }
             
             for obj in result.get('objects', []):
-                # 确保特征格式符合 tracking 预期
+                # 🆕 保存mask用于yaw计算
+                mask_data = None
+                if 'mask' in obj and obj['mask'] is not None:
+                    mask = obj['mask']
+                    if isinstance(mask, np.ndarray):
+                        # 保存mask的轮廓点，用于重建和yaw计算
+                        try:
+                            contours, _ = cv2.findContours(mask.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                            if contours:
+                                largest_contour = max(contours, key=cv2.contourArea)
+                                # 简化轮廓，减少数据量
+                                epsilon = 0.02 * cv2.arcLength(largest_contour, True)
+                                simplified_contour = cv2.approxPolyDP(largest_contour, epsilon, True)
+                                contour_points = simplified_contour.reshape(-1, 2).tolist()
+                                
+                                # 保存mask信息
+                                mask_data = {
+                                    'contour_points': contour_points,
+                                    'mask_shape': mask.shape,
+                                    'mask_area': int(np.sum(mask > 0)),
+                                    # 🆕 保存最小外接矩形信息，用于yaw计算
+                                    'min_area_rect': {
+                                        'center': cv2.minAreaRect(largest_contour)[0],
+                                        'size': cv2.minAreaRect(largest_contour)[1], 
+                                        'angle': cv2.minAreaRect(largest_contour)[2]
+                                    }
+                                }
+                        except Exception as e:
+                            self.get_logger().warn(f'处理mask失败: {e}')
+                            mask_data = None
+                
+                # 确保3D坐标被正确保存
+                spatial_features = obj.get('features', {}).get('spatial', {})
+                world_coordinates = spatial_features.get('world_coordinates', [0, 0, 0])
+                scan_detail = spatial_features.get('scan_detail', [0, 0, 0])
+                # 构建对象数据
                 obj_data = {
                     'object_id': obj['object_id'],
                     'class_id': int(obj['class_id']),
@@ -1190,25 +1185,30 @@ class BypassCvBridgeDetectionNode(Node):
                     'description': obj['description'],
                     'bounding_box': obj.get('bounding_box', [0, 0, 0, 0]),
                     
-                    # 🆕 确保 tracking 系统需要的特征格式
+                    # 🆕 保存mask信息用于yaw计算
+                    'mask_info': mask_data,
+                    
+                    # 确保特征格式正确
                     'features': {
                         'color': {
                             'color_name': obj.get('features', {}).get('color', {}).get('color_name', 'unknown'),
                             'histogram': obj.get('features', {}).get('color', {}).get('histogram', []),
-                            # 确保有其他颜色统计信息
                             **obj.get('features', {}).get('color', {})
                         },
                         'shape': {
-                            # 确保有 hu_moments（如果 ShapeFeatureExtractor 没有，需要添加）
                             'hu_moments': obj.get('features', {}).get('shape', {}).get('hu_moments', []),
                             'contours': obj.get('features', {}).get('shape', {}).get('contours', []),
                             'area': obj.get('features', {}).get('shape', {}).get('area', 0),
+                            'orientation': obj.get('features', {}).get('shape', {}).get('orientation', 0),
                             **obj.get('features', {}).get('shape', {})
                         },
                         'spatial': {
                             'centroid_2d': obj.get('features', {}).get('spatial', {}).get('centroid_2d', [0, 0]),
                             'region_position': obj.get('features', {}).get('spatial', {}).get('region_position', 'unknown'),
-                            'world_coordinates': obj.get('features', {}).get('spatial', {}).get('world_coordinates', [0, 0, 0]),
+                            'scan_info':scan_detail,
+                            # 🆕 确保3D坐标被保存
+                            'world_coordinates': world_coordinates,
+                            'centroid_3d_camera': obj.get('features', {}).get('spatial', {}).get('centroid_3d_camera', [0, 0, 0]),
                             **obj.get('features', {}).get('spatial', {})
                         },
                         'depth_info': obj.get('features', {}).get('depth_info', {})
@@ -1222,11 +1222,82 @@ class BypassCvBridgeDetectionNode(Node):
             json_msg.data = json.dumps(result_data, indent=2)
             self.detection_result_pub.publish(json_msg)
             
-            self.get_logger().info('📤 Detection result published (JSON format)')
+            # 🆕 同时保存mask信息到单独文件，供静态抓取使用
+            self._save_masks_for_grasp(result_data)
+            self._save_final_detection_results(result_data)
+            self.get_logger().info('📤 Detection result published with mask and 3D coordinates')
             
         except Exception as e:
             self.get_logger().error(f'Failed to publish detection result: {e}')
+            import traceback
+            traceback.print_exc()
 
+    def _save_final_detection_results(self, result_data):
+        """
+        保存最终的检测结果到 detection_results.json 文件，包含深度和世界坐标信息。
+        它将覆盖 detection_pipeline 之前可能保存的同名文件。
+        """
+        try:
+            # 确保输出目录与 detection_pipeline 使用的目录一致
+            final_results_file = os.path.join(self.detection_pipeline.output_dir, "detection_results.json")
+            
+            # 在保存前，确保所有 mask 都是列表，并且 world_coordinates 也是可序列化的
+            # 遍历对象，处理 mask 和 spatial features
+            processed_objects = []
+            for obj in result_data.get('objects', []):
+                # 创建一个对象的副本，以避免直接修改原始对象，影响其他使用
+                processed_obj = obj.copy()
+
+                # 处理 mask (从 numpy array 到 list)
+                if 'mask' in processed_obj and isinstance(processed_obj['mask'], np.ndarray):
+                    processed_obj['mask'] = processed_obj['mask'].tolist()
+                
+                # 处理 world_coordinates (确保是 list 或 tuple)
+                if 'features' in processed_obj and 'spatial' in processed_obj['features']:
+                    if 'world_coordinates' in processed_obj['features']['spatial']:
+                        wc = processed_obj['features']['spatial']['world_coordinates']
+                        if isinstance(wc, np.ndarray):
+                            processed_obj['features']['spatial']['world_coordinates'] = wc.tolist()
+                        # 如果已经是 tuple (如你的日志所示)，则无需转换
+                
+                processed_objects.append(processed_obj)
+            
+            # 构建最终的 JSON 结构
+            final_json_data = {
+                'objects': processed_objects,
+                'scan_info': result_data.get('scan_info', {}) # 包含扫描信息等元数据
+                # 你可以根据需要添加其他顶级键
+            }
+
+            with open(final_results_file, 'w', encoding='utf-8') as f:
+                json.dump(final_json_data, f, indent=4, ensure_ascii=False) # 使用 indent 4 使 JSON 更可读
+            
+            self.get_logger().info(f'💾 最终检测结果已保存并覆盖: {final_results_file}')
+            
+        except TypeError as e:
+            self.get_logger().error(f"类型错误：无法将最终检测结果序列化到 JSON: {e}")
+            self.get_logger().error(f"检查数据结构，特别是mask和world_coordinates是否已正确转换。")
+        except Exception as e:
+            self.get_logger().error(f'保存最终检测结果失败: {e}', exc_info=True)
+
+
+    def _save_masks_for_grasp(self, result_data):
+        """保存masks到单独文件，供静态抓取系统使用"""
+        try:
+            masks_file = os.path.join(self.detection_pipeline.output_dir, "object_masks.json")
+            
+            masks_data = {}
+            for obj in result_data['objects']:
+                if obj.get('mask_info'):
+                    masks_data[obj['object_id']] = obj['mask_info']
+            
+            with open(masks_file, 'w') as f:
+                json.dump(masks_data, f, indent=2)
+            
+            self.get_logger().info(f'💾 Masks saved to: {masks_file}')
+            
+        except Exception as e:
+            self.get_logger().error(f'Failed to save masks: {e}')
 
     def _publish_visualization_from_file(self, output_dir):
         """从文件发布可视化图像"""
@@ -1294,7 +1365,7 @@ class BypassCvBridgeDetectionNode(Node):
                     
                     scan_info['center_pose'] = {
                         'position': {'x': center_x, 'y': center_y, 'z': center_z},
-                        'orientation': {'roll': 179, 'pitch': 0, 'yaw': 0}
+                        'orientation': {'roll': 179, 'pitch': 0, 'yaw': waypoint_info.get('yaw', 0)}
                     }
             
             return scan_info
@@ -1347,61 +1418,6 @@ class BypassCvBridgeDetectionNode(Node):
                 
         except Exception as e:
             self.get_logger().error(f'目标选择流程失败: {e}')
-
-    def _publish_detection_complete_signal(self, scan_info, result):
-        """安全地发布检测完成信号"""
-        try:
-            # 准备基础数据
-            complete_data = {
-                'scan_directory': str(self.current_scan_output_dir),
-                'detection_count': len(result.get('objects', [])),
-                'status': 'completed',
-                'total_objects': len(result.get('objects', []))
-            }
-            
-            # 安全地添加扫描中心位姿
-            center_pose = scan_info.get('center_pose')
-            if center_pose and isinstance(center_pose, dict):
-                complete_data['scan_center_pose'] = self._serialize_pose_data(center_pose)
-            else:
-                complete_data['scan_center_pose'] = None
-            
-            # 安全地添加扫描边界
-            scan_bounds = scan_info.get('bounds')
-            if scan_bounds:
-                complete_data['scan_bounds'] = self._serialize_bounds_data(scan_bounds)
-            else:
-                complete_data['scan_bounds'] = None
-            
-            # 安全地添加waypoint位姿列表
-            waypoint_poses = scan_info.get('waypoint_poses', [])
-            if waypoint_poses and isinstance(waypoint_poses, list):
-                complete_data['waypoint_poses'] = [
-                    self._serialize_pose_data(pose) for pose in waypoint_poses 
-                    if isinstance(pose, dict)
-                ]
-            else:
-                complete_data['waypoint_poses'] = []
-            
-            # 尝试序列化并发布
-            try:
-                json_str = json.dumps(complete_data, indent=2, ensure_ascii=False)
-                complete_msg = String()
-                complete_msg.data = json_str
-                self.detection_complete_pub.publish(complete_msg)
-                
-                self.get_logger().info('✅ 检测完成信号已发布')
-                self.get_logger().info(f'📊 信号内容: {len(json_str)} 字符')
-                
-            except (TypeError, ValueError) as json_error:
-                self.get_logger().error(f'JSON序列化失败: {json_error}')
-                # 发布简化版本
-                self._publish_simplified_complete_signal(result)
-                
-        except Exception as e:
-            self.get_logger().error(f'发布检测完成信号失败: {e}')
-            # 最后的回退方案
-            self._publish_minimal_complete_signal()
 
     def _serialize_pose_data(self, pose_data):
         """安全地序列化位姿数据"""
@@ -1502,7 +1518,7 @@ class BypassCvBridgeDetectionNode(Node):
                 
             except (TypeError, ValueError) as json_error:
                 self.get_logger().error(f'JSON serialization failed: {json_error}')
-                self._publish_simplified_complete_signal(result)
+                self._publish_minimal_complete_signal(result)
                 
         except Exception as e:
             self.get_logger().error(f'Failed to publish detection complete signal: {e}')
@@ -1524,64 +1540,6 @@ class BypassCvBridgeDetectionNode(Node):
             
         except Exception as e:
             self.get_logger().error(f'最小化信号发布失败: {e}')
-
-    def _collect_scan_info(self):
-        """收集扫描信息用于tracking回退策略（改进版）"""
-        try:
-            scan_info = {
-                'center_pose': None,
-                'bounds': None,
-                'waypoint_poses': []
-            }
-            
-            if self.fusion_mapping_data:
-                waypoint_contributions = self.fusion_mapping_data.get('waypoint_contributions', {})
-                
-                # 收集所有waypoint位姿
-                poses = []
-                for wp_data in waypoint_contributions.values():
-                    waypoint_info = wp_data.get('waypoint_data', {})
-                    world_pos = waypoint_info.get('world_pos')
-                    if world_pos and len(world_pos) >= 3:
-                        try:
-                            pose = {
-                                'position': {
-                                    'x': float(world_pos[0]),
-                                    'y': float(world_pos[1]),
-                                    'z': float(world_pos[2])
-                                },
-                                'orientation': {
-                                    'roll': float(waypoint_info.get('roll', 0)),
-                                    'pitch': float(waypoint_info.get('pitch', 0)),
-                                    'yaw': float(waypoint_info.get('yaw', 0))
-                                }
-                            }
-                            poses.append(pose)
-                        except (ValueError, TypeError) as e:
-                            self.get_logger().warn(f'Waypoint位姿数据转换失败: {e}')
-                            continue
-                
-                scan_info['waypoint_poses'] = poses
-                
-                # 计算扫描中心
-                if poses:
-                    try:
-                        center_x = sum(p['position']['x'] for p in poses) / len(poses)
-                        center_y = sum(p['position']['y'] for p in poses) / len(poses)
-                        center_z = 350.0  # 固定追踪高度
-                        
-                        scan_info['center_pose'] = {
-                            'position': {'x': center_x, 'y': center_y, 'z': center_z},
-                            'orientation': {'roll': 179.0, 'pitch': 0.0, 'yaw': 0.0}
-                        }
-                    except (ValueError, TypeError) as e:
-                        self.get_logger().warn(f'扫描中心计算失败: {e}')
-            
-            return scan_info
-            
-        except Exception as e:
-            self.get_logger().error(f'收集扫描信息失败: {e}')
-            return {'center_pose': None, 'bounds': None, 'waypoint_poses': []}
 
 
 def main(args=None):

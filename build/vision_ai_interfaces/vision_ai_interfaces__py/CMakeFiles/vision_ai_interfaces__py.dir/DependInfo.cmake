@@ -36,6 +36,10 @@ set(CMAKE_MULTIPLE_OUTPUT_PAIRS
   "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_generator_py/vision_ai_interfaces/srv/_process_detection_s.c" "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_generator_py/vision_ai_interfaces/_vision_ai_interfaces_s.ep.rosidl_typesupport_fastrtps_c.c"
   "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_generator_py/vision_ai_interfaces/srv/_process_stitching.py" "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_generator_py/vision_ai_interfaces/_vision_ai_interfaces_s.ep.rosidl_typesupport_fastrtps_c.c"
   "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_generator_py/vision_ai_interfaces/srv/_process_stitching_s.c" "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_generator_py/vision_ai_interfaces/_vision_ai_interfaces_s.ep.rosidl_typesupport_fastrtps_c.c"
+  "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_generator_py/vision_ai_interfaces/srv/_set_gripper_close.py" "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_generator_py/vision_ai_interfaces/_vision_ai_interfaces_s.ep.rosidl_typesupport_fastrtps_c.c"
+  "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_generator_py/vision_ai_interfaces/srv/_set_gripper_close_s.c" "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_generator_py/vision_ai_interfaces/_vision_ai_interfaces_s.ep.rosidl_typesupport_fastrtps_c.c"
+  "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_generator_py/vision_ai_interfaces/srv/_set_gripper_position.py" "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_generator_py/vision_ai_interfaces/_vision_ai_interfaces_s.ep.rosidl_typesupport_fastrtps_c.c"
+  "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_generator_py/vision_ai_interfaces/srv/_set_gripper_position_s.c" "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_generator_py/vision_ai_interfaces/_vision_ai_interfaces_s.ep.rosidl_typesupport_fastrtps_c.c"
   )
 
 

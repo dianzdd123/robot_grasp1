@@ -10,6 +10,8 @@
     "/home/qi/ros2_ws/src/vision_ai_interfaces:srv/PlanScan.srv",
     "/home/qi/ros2_ws/src/vision_ai_interfaces:srv/ExecuteScan.srv",
     "/home/qi/ros2_ws/src/vision_ai_interfaces:srv/ProcessStitching.srv",
-    "/home/qi/ros2_ws/src/vision_ai_interfaces:srv/ProcessDetection.srv"
+    "/home/qi/ros2_ws/src/vision_ai_interfaces:srv/ProcessDetection.srv",
+    "/home/qi/ros2_ws/src/vision_ai_interfaces:srv/SetGripperPosition.srv",
+    "/home/qi/ros2_ws/src/vision_ai_interfaces:srv/SetGripperClose.srv"
   ]
 }

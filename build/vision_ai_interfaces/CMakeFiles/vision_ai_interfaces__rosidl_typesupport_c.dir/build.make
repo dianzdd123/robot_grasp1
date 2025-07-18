@@ -85,6 +85,8 @@ rosidl_typesupport_c/vision_ai_interfaces/msg/scan_plan__type_support.cpp: rosid
 rosidl_typesupport_c/vision_ai_interfaces/msg/scan_plan__type_support.cpp: rosidl_adapter/vision_ai_interfaces/srv/ExecuteScan.idl
 rosidl_typesupport_c/vision_ai_interfaces/msg/scan_plan__type_support.cpp: rosidl_adapter/vision_ai_interfaces/srv/ProcessStitching.idl
 rosidl_typesupport_c/vision_ai_interfaces/msg/scan_plan__type_support.cpp: rosidl_adapter/vision_ai_interfaces/srv/ProcessDetection.idl
+rosidl_typesupport_c/vision_ai_interfaces/msg/scan_plan__type_support.cpp: rosidl_adapter/vision_ai_interfaces/srv/SetGripperPosition.idl
+rosidl_typesupport_c/vision_ai_interfaces/msg/scan_plan__type_support.cpp: rosidl_adapter/vision_ai_interfaces/srv/SetGripperClose.idl
 rosidl_typesupport_c/vision_ai_interfaces/msg/scan_plan__type_support.cpp: /opt/ros/humble/share/geometry_msgs/msg/Accel.idl
 rosidl_typesupport_c/vision_ai_interfaces/msg/scan_plan__type_support.cpp: /opt/ros/humble/share/geometry_msgs/msg/AccelStamped.idl
 rosidl_typesupport_c/vision_ai_interfaces/msg/scan_plan__type_support.cpp: /opt/ros/humble/share/geometry_msgs/msg/AccelWithCovariance.idl
@@ -204,6 +206,12 @@ rosidl_typesupport_c/vision_ai_interfaces/srv/process_stitching__type_support.cp
 
 rosidl_typesupport_c/vision_ai_interfaces/srv/process_detection__type_support.cpp: rosidl_typesupport_c/vision_ai_interfaces/msg/scan_plan__type_support.cpp
 	@$(CMAKE_COMMAND) -E touch_nocreate rosidl_typesupport_c/vision_ai_interfaces/srv/process_detection__type_support.cpp
+
+rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_position__type_support.cpp: rosidl_typesupport_c/vision_ai_interfaces/msg/scan_plan__type_support.cpp
+	@$(CMAKE_COMMAND) -E touch_nocreate rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_position__type_support.cpp
+
+rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_close__type_support.cpp: rosidl_typesupport_c/vision_ai_interfaces/msg/scan_plan__type_support.cpp
+	@$(CMAKE_COMMAND) -E touch_nocreate rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_close__type_support.cpp
 
 CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/rosidl_typesupport_c/vision_ai_interfaces/msg/scan_plan__type_support.cpp.o: CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/flags.make
 CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/rosidl_typesupport_c/vision_ai_interfaces/msg/scan_plan__type_support.cpp.o: rosidl_typesupport_c/vision_ai_interfaces/msg/scan_plan__type_support.cpp
@@ -345,6 +353,34 @@ CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/rosidl_typesupport_c/v
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/rosidl_typesupport_c/vision_ai_interfaces/srv/process_detection__type_support.cpp.s"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_typesupport_c/vision_ai_interfaces/srv/process_detection__type_support.cpp -o CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/rosidl_typesupport_c/vision_ai_interfaces/srv/process_detection__type_support.cpp.s
 
+CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_position__type_support.cpp.o: CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/flags.make
+CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_position__type_support.cpp.o: rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_position__type_support.cpp
+CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_position__type_support.cpp.o: CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/qi/ros2_ws/build/vision_ai_interfaces/CMakeFiles --progress-num=$(CMAKE_PROGRESS_12) "Building CXX object CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_position__type_support.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_position__type_support.cpp.o -MF CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_position__type_support.cpp.o.d -o CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_position__type_support.cpp.o -c /home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_position__type_support.cpp
+
+CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_position__type_support.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_position__type_support.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_position__type_support.cpp > CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_position__type_support.cpp.i
+
+CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_position__type_support.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_position__type_support.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_position__type_support.cpp -o CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_position__type_support.cpp.s
+
+CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_close__type_support.cpp.o: CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/flags.make
+CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_close__type_support.cpp.o: rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_close__type_support.cpp
+CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_close__type_support.cpp.o: CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/qi/ros2_ws/build/vision_ai_interfaces/CMakeFiles --progress-num=$(CMAKE_PROGRESS_13) "Building CXX object CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_close__type_support.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_close__type_support.cpp.o -MF CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_close__type_support.cpp.o.d -o CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_close__type_support.cpp.o -c /home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_close__type_support.cpp
+
+CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_close__type_support.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_close__type_support.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_close__type_support.cpp > CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_close__type_support.cpp.i
+
+CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_close__type_support.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_close__type_support.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_close__type_support.cpp -o CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_close__type_support.cpp.s
+
 # Object files for target vision_ai_interfaces__rosidl_typesupport_c
 vision_ai_interfaces__rosidl_typesupport_c_OBJECTS = \
 "CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/rosidl_typesupport_c/vision_ai_interfaces/msg/scan_plan__type_support.cpp.o" \
@@ -356,7 +392,9 @@ vision_ai_interfaces__rosidl_typesupport_c_OBJECTS = \
 "CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/rosidl_typesupport_c/vision_ai_interfaces/srv/plan_scan__type_support.cpp.o" \
 "CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/rosidl_typesupport_c/vision_ai_interfaces/srv/execute_scan__type_support.cpp.o" \
 "CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/rosidl_typesupport_c/vision_ai_interfaces/srv/process_stitching__type_support.cpp.o" \
-"CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/rosidl_typesupport_c/vision_ai_interfaces/srv/process_detection__type_support.cpp.o"
+"CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/rosidl_typesupport_c/vision_ai_interfaces/srv/process_detection__type_support.cpp.o" \
+"CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_position__type_support.cpp.o" \
+"CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_close__type_support.cpp.o"
 
 # External object files for target vision_ai_interfaces__rosidl_typesupport_c
 vision_ai_interfaces__rosidl_typesupport_c_EXTERNAL_OBJECTS =
@@ -371,6 +409,8 @@ libvision_ai_interfaces__rosidl_typesupport_c.so: CMakeFiles/vision_ai_interface
 libvision_ai_interfaces__rosidl_typesupport_c.so: CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/rosidl_typesupport_c/vision_ai_interfaces/srv/execute_scan__type_support.cpp.o
 libvision_ai_interfaces__rosidl_typesupport_c.so: CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/rosidl_typesupport_c/vision_ai_interfaces/srv/process_stitching__type_support.cpp.o
 libvision_ai_interfaces__rosidl_typesupport_c.so: CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/rosidl_typesupport_c/vision_ai_interfaces/srv/process_detection__type_support.cpp.o
+libvision_ai_interfaces__rosidl_typesupport_c.so: CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_position__type_support.cpp.o
+libvision_ai_interfaces__rosidl_typesupport_c.so: CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_close__type_support.cpp.o
 libvision_ai_interfaces__rosidl_typesupport_c.so: CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/build.make
 libvision_ai_interfaces__rosidl_typesupport_c.so: libvision_ai_interfaces__rosidl_generator_c.so
 libvision_ai_interfaces__rosidl_typesupport_c.so: /opt/ros/humble/lib/libsensor_msgs__rosidl_typesupport_c.so
@@ -385,7 +425,7 @@ libvision_ai_interfaces__rosidl_typesupport_c.so: /opt/ros/humble/lib/libbuiltin
 libvision_ai_interfaces__rosidl_typesupport_c.so: /opt/ros/humble/lib/librosidl_runtime_c.so
 libvision_ai_interfaces__rosidl_typesupport_c.so: /opt/ros/humble/lib/librcutils.so
 libvision_ai_interfaces__rosidl_typesupport_c.so: CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --bold --progress-dir=/home/qi/ros2_ws/build/vision_ai_interfaces/CMakeFiles --progress-num=$(CMAKE_PROGRESS_12) "Linking CXX shared library libvision_ai_interfaces__rosidl_typesupport_c.so"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --bold --progress-dir=/home/qi/ros2_ws/build/vision_ai_interfaces/CMakeFiles --progress-num=$(CMAKE_PROGRESS_14) "Linking CXX shared library libvision_ai_interfaces__rosidl_typesupport_c.so"
 	$(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/link.txt --verbose=$(VERBOSE)
 
 # Rule to build all files generated by this target.
@@ -406,6 +446,8 @@ CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/depend: rosidl_typesup
 CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/depend: rosidl_typesupport_c/vision_ai_interfaces/srv/plan_scan__type_support.cpp
 CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/depend: rosidl_typesupport_c/vision_ai_interfaces/srv/process_detection__type_support.cpp
 CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/depend: rosidl_typesupport_c/vision_ai_interfaces/srv/process_stitching__type_support.cpp
+CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/depend: rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_close__type_support.cpp
+CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/depend: rosidl_typesupport_c/vision_ai_interfaces/srv/set_gripper_position__type_support.cpp
 	cd /home/qi/ros2_ws/build/vision_ai_interfaces && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /home/qi/ros2_ws/src/vision_ai_interfaces /home/qi/ros2_ws/src/vision_ai_interfaces /home/qi/ros2_ws/build/vision_ai_interfaces /home/qi/ros2_ws/build/vision_ai_interfaces /home/qi/ros2_ws/build/vision_ai_interfaces/CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/DependInfo.cmake --color=$(COLOR)
 .PHONY : CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c.dir/depend
 

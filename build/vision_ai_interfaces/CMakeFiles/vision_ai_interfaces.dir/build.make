@@ -84,6 +84,12 @@ CMakeFiles/vision_ai_interfaces: rosidl_cmake/srv/ProcessStitching_Response.msg
 CMakeFiles/vision_ai_interfaces: /home/qi/ros2_ws/src/vision_ai_interfaces/srv/ProcessDetection.srv
 CMakeFiles/vision_ai_interfaces: rosidl_cmake/srv/ProcessDetection_Request.msg
 CMakeFiles/vision_ai_interfaces: rosidl_cmake/srv/ProcessDetection_Response.msg
+CMakeFiles/vision_ai_interfaces: /home/qi/ros2_ws/src/vision_ai_interfaces/srv/SetGripperPosition.srv
+CMakeFiles/vision_ai_interfaces: rosidl_cmake/srv/SetGripperPosition_Request.msg
+CMakeFiles/vision_ai_interfaces: rosidl_cmake/srv/SetGripperPosition_Response.msg
+CMakeFiles/vision_ai_interfaces: /home/qi/ros2_ws/src/vision_ai_interfaces/srv/SetGripperClose.srv
+CMakeFiles/vision_ai_interfaces: rosidl_cmake/srv/SetGripperClose_Request.msg
+CMakeFiles/vision_ai_interfaces: rosidl_cmake/srv/SetGripperClose_Response.msg
 CMakeFiles/vision_ai_interfaces: /opt/ros/humble/share/geometry_msgs/msg/Accel.idl
 CMakeFiles/vision_ai_interfaces: /opt/ros/humble/share/geometry_msgs/msg/AccelStamped.idl
 CMakeFiles/vision_ai_interfaces: /opt/ros/humble/share/geometry_msgs/msg/AccelWithCovariance.idl

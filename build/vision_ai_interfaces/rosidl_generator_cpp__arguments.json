@@ -12,7 +12,9 @@
     "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_adapter/vision_ai_interfaces:srv/PlanScan.idl",
     "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_adapter/vision_ai_interfaces:srv/ExecuteScan.idl",
     "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_adapter/vision_ai_interfaces:srv/ProcessStitching.idl",
-    "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_adapter/vision_ai_interfaces:srv/ProcessDetection.idl"
+    "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_adapter/vision_ai_interfaces:srv/ProcessDetection.idl",
+    "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_adapter/vision_ai_interfaces:srv/SetGripperPosition.idl",
+    "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_adapter/vision_ai_interfaces:srv/SetGripperClose.idl"
   ],
   "ros_interface_dependencies": [
     "geometry_msgs:/opt/ros/humble/share/geometry_msgs/msg/Accel.idl",
@@ -132,6 +134,8 @@
     "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_adapter/vision_ai_interfaces/srv/ExecuteScan.idl",
     "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_adapter/vision_ai_interfaces/srv/ProcessStitching.idl",
     "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_adapter/vision_ai_interfaces/srv/ProcessDetection.idl",
+    "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_adapter/vision_ai_interfaces/srv/SetGripperPosition.idl",
+    "/home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_adapter/vision_ai_interfaces/srv/SetGripperClose.idl",
     "/opt/ros/humble/share/geometry_msgs/msg/Accel.idl",
     "/opt/ros/humble/share/geometry_msgs/msg/AccelStamped.idl",
     "/opt/ros/humble/share/geometry_msgs/msg/AccelWithCovariance.idl",

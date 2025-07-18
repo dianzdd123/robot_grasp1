@@ -282,4 +282,10 @@ CMakeFiles/vision_ai_interfaces__rosidl_typesupport_c__pyext.dir/rosidl_generato
  /home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_generator_c/vision_ai_interfaces/srv/detail/process_detection__type_support.h
  /home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_generator_c/vision_ai_interfaces/srv/detail/process_detection__struct.h
  /home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_generator_c/vision_ai_interfaces/srv/detail/process_detection__functions.h
+ /home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_position__type_support.h
+ /home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_position__struct.h
+ /home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_position__functions.h
+ /home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_close__type_support.h
+ /home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_close__struct.h
+ /home/qi/ros2_ws/build/vision_ai_interfaces/rosidl_generator_c/vision_ai_interfaces/srv/detail/set_gripper_close__functions.h
 

@@ -46,10 +46,20 @@ file(REMOVE_RECURSE
   "rosidl_generator_cpp/vision_ai_interfaces/srv/detail/process_stitching__struct.hpp"
   "rosidl_generator_cpp/vision_ai_interfaces/srv/detail/process_stitching__traits.hpp"
   "rosidl_generator_cpp/vision_ai_interfaces/srv/detail/process_stitching__type_support.hpp"
+  "rosidl_generator_cpp/vision_ai_interfaces/srv/detail/set_gripper_close__builder.hpp"
+  "rosidl_generator_cpp/vision_ai_interfaces/srv/detail/set_gripper_close__struct.hpp"
+  "rosidl_generator_cpp/vision_ai_interfaces/srv/detail/set_gripper_close__traits.hpp"
+  "rosidl_generator_cpp/vision_ai_interfaces/srv/detail/set_gripper_close__type_support.hpp"
+  "rosidl_generator_cpp/vision_ai_interfaces/srv/detail/set_gripper_position__builder.hpp"
+  "rosidl_generator_cpp/vision_ai_interfaces/srv/detail/set_gripper_position__struct.hpp"
+  "rosidl_generator_cpp/vision_ai_interfaces/srv/detail/set_gripper_position__traits.hpp"
+  "rosidl_generator_cpp/vision_ai_interfaces/srv/detail/set_gripper_position__type_support.hpp"
   "rosidl_generator_cpp/vision_ai_interfaces/srv/execute_scan.hpp"
   "rosidl_generator_cpp/vision_ai_interfaces/srv/plan_scan.hpp"
   "rosidl_generator_cpp/vision_ai_interfaces/srv/process_detection.hpp"
   "rosidl_generator_cpp/vision_ai_interfaces/srv/process_stitching.hpp"
+  "rosidl_generator_cpp/vision_ai_interfaces/srv/set_gripper_close.hpp"
+  "rosidl_generator_cpp/vision_ai_interfaces/srv/set_gripper_position.hpp"
 )
 
 # Per-language clean rules from dependency scanning.

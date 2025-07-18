@@ -82,9 +82,6 @@ if colcon build \
         echo -e "${YELLOW}⚠️  tracking_node 未找到，可能未包含或构建失败${NC}"
     fi
     
-    echo -e "${YELLOW}🚀 启动完整系统...${NC}"
-    echo -e "${BLUE}💡 提示: 使用 './restart.sh --no-display' 可禁用图像显示${NC}"
-    
     ./dev.sh full_system
 else
     echo -e "${RED}❌ 编译失败，请检查错误信息${NC}"

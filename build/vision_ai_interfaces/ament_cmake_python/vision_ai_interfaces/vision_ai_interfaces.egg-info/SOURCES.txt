@@ -16,3 +16,5 @@ vision_ai_interfaces/srv/_execute_scan.py
 vision_ai_interfaces/srv/_plan_scan.py
 vision_ai_interfaces/srv/_process_detection.py
 vision_ai_interfaces/srv/_process_stitching.py
+vision_ai_interfaces/srv/_set_gripper_close.py
+vision_ai_interfaces/srv/_set_gripper_position.py

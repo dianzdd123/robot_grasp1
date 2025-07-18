@@ -19,6 +19,10 @@ file(REMOVE_RECURSE
   "CMakeFiles/vision_ai_interfaces__rosidl_typesupport_cpp.dir/rosidl_typesupport_cpp/vision_ai_interfaces/srv/process_detection__type_support.cpp.o.d"
   "CMakeFiles/vision_ai_interfaces__rosidl_typesupport_cpp.dir/rosidl_typesupport_cpp/vision_ai_interfaces/srv/process_stitching__type_support.cpp.o"
   "CMakeFiles/vision_ai_interfaces__rosidl_typesupport_cpp.dir/rosidl_typesupport_cpp/vision_ai_interfaces/srv/process_stitching__type_support.cpp.o.d"
+  "CMakeFiles/vision_ai_interfaces__rosidl_typesupport_cpp.dir/rosidl_typesupport_cpp/vision_ai_interfaces/srv/set_gripper_close__type_support.cpp.o"
+  "CMakeFiles/vision_ai_interfaces__rosidl_typesupport_cpp.dir/rosidl_typesupport_cpp/vision_ai_interfaces/srv/set_gripper_close__type_support.cpp.o.d"
+  "CMakeFiles/vision_ai_interfaces__rosidl_typesupport_cpp.dir/rosidl_typesupport_cpp/vision_ai_interfaces/srv/set_gripper_position__type_support.cpp.o"
+  "CMakeFiles/vision_ai_interfaces__rosidl_typesupport_cpp.dir/rosidl_typesupport_cpp/vision_ai_interfaces/srv/set_gripper_position__type_support.cpp.o.d"
   "libvision_ai_interfaces__rosidl_typesupport_cpp.pdb"
   "libvision_ai_interfaces__rosidl_typesupport_cpp.so"
   "rosidl_typesupport_cpp/vision_ai_interfaces/msg/detected_object__type_support.cpp"
@@ -31,6 +35,8 @@ file(REMOVE_RECURSE
   "rosidl_typesupport_cpp/vision_ai_interfaces/srv/plan_scan__type_support.cpp"
   "rosidl_typesupport_cpp/vision_ai_interfaces/srv/process_detection__type_support.cpp"
   "rosidl_typesupport_cpp/vision_ai_interfaces/srv/process_stitching__type_support.cpp"
+  "rosidl_typesupport_cpp/vision_ai_interfaces/srv/set_gripper_close__type_support.cpp"
+  "rosidl_typesupport_cpp/vision_ai_interfaces/srv/set_gripper_position__type_support.cpp"
 )
 
 # Per-language clean rules from dependency scanning.

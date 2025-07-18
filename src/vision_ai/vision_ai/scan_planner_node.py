@@ -12,7 +12,7 @@ class ScanPlannerNode(Node):
         super().__init__('scan_planner_node')
         
         # 机械臂安全约束
-        self.safe_pose = [200, 0, 250, 179, -20, 0]  # mm + deg
+        self.safe_pose = [200, 0, 250, 179, 0, 0]  # mm + deg
         self.workspace_limit = 800  # mm
         self.obstacle_radius = 150  # mm
         self.max_height = 450  # mm，最大扫描高度
