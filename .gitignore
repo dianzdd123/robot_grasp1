@@ -56,4 +56,5 @@ checkpoints/
 # 输出文件夹
 output/
 outputs/
-results/
+results/scan_output_*/
+scan_output_*
