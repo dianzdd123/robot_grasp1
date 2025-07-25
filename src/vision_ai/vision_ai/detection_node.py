@@ -104,7 +104,6 @@ class BypassCvBridgeDetectionNode(Node):
         self.latest_depth_image = msg
         self.get_logger().info('📏 收到深度信息（备用）')
 
-
     def _load_images_directly(self):
         """直接从文件加载图像，绕过ROS消息"""
         try:
@@ -300,30 +299,114 @@ class BypassCvBridgeDetectionNode(Node):
             is_single_point = fusion_params.get('single_point', False)
             
             if is_single_point:
-                # 单点扫描：直接使用主waypoint的深度数据
-                depth_info = self._get_depth_info_single_point(detection_obj)
+                # 🆕 单点扫描：获取waypoint数据和深度数据
+                waypoint_contributions = self.fusion_mapping_data['waypoint_contributions']
+                main_waypoint_idx = list(waypoint_contributions.keys())[0]
+                waypoint_data = waypoint_contributions[main_waypoint_idx]['waypoint_data']
+                
+                # 加载深度数据
+                depth_file = waypoint_data.get('depth_raw_filename')
+                if not depth_file:
+                    self.get_logger().warn(f'对象 {detection_obj["object_id"]} 无深度文件')
+                    return detection_obj
+                
+                depth_full_path = os.path.join(self.current_scan_output_dir, os.path.basename(depth_file))
+                if not os.path.exists(depth_full_path):
+                    self.get_logger().warn(f'深度文件不存在: {depth_full_path}')
+                    return detection_obj
+                
+                depth_data = np.load(depth_full_path)
+                
+                # 🆕 使用增强的高度计算（传入正确的参数）
+                depth_result = self._calculate_object_height_corrected_sin(
+                    mask, depth_data, bbox, waypoint_data
+                )
+                
+                # 计算3D空间信息（包含抓夹宽度）
+                spatial_3d = self._calculate_3d_spatial_features_sin(
+                    mask, depth_data, waypoint_data, bbox
+                )
+                
             else:
                 # 多点扫描：分析对象的来源waypoint分布
                 source_analysis = self._analyze_object_sources(bbox, mask)
-                depth_info = self._get_depth_info_from_waypoint(detection_obj, source_analysis)
+                
+                if not source_analysis['coverage_threshold_met']:
+                    self.get_logger().warn(f'对象 {detection_obj["object_id"]} 跨越多个waypoint，使用主要来源')
+                
+                dominant_wp_idx = source_analysis['dominant_waypoint']
+                waypoint_data = self.fusion_mapping_data['waypoint_contributions'][dominant_wp_idx]['waypoint_data']
+                
+                # 加载该waypoint的深度数据
+                depth_file = waypoint_data.get('depth_raw_filename')
+                if not depth_file:
+                    self.get_logger().warn(f'Waypoint {dominant_wp_idx} 无深度文件')
+                    return detection_obj
+                
+                depth_full_path = os.path.join(self.current_scan_output_dir, os.path.basename(depth_file))
+                if not os.path.exists(depth_full_path):
+                    self.get_logger().warn(f'Waypoint {dominant_wp_idx} 深度文件不存在: {depth_full_path}')
+                    return detection_obj
+                
+                depth_data = np.load(depth_full_path)
+                
+                # 🆕 对于多点扫描，需要将融合图像中的检测结果映射回原始图像坐标
+                # 这里需要进行坐标映射（简化版本，假设尺寸匹配）
+                depth_result = self._calculate_object_height_corrected_sin(
+                    mask, depth_data, bbox, waypoint_data
+                )
+                
+                spatial_3d = self._calculate_3d_spatial_features_sin(
+                    mask, depth_data, waypoint_data, bbox
+                )
             
-            if depth_info:
-                # 增强对象信息
+            # 🆕 应用增强信息到检测对象
+            if depth_result:
+                # 更新空间特征
                 if 'spatial' not in detection_obj['features']:
                     detection_obj['features']['spatial'] = {}
                 
-                detection_obj['features']['spatial'].update(depth_info['spatial_features'])
-                detection_obj['features']['depth_info'] = depth_info['depth_analysis']
+                detection_obj['features']['spatial'].update(spatial_3d)
+                
+                # 🆕 更新深度信息，包含背景深度和抓夹宽度
+                detection_obj['features']['depth_info'] = {
+                    'height_mm': depth_result['height_mm'],
+                    'background_world_z': depth_result['background_world_z'],
+                    'background_depth_m': depth_result['background_depth_m'],
+                    'depth_confidence': depth_result['confidence'],
+                    'source_waypoint': main_waypoint_idx if is_single_point else dominant_wp_idx,
+                    'coverage_ratio': 1.0 if is_single_point else source_analysis['coverage_ratio'],
+                    'scan_type': 'single_point' if is_single_point else 'multi_point'
+                }
+                
+                # 🆕 添加抓夹宽度信息
+                gripper_info = spatial_3d.get('gripper_width_info')
+                if gripper_info:
+                    detection_obj['features']['grasp_info'] = {
+                        'recommended_width': gripper_info['recommended_gripper_width'],
+                        'real_width_mm': gripper_info['real_width_mm'],
+                        'grasp_angle': gripper_info['angle'],
+                        'pixel_width': gripper_info['pixel_width'],
+                        'depth_used': gripper_info['depth_used']
+                    }
                 
                 # 更新描述
                 detection_obj['description'] = self._generate_enhanced_description(
-                    detection_obj, depth_info
+                    detection_obj, {'depth_analysis': depth_result, 'spatial_features': spatial_3d}
                 )
                 
                 self.get_logger().info(
                     f'✅ 对象 {detection_obj["object_id"]} 深度增强完成: '
-                    f'高度={depth_info["depth_analysis"].get("height_mm", "N/A")}mm'
+                    f'高度={depth_result["height_mm"]:.1f}mm, '
+                    f'背景Z={depth_result["background_world_z"]:.1f}mm'
                 )
+                
+                # 如果有抓夹信息，也记录一下
+                if gripper_info:
+                    self.get_logger().info(
+                        f'🤏 抓夹信息: 推荐宽度={gripper_info["recommended_gripper_width"]}mm, '
+                        f'实际宽度={gripper_info["real_width_mm"]:.1f}mm'
+                    )
             else:
                 self.get_logger().warn(f'⚠️ 对象 {detection_obj["object_id"]} 深度增强失败')
             
@@ -331,6 +414,8 @@ class BypassCvBridgeDetectionNode(Node):
             
         except Exception as e:
             self.get_logger().error(f'对象深度增强失败: {e}')
+            import traceback
+            traceback.print_exc()
             return detection_obj
 
 
@@ -487,8 +572,8 @@ class BypassCvBridgeDetectionNode(Node):
             self.get_logger().error(f'高度计算失败: {e}')
             return 30.0
 
-    def _calculate_height_method1(self, mask, depth_data, bbox):
-        """方法1: bbox内对比（适配ROS深度数据）"""
+    def _calculate_height_method1_enhanced(self, mask, depth_data, bbox, background_depths):
+        """方法1: bbox内对比（增强版，保存背景深度）"""
         try:
             x1, y1, x2, y2 = bbox
             mask_depths = []
@@ -497,28 +582,32 @@ class BypassCvBridgeDetectionNode(Node):
             for y in range(y1, y2):
                 for x in range(x1, x2):
                     if 0 <= y < mask.shape[0] and 0 <= x < mask.shape[1]:
-                        # ROS深度数据通常以米为单位
                         depth_val = depth_data[y, x] / 1000.0  # 转换为米
                         if depth_val > 0.01:  # 有效深度值
                             if mask[y, x] > 0:
                                 mask_depths.append(depth_val)
                             else:
                                 non_mask_depths.append(depth_val)
+                                background_depths.append(depth_val)  # 收集背景深度
             
             if len(mask_depths) < 10 or len(non_mask_depths) < 5:
                 return None
             
-            mask_avg = np.median(mask_depths)
-            bg_avg = np.median(non_mask_depths)
-            height_mm = abs(mask_avg - bg_avg) * 1000  # 转换为毫米
+            mask_median = np.median(mask_depths)
+            bg_median = np.median(non_mask_depths)
+            height_mm = abs(mask_median - bg_median) * 1000
             
-            return height_mm if 5 <= height_mm <= 500 else None
+            return {
+                'height': height_mm,
+                'background_depth': bg_median,
+                'object_depth': mask_median
+            } if 5 <= height_mm <= 500 else None
             
         except Exception:
             return None
 
-    def _calculate_height_method2(self, mask, depth_data, bbox):
-        """方法2: 扩展背景采样"""
+    def _calculate_height_method2_enhanced(self, mask, depth_data, bbox, background_depths):
+        """方法2: 扩展背景采样（增强版）"""
         try:
             x1, y1, x2, y2 = bbox
             h, w = mask.shape
@@ -539,34 +628,38 @@ class BypassCvBridgeDetectionNode(Node):
                         if depth_val > 0.01:
                             mask_depths.append(depth_val)
             
-            # 收集背景深度
-            background_depths = []
+            # 收集扩展区域背景深度
+            extended_bg_depths = []
             for y in range(expanded_y1, expanded_y2):
                 for x in range(expanded_x1, expanded_x2):
                     if not (x1 <= x < x2 and y1 <= y < y2):
                         depth_val = depth_data[y, x] / 1000.0
                         if depth_val > 0.01:
-                            background_depths.append(depth_val)
+                            extended_bg_depths.append(depth_val)
+                            background_depths.append(depth_val)  # 收集背景深度
             
-            if len(mask_depths) < 10 or len(background_depths) < 20:
+            if len(mask_depths) < 10 or len(extended_bg_depths) < 20:
                 return None
             
-            mask_avg = np.median(mask_depths)
-            bg_avg = np.median(background_depths)
-            height_mm = abs(mask_avg - bg_avg) * 1000
+            mask_median = np.median(mask_depths)
+            bg_median = np.median(extended_bg_depths)
+            height_mm = abs(mask_median - bg_median) * 1000
             
-            return height_mm if 5 <= height_mm <= 500 else None
+            return {
+                'height': height_mm,
+                'background_depth': bg_median,
+                'object_depth': mask_median
+            } if 5 <= height_mm <= 500 else None
             
         except Exception:
             return None
 
-    def _calculate_height_method3(self, mask, depth_data, click_point):
-        """方法3: 基于中心点的高度估算"""
+    def _calculate_height_method3_enhanced(self, mask, depth_data, click_point, background_depths):
+        """方法3: 基于中心点的高度估算（增强版）"""
         try:
             center_x, center_y = click_point
             h, w = mask.shape
             
-            # 获取中心点深度
             if not (0 <= center_x < w and 0 <= center_y < h):
                 return None
             
@@ -576,7 +669,7 @@ class BypassCvBridgeDetectionNode(Node):
             
             # 在中心点周围采样背景深度
             sample_radius = 50
-            background_depths = []
+            surrounding_bg_depths = []
             
             for dy in range(-sample_radius, sample_radius + 1, 5):
                 for dx in range(-sample_radius, sample_radius + 1, 5):
@@ -587,15 +680,20 @@ class BypassCvBridgeDetectionNode(Node):
                         if mask[sample_y, sample_x] == 0:  # 背景区域
                             depth_val = depth_data[sample_y, sample_x] / 1000.0
                             if depth_val > 0.01:
-                                background_depths.append(depth_val)
+                                surrounding_bg_depths.append(depth_val)
+                                background_depths.append(depth_val)  # 收集背景深度
             
-            if len(background_depths) < 10:
+            if len(surrounding_bg_depths) < 10:
                 return None
             
-            bg_avg = np.median(background_depths)
-            height_mm = abs(center_depth - bg_avg) * 1000
+            bg_median = np.median(surrounding_bg_depths)
+            height_mm = abs(center_depth - bg_median) * 1000
             
-            return height_mm if 5 <= height_mm <= 500 else None
+            return {
+                'height': height_mm,
+                'background_depth': bg_median,
+                'object_depth': center_depth
+            } if 5 <= height_mm <= 500 else None
             
         except Exception:
             return None
@@ -683,7 +781,7 @@ class BypassCvBridgeDetectionNode(Node):
         # 应用旋转变换
         rotation = R.from_euler('XYZ', cam_orientation, degrees=True)
         R_wc = rotation.as_matrix()
-        
+        gripper_info = self._calculate_real_gripper_width(mask, depth_data, waypoint_data)
         # 最终的夹爪目标世界坐标
         gripper_world_target = R_wc @ camera_point_reordered + np.array(cam_position)
         world_x, world_y, world_z = gripper_world_target
@@ -691,18 +789,26 @@ class BypassCvBridgeDetectionNode(Node):
         bbox_area = (bbox[2] - bbox[0]) * (bbox[3] - bbox[1])
         mask_area = np.sum(mask > 0)
         coverage_ratio = mask_area / bbox_area if bbox_area > 0 else 0
-        return {
-                'centroid_3d_camera': (cam_x, cam_y, cam_z),
-                'world_coordinates': (world_x, world_y, world_z),
-                'scan_detail':(cam_orientation),
-                'distance_to_camera': cam_z,
-                'mask_area_pixels': int(mask_area),
-                'bbox_area_pixels': int(bbox_area),
-                'mask_coverage_ratio': float(coverage_ratio),
-                'estimated_real_area_mm2': float(mask_area * (cam_z * 1000) ** 2 / 1000000),  # 粗略估算
-            }
+        result = {
+            'centroid_3d_camera': (cam_x, cam_y, cam_z),
+            'world_coordinates': (world_x, world_y, world_z),
+            'scan_detail': (cam_orientation),
+            'distance_to_camera': cam_z,
+            'mask_area_pixels': int(mask_area),
+            'bbox_area_pixels': int(bbox_area),
+            'mask_coverage_ratio': float(coverage_ratio),
+            'estimated_real_area_mm2': float(mask_area * (cam_z * 1000) ** 2 / 1000000),
+        }
+        
+        # 🆕 添加抓夹信息
+        if gripper_info:
+            result.update({
+                'gripper_width_info': gripper_info
+            })
+        
+        return result
     def _calculate_object_height_corrected_sin(self, mask, depth_data, bbox, waypoint_data):
-        """集成你的三种高度计算方法（来自gaisp.py）"""
+        """集成高度计算方法并保存背景深度信息"""
         try:
             x1, y1, x2, y2 = map(int, bbox)
             
@@ -714,53 +820,120 @@ class BypassCvBridgeDetectionNode(Node):
             # 计算bbox中心点
             center_x, center_y = (x1 + x2) // 2, (y1 + y2) // 2
             
-            self.get_logger().info(f'🔍 计算高度: bbox=[{x1},{y1},{x2},{y2}], center=[{center_x},{center_y}]')
+            self.get_logger().info(f'🔍 计算高度和背景深度: bbox=[{x1},{y1},{x2},{y2}], center=[{center_x},{center_y}]')
+            
+            # 存储背景深度值用于后续计算
+            background_depths = []
             
             # 方法1: bbox内对比
-            method1_height = self._calculate_height_method1(mask, depth_data, [x1, y1, x2, y2])
+            method1_result = self._calculate_height_method1_enhanced(mask, depth_data, [x1, y1, x2, y2], background_depths)
             
             # 方法2: 扩展背景采样
-            method2_height = self._calculate_height_method2(mask, depth_data, [x1, y1, x2, y2])
+            method2_result = self._calculate_height_method2_enhanced(mask, depth_data, [x1, y1, x2, y2], background_depths)
             
             # 方法3: 中心点对比
-            method3_height = self._calculate_height_method3(mask, depth_data, (center_x, center_y))
+            method3_result = self._calculate_height_method3_enhanced(mask, depth_data, (center_x, center_y), background_depths)
             
-            # 综合评估（与你的原算法相同）
-            valid_heights = []
-            if method1_height is not None and 5 <= method1_height <= 500:
-                valid_heights.append(("bbox内对比", method1_height))
-            if method2_height is not None and 5 <= method2_height <= 500:
-                valid_heights.append(("扩展背景", method2_height))
-            if method3_height is not None and 5 <= method3_height <= 500:
-                valid_heights.append(("中心点对比", method3_height))
+            # 综合评估
+            valid_results = []
+            if method1_result and 5 <= method1_result['height'] <= 500:
+                valid_results.append(("bbox内对比", method1_result))
+            if method2_result and 5 <= method2_result['height'] <= 500:
+                valid_results.append(("扩展背景", method2_result))
+            if method3_result and 5 <= method3_result['height'] <= 500:
+                valid_results.append(("中心点对比", method3_result))
             
-            self.get_logger().info(f'📊 高度计算结果: {len(valid_heights)} 个有效值')
-            for method_name, height in valid_heights:
-                self.get_logger().info(f'  - {method_name}: {height:.1f}mm')
+            self.get_logger().info(f'📊 高度计算结果: {len(valid_results)} 个有效值')
             
-            if not valid_heights:
+            if not valid_results:
                 self.get_logger().warn('所有高度计算方法都失败，使用默认值')
-                return 30.0  # 默认值
+                # 计算默认背景深度
+                default_bg_depth = self._calculate_default_background_depth(background_depths)
+                bg_world_z = self._convert_depth_to_world_z(default_bg_depth, waypoint_data)
+                return {
+                    'height_mm': 30.0,
+                    'background_world_z': bg_world_z,
+                    'background_depth_m': default_bg_depth,
+                    'confidence': 0.3
+                }
             
-            if len(valid_heights) == 1:
-                final_height = valid_heights[0][1]
-                self.get_logger().info(f'✅ 使用单一方法: {final_height:.1f}mm')
-                return final_height
-            
-            # 多值处理逻辑
-            heights = [h[1] for h in valid_heights]
-            if max(heights) - min(heights) < 20:
-                final_height = np.mean(heights)
-                self.get_logger().info(f'✅ 使用平均值: {final_height:.1f}mm')
-                return final_height
+            # 选择最佳结果
+            if len(valid_results) == 1:
+                final_result = valid_results[0][1]
+                self.get_logger().info(f'✅ 使用单一方法: {final_result["height"]:.1f}mm')
             else:
-                final_height = np.median(heights)
-                self.get_logger().info(f'✅ 使用中位数: {final_height:.1f}mm')
-                return final_height
+                heights = [r[1]['height'] for r in valid_results]
+                bg_depths = [r[1]['background_depth'] for r in valid_results]
+                
+                if max(heights) - min(heights) < 20:
+                    final_height = np.mean(heights)
+                    final_bg_depth = np.median(bg_depths)
+                    self.get_logger().info(f'✅ 使用平均值: {final_height:.1f}mm')
+                else:
+                    final_height = np.median(heights)
+                    final_bg_depth = np.median(bg_depths)
+                    self.get_logger().info(f'✅ 使用中位数: {final_height:.1f}mm')
+                
+                final_result = {
+                    'height': final_height,
+                    'background_depth': final_bg_depth
+                }
+            
+            # 转换背景深度到世界坐标
+            bg_world_z = self._convert_depth_to_world_z(final_result['background_depth'], waypoint_data)
+            
+            self.get_logger().info(f'🌍 背景深度转换: {final_result["background_depth"]:.3f}m → 世界Z: {bg_world_z:.1f}mm')
+            
+            return {
+                'height_mm': final_result['height'],
+                'background_world_z': bg_world_z,
+                'background_depth_m': final_result['background_depth'],
+                'confidence': 0.8 if len(valid_results) >= 2 else 0.6
+            }
                 
         except Exception as e:
-            self.get_logger().error(f'高度计算失败: {e}')
-            return 30.0
+            self.get_logger().error(f'高度和背景深度计算失败: {e}')
+            return {
+                'height_mm': 30.0,
+                'background_world_z': 0.0,
+                'background_depth_m': 0.3,
+                'confidence': 0.2
+            }
+    def _convert_depth_to_world_z(self, depth_m, waypoint_data):
+        """将相机坐标系深度转换为世界坐标Z"""
+        try:
+            # 获取相机在世界坐标系中的位置和姿态
+            cam_world_pos = np.array(waypoint_data['world_pos'])  # [x, y, z]
+            cam_orientation = [
+                abs(waypoint_data['roll']) - 180, 
+                waypoint_data['pitch'], 
+                waypoint_data['yaw']
+            ]
+            
+            # 相机坐标系中的点 (0, 0, depth)
+            camera_point = np.array([0, 0, depth_m])
+            
+            # 应用旋转变换到世界坐标系
+            from scipy.spatial.transform import Rotation as R
+            rotation = R.from_euler('XYZ', cam_orientation, degrees=True)
+            R_wc = rotation.as_matrix()
+            
+            # 转换到世界坐标系
+            world_point = R_wc @ camera_point + cam_world_pos
+            world_z = world_point[2]
+            
+            self.get_logger().info(f'深度转换: 相机深度={depth_m:.3f}m → 世界Z={world_z:.3f}m')
+            return world_z
+            
+        except Exception as e:
+            self.get_logger().error(f'深度到世界坐标转换失败: {e}')
+            return waypoint_data['world_pos'][2] - depth_m  # 简化计算
+
+    def _calculate_default_background_depth(self, background_depths):
+        """计算默认背景深度"""
+        if background_depths:
+            return np.median(background_depths)
+        return 0.2  # 默认30cm
         
     def _calculate_object_3d_center(self, mask, depth_data):
         """计算对象的3D中心点"""
@@ -929,8 +1102,82 @@ class BypassCvBridgeDetectionNode(Node):
         except Exception as e:
             self.get_logger().error(f'获取waypoint深度信息失败: {e}')
             return None
-           
-
+        
+    def _calculate_real_gripper_width(self, mask, depth_data, waypoint_data):
+        """计算真实抓夹宽度"""
+        try:
+            # 找到mask的最小外接矩形
+            contours, _ = cv2.findContours(mask.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            if not contours:
+                return None
+            
+            largest_contour = max(contours, key=cv2.contourArea)
+            rect = cv2.minAreaRect(largest_contour)
+            _, (width, height), angle = rect
+            
+            # 选择较短的边作为抓夹宽度参考
+            shorter_side_pixels = min(width, height)
+            
+            # 获取物体中心深度
+            center_depth = self._get_object_center_depth(mask, depth_data)
+            if center_depth is None:
+                return None
+            
+            # 相机内参（你可能需要根据实际情况调整）
+            fx = 912.7  # 根据你的相机内参
+            
+            # 像素到毫米转换
+            # real_width_mm = pixel_width * (depth_m / focal_length) * 1000
+            real_width_mm = shorter_side_pixels * (center_depth / fx) * 1000
+            
+            # 添加安全余量（建议比实际宽度大20-30%）
+            safety_margin = 1.25
+            recommended_width = real_width_mm * safety_margin
+            
+            # 限制在合理范围内
+            recommended_width = max(100, min(800, recommended_width))
+            
+            self.get_logger().info(f'🤏 抓夹宽度计算: 像素={shorter_side_pixels:.1f}, 深度={center_depth:.3f}m')
+            self.get_logger().info(f'   实际宽度={real_width_mm:.1f}mm, 推荐={recommended_width:.1f}mm')
+            
+            return {
+                'real_width_mm': real_width_mm,
+                'recommended_gripper_width': int(recommended_width),
+                'pixel_width': shorter_side_pixels,
+                'depth_used': center_depth,
+                'angle': angle
+            }
+            
+        except Exception as e:
+            self.get_logger().error(f'抓夹宽度计算失败: {e}')
+            return None
+                   
+    def _get_object_center_depth(self, mask, depth_data):
+        """获取物体中心的深度值"""
+        try:
+            # 找到mask中心
+            mask_indices = np.where(mask > 0)
+            if len(mask_indices[0]) == 0:
+                return None
+            
+            center_y = int(np.median(mask_indices[0]))
+            center_x = int(np.median(mask_indices[1]))
+            
+            # 获取中心点周围的深度值
+            depth_samples = []
+            for dy in range(-3, 4):
+                for dx in range(-3, 4):
+                    y, x = center_y + dy, center_x + dx
+                    if 0 <= y < depth_data.shape[0] and 0 <= x < depth_data.shape[1]:
+                        if mask[y, x] > 0:  # 确保在物体内
+                            depth_val = depth_data[y, x] / 1000.0
+                            if depth_val > 0.01:
+                                depth_samples.append(depth_val)
+            
+            return np.median(depth_samples) if depth_samples else None
+            
+        except Exception:
+            return None
     def _analyze_object_sources(self, bbox, mask):
         """分析对象的来源waypoint分布"""
         try:

@@ -171,24 +171,42 @@ class DetectionPipeline:
     def _extract_all_features(self, image: np.ndarray, mask: np.ndarray,
                             depth_image: Optional[np.ndarray] = None,
                             camera_pose: Optional[Dict] = None) -> Dict:
-        """提取所有四维特征 - 改进版本"""
+        """提取所有四维特征 - 改进版本，保存原始mask"""
         features = {}
         
         try:
+            # 🆕 保存原始mask数据用于改进的相似度计算
+            if mask.dtype != bool:
+                mask_bool = mask > 0.5
+            else:
+                mask_bool = mask
+            
             # 1. 颜色特征 - 使用改进的颜色检测
             color_stats = self.color_extractor.get_color_statistics(image, mask)
             
+            # 🆕 使用改进的颜色直方图
+            improved_histogram = self._extract_color_histogram_improved(image, mask_bool, bins=32)
+            color_stats['histogram'] = improved_histogram
+            
             # 使用改进的颜色检测覆盖原有结果
-            improved_color = self._improve_color_detection(image, mask)
+            improved_color = self._improve_color_detection(image, mask_bool)
             color_stats['color_name'] = improved_color
             
             features['color'] = color_stats
             
             # 2. 形状特征
             shape_features = self.shape_extractor.extract_all_features(mask)
+            
+            # 🆕 保存原始mask用于改进的Hu矩计算
+            shape_features['raw_mask'] = mask_bool.copy()
+            
+            # 🆕 添加鲁棒形状特征
+            robust_features = self._extract_robust_shape_features(mask_bool)
+            shape_features.update(robust_features)
+            
             features['shape'] = shape_features
             
-            # 3. 空间特征（如果有深度和位姿信息）
+            # 3. 空间特征（保持原有逻辑）
             if depth_image is not None and camera_pose is not None:
                 spatial_features = self.spatial_extractor.extract_all_features(
                     mask, depth_image, camera_pose
@@ -216,7 +234,97 @@ class DetectionPipeline:
             features = {'error': str(e)}
         
         return features
-    
+    def _extract_color_histogram_improved(self, image, mask, bins=32):
+        """改进的颜色直方图提取 - 与charttest.py保持一致"""
+        if mask.dtype != bool:
+            mask = mask > 0.5
+        
+        masked_pixels = image[mask]
+        if len(masked_pixels) == 0:
+            return [0.0] * (bins * 3)
+        
+        # 分别计算RGB三个通道的直方图
+        hist_r = np.histogram(masked_pixels[:, 0], bins=bins, range=(0, 256))[0]
+        hist_g = np.histogram(masked_pixels[:, 1], bins=bins, range=(0, 256))[0]
+        hist_b = np.histogram(masked_pixels[:, 2], bins=bins, range=(0, 256))[0]
+        
+        # 归一化直方图
+        hist_r = hist_r / (np.sum(hist_r) + 1e-10)
+        hist_g = hist_g / (np.sum(hist_g) + 1e-10)
+        hist_b = hist_b / (np.sum(hist_b) + 1e-10)
+        
+        return np.concatenate([hist_r, hist_g, hist_b]).tolist()
+
+    def _extract_robust_shape_features(self, mask, smooth_kernel_size=7):
+        """提取鲁棒形状特征 - 与charttest.py保持一致"""
+        if mask.dtype == bool:
+            mask_uint8 = mask.astype(np.uint8) * 255
+        else:
+            mask_uint8 = (mask * 255).astype(np.uint8)
+        
+        # 形态学处理
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (smooth_kernel_size, smooth_kernel_size))
+        mask_smooth = cv2.morphologyEx(mask_uint8, cv2.MORPH_CLOSE, kernel)
+        mask_smooth = cv2.morphologyEx(mask_smooth, cv2.MORPH_OPEN, kernel)
+        
+        features = {}
+        
+        # 鲁棒Hu矩
+        moments = cv2.moments(mask_smooth)
+        if moments['m00'] > 0:
+            hu_moments = cv2.HuMoments(moments).flatten()
+            hu_log = -np.sign(hu_moments) * np.log10(np.abs(hu_moments) + 1e-8)
+            features['hu_moments_robust'] = hu_log.tolist()
+        else:
+            features['hu_moments_robust'] = [0.0] * 7
+        
+        # 轮廓特征
+        contours, _ = cv2.findContours(mask_smooth, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        if contours:
+            largest_contour = max(contours, key=cv2.contourArea)
+            contour_area = cv2.contourArea(largest_contour)
+            hull_area = cv2.contourArea(cv2.convexHull(largest_contour))
+            solidity = contour_area / hull_area if hull_area > 0 else 0
+            
+            perimeter = cv2.arcLength(largest_contour, True)
+            circularity = 4 * np.pi * contour_area / (perimeter * perimeter) if perimeter > 0 else 0
+            
+            rect = cv2.minAreaRect(largest_contour)
+            width, height = rect[1]
+            aspect_ratio = max(width, height) / (min(width, height) + 1e-8)
+            
+            if len(largest_contour) >= 5:
+                ellipse = cv2.fitEllipse(largest_contour)
+                ellipse_aspect = max(ellipse[1]) / (min(ellipse[1]) + 1e-8)
+            else:
+                ellipse_aspect = aspect_ratio
+                
+            features['shape_descriptors'] = [solidity, circularity, aspect_ratio, ellipse_aspect]
+        else:
+            features['shape_descriptors'] = [0.0, 0.0, 0.0, 0.0]
+        
+        # 傅里叶描述子
+        if contours:
+            largest_contour = max(contours, key=cv2.contourArea)
+            if len(largest_contour) > 10:
+                contour_points = largest_contour.reshape(-1, 2)
+                cx, cy = np.mean(contour_points, axis=0)
+                distances = np.sqrt((contour_points[:, 0] - cx)**2 + (contour_points[:, 1] - cy)**2)
+                
+                if len(distances) > 1:
+                    fft_desc = np.fft.fft(distances)
+                    fourier_desc = np.abs(fft_desc[1:9])
+                    if fourier_desc[0] > 1e-8:
+                        fourier_desc = fourier_desc / fourier_desc[0]
+                    features['fourier_descriptors'] = fourier_desc.tolist()
+                else:
+                    features['fourier_descriptors'] = [0.0] * 8
+            else:
+                features['fourier_descriptors'] = [0.0] * 8
+        else:
+            features['fourier_descriptors'] = [0.0] * 8
+        
+        return features    
     def _generate_description(self, class_name: str, features: Dict, object_id: int) -> str:
         """生成英文描述"""
         try:
@@ -640,23 +748,50 @@ class DetectionPipeline:
         return "mixed"
 
     def _save_detection_results(self, objects: List[Dict]):
-        """保存检测结果到文件"""
+        """保存检测结果到文件 - 改进版本，支持mask数据保存"""
         try:
+            # 🆕 创建mask数据目录
+            mask_data_dir = os.path.join(self.output_dir, 'mask_data')
+            os.makedirs(mask_data_dir, exist_ok=True)
+            
             # 创建可序列化的数据
             serializable_objects = []
             
             for obj in objects:
                 obj_copy = obj.copy()
-                # 🆕 移除所有不可序列化的numpy数组
+                
+                # 🆕 处理mask数据
+                if 'features' in obj_copy and 'shape' in obj_copy['features']:
+                    shape_features = obj_copy['features']['shape']
+                    
+                    # 保存原始mask到.npy文件
+                    if 'raw_mask' in shape_features:
+                        raw_mask = shape_features['raw_mask']
+                        mask_filename = f"mask_{obj_copy['object_id']}.npy"
+                        mask_filepath = os.path.join(mask_data_dir, mask_filename)
+                        
+                        # 保存mask文件
+                        np.save(mask_filepath, raw_mask)
+                        
+                        # 在JSON中记录mask文件信息
+                        shape_features['raw_mask_file'] = f'mask_data/{mask_filename}'
+                        shape_features['raw_mask_shape'] = raw_mask.shape
+                        shape_features['raw_mask_dtype'] = str(raw_mask.dtype)
+                        
+                        # 从JSON数据中移除原始mask数组
+                        del shape_features['raw_mask']
+                        
+                        print(f"[PIPELINE] 保存mask文件: {mask_filepath}")
+                
+                # 移除不可序列化的mask
                 if 'mask' in obj_copy:
                     del obj_copy['mask']
                 
-                # 🆕 处理features中的numpy数组
+                # 处理features中的numpy数组
                 if 'features' in obj_copy:
                     features = obj_copy['features']
                     for feature_type, feature_data in features.items():
                         if isinstance(feature_data, dict):
-                            # 递归处理嵌套字典中的numpy数组
                             features[feature_type] = self._sanitize_for_json(feature_data)
                 
                 serializable_objects.append(obj_copy)
@@ -665,7 +800,8 @@ class DetectionPipeline:
                 'detection_summary': {
                     'total_objects': len(objects),
                     'detection_time': datetime.now().isoformat(),
-                    'objects_by_class': self._group_objects_by_class(objects)
+                    'objects_by_class': self._group_objects_by_class(objects),
+                    'mask_data_directory': 'mask_data'  # 🆕 记录mask目录
                 },
                 'objects': serializable_objects
             }
@@ -676,6 +812,7 @@ class DetectionPipeline:
                 json.dump(result_data, f, indent=2, ensure_ascii=False)
             
             print(f"[PIPELINE] 检测结果已保存到: {json_file}")
+            print(f"[PIPELINE] Mask数据已保存到: {mask_data_dir}")
             
             # 生成可读的摘要文件
             self._save_detection_summary(objects)

@@ -19,7 +19,7 @@ def trigger_detection():
     time.sleep(1.0)
     
     # 发送触发消息
-    scan_dir = '/home/qi/ros2_ws/scan_output_20250714_222550'
+    scan_dir = '/home/qi/ros2_ws/scan_output_20250724_161725'
     
     msg = String()
     msg.data = scan_dir

@@ -283,11 +283,11 @@ class AutomatedStaticGraspSystem(Node):
             
             # Calculate yaw angle and gripper width
             if width > height:
-                dis = max(150, min(500, int(height * 2 - 10)))  # Calculate gripper width based on shorter one
+                dis = max(150, min(500, int(height * 2 - 50)))  # Calculate gripper width based on shorter one
                 yaw_angle = -angle + 90 + scan_yaw
             else:
                 yaw_angle = -angle + scan_yaw
-                dis = max(150, min(500, int(width * 2 - 10)))   # Calculate gripper width based on shorter one
+                dis = max(150, min(500, int(width * 2 - 50)))   # Calculate gripper width based on shorter one
             
             # Normalize yaw angle to [-180, 180]
             while yaw_angle > 180:
@@ -365,7 +365,7 @@ class AutomatedStaticGraspSystem(Node):
         offset_z = offset_down
         
         compensated_x = target_x - offset_x
-        compensated_y = target_y - offset_y
+        compensated_y = target_y - offset_y*0.8
         compensated_z = target_z + offset_z
         
         self.get_logger().info(f'🔧 Pitch compensation: pitch={pitch_deg}°, yaw={yaw_deg}°')
@@ -376,119 +376,347 @@ class AutomatedStaticGraspSystem(Node):
         return compensated_x, compensated_y, compensated_z
 
     def execute_single_grasp_and_place(self, target: Dict) -> bool:
-        """Execute grasp and place sequence for a single target - using new gripper control"""
+        """执行抓取和放置序列 - 使用正确的补偿公式"""
         try:
-            self.get_logger().info(f' Starting grasp sequence for: {target["description"]}')
+            self.get_logger().info(f' 开始抓取序列: {target["description"]}')
             
+            # 获取增强信息
+            depth_info = target.get('features', {}).get('depth_info', {})
+            spatial_features = target.get('features', {}).get('spatial', {})
+            gripper_info = spatial_features.get('gripper_width_info', {})
+            
+            # 基础位置信息
             target_x, target_y, target_z = target['world_coordinates'][:3]
             
-            yaw, wid = self.calculate_yaw_from_mask(target['mask'], target.get('scan_detail'))
-            height_mm = target['features'].get('depth_info', {}).get('height_mm', 30.0)
+            # 🆕 使用正确的背景Z补偿公式
+            background_world_z = depth_info.get('background_world_z', target_z)
+            background_depth_m = depth_info.get('background_depth_m', 0.3)
+            object_height_mm = depth_info.get('height_mm', 30.0)
             
-            self.get_logger().info(f' Grasp parameters: yaw={yaw:.1f}°, wid={wid}, height={height_mm:.1f}mm')
+            # 🆕 计算真实的背景补偿高度
+            background_z_compensated = background_world_z - (background_depth_m * 1000)
             
-            strategy = self.plan_grasp_strategy(height_mm, yaw)
+            self.get_logger().info(f'📏 深度信息分析:')
+            self.get_logger().info(f'   背景世界Z: {background_world_z:.1f}mm')
+            self.get_logger().info(f'   背景深度: {background_depth_m:.3f}m ({background_depth_m*1000:.1f}mm)')
+            self.get_logger().info(f'   补偿后背景Z: {background_z_compensated:.1f}mm')
+            self.get_logger().info(f'   物体高度: {object_height_mm:.1f}mm')
             
-            # Calculate actual grasp position
-            actual_grasp_z = target_z + strategy['z_offset_grasp']
+            # 🆕 使用正确的抓夹宽度计算公式
+            if gripper_info and 'real_width_mm' in gripper_info:
+                real_width_mm = gripper_info['real_width_mm']
+                
+                # 你的公式：
+                # 预抓取宽度 = real_width_mm * 10 + 50
+                # 最终抓取宽度 = real_width_mm * 10 - 100
+                pre_grasp_width = int(real_width_mm * 10 + 50)
+                final_grasp_width = int(real_width_mm * 10 - 150)
+                
+                # 确保在合理范围内
+                pre_grasp_width = max(400, min(850, pre_grasp_width))
+                final_grasp_width = max(50, min(800, final_grasp_width))
+                
+                self.get_logger().info(f'🤏 抓夹宽度计算:')
+                self.get_logger().info(f'   实际宽度: {real_width_mm:.1f}mm')
+                self.get_logger().info(f'   预抓取宽度: {real_width_mm:.1f} * 10 + 50 = {pre_grasp_width}')
+                self.get_logger().info(f'   最终抓取宽度: {real_width_mm:.1f} * 10 - 100 = {final_grasp_width}')
+                
+            else:
+                # 回退到原有计算方法
+                yaw, backup_width = self.calculate_yaw_from_mask(target['mask'], spatial_features.get('scan_detail'))
+                pre_grasp_width = max(backup_width + 100, 600)
+                final_grasp_width = backup_width
+                self.get_logger().warn('⚠️ 未找到real_width_mm，使用备用抓夹宽度计算')
             
-            # Calculate pitch compensation
+            # 计算yaw角度
+            yaw, _ = self.calculate_yaw_from_mask(target['mask'], spatial_features.get('scan_detail'))
+            
+            self.get_logger().info(f' 抓取参数总结:')
+            self.get_logger().info(f'   yaw角度: {yaw:.1f}°')
+            self.get_logger().info(f'   预抓取宽度: {pre_grasp_width}')
+            self.get_logger().info(f'   最终抓取宽度: {final_grasp_width}')
+            
+            # 🆕 基于补偿后的背景高度计算抓取策略
+            strategy = self.plan_grasp_strategy_with_compensation(
+                object_height_mm, background_z_compensated, yaw
+            )
+            
+            # 🆕 计算实际抓取位置（基于补偿后的背景高度）
+            actual_grasp_z = background_z_compensated + strategy['z_offset_above_background']
+            
+            self.get_logger().info(f'🎯 抓取高度计算:')
+            self.get_logger().info(f'   补偿背景Z: {background_z_compensated:.1f}mm')
+            self.get_logger().info(f'   Z偏移: {strategy["z_offset_above_background"]:.1f}mm')
+            self.get_logger().info(f'   最终抓取Z: {actual_grasp_z:.1f}mm')
+            
+            # 计算pitch补偿
             compensated_x, compensated_y, compensated_z = self.calculate_pitch_compensation(
                 target_x, target_y, actual_grasp_z, 
                 strategy['pitch'], yaw
             )
             
-            # # 1.  Open gripper to suitable pre-grasp position
-            # pre_grasp_width = max(wid + 100, 600)  # 100mm wider than target
-            # self.get_logger().info(f' Step 1: Setting gripper to pre-grasp width: {pre_grasp_width}')
-            # if not self.call_gripper_set_position(pre_grasp_width):
-            #     self.get_logger().warn(' Gripper set might have failed, but continuing execution')
-            # time.sleep(2)  #  Add wait time
-            self.get_logger().info(' Step 1 complete')
+            self.get_logger().info(f'🔧 Pitch补偿后坐标: [{compensated_x:.1f}, {compensated_y:.1f}, {compensated_z:.1f}]')
             
-            # 2. Move to safe pre-grasp position
-            safe_z_approach = max(actual_grasp_z + 100, 350)
-            pre_comp_x, pre_comp_y, pre_comp_z = self.calculate_pitch_compensation(
-                target_x, target_y, safe_z_approach, 0, yaw
+            # 执行抓取序列
+            success = self._execute_enhanced_grasp_sequence(
+                compensated_x, compensated_y, compensated_z,
+                strategy, yaw, pre_grasp_width, final_grasp_width, 
+                background_z_compensated, target
             )
             
-            self.get_logger().info(f' Step 2: Moving to safe pre-grasp position: [{pre_comp_x:.1f}, {pre_comp_y:.1f}, {pre_comp_z:.1f}]')
-            if not self.move_to_pose(pre_comp_x, pre_comp_y, pre_comp_z, 180, 0, yaw):
-                self.get_logger().error(' Step 2 failed')
+            if success:
+                self.get_logger().info(f'✅ 完整抓取序列成功: {target["description"]}')
+            else:
+                self.get_logger().error(f'❌ 抓取序列失败: {target["description"]}')
+            
+            return success
+            
+        except Exception as e:
+            self.get_logger().error(f'单个抓取序列失败 {target.get("description", "unknown")}: {e}')
+            import traceback
+            traceback.print_exc()
+            return False
+
+    def plan_grasp_strategy_with_compensation(self, object_height_mm: float, background_z_compensated: float, yaw: float) -> Dict:
+        """基于补偿后背景高度的抓取策略规划"""
+        try:
+            # 基础策略（基于物体高度）
+            if object_height_mm < 20:
+                base_pitch = 0.0
+                height_offset = object_height_mm * 0.6  # 薄物体，稍微偏下抓取
+            elif object_height_mm < 40:
+                base_pitch = -5.0
+                height_offset = object_height_mm * 0.8  # 中等薄度，中间偏上
+            elif object_height_mm < 80:
+                base_pitch = -15.0
+                height_offset = object_height_mm * 1  # 中等物体
+            elif object_height_mm < 120:
+                base_pitch = -25.0
+                height_offset = object_height_mm * 1  # 较高物体
+            else:
+                base_pitch = -35.0
+                height_offset = min(object_height_mm * 0.8, 100)  # 高物体，但限制最大偏移
+            
+            # 🆕 根据补偿后的背景高度调整策略
+            if background_z_compensated < 0:
+                # 背景在基准面以下，需要更保守的策略
+                pitch_adjustment = 5.0  # 减少倾斜
+                height_adjustment = 10.0  # 增加高度偏移
+                self.get_logger().info('⚠️ 背景低于基准面，使用保守策略')
+            elif background_z_compensated > 200:
+                # 背景较高，可以更积极
+                pitch_adjustment = -5.0  # 增加倾斜
+                height_adjustment = -5.0  # 减少高度偏移
+                self.get_logger().info('📈 背景较高，使用积极策略')
+            else:
+                pitch_adjustment = 0.0
+                height_adjustment = 20.0
+            
+            final_pitch = base_pitch + pitch_adjustment
+            
+            # 🆕 添加安全余量（相对于物体高度动态调整）
+            if object_height_mm < 30:
+                safety_margin = 110.0  # 薄物体需要更多安全余量
+            else:
+                safety_margin = 120.0
+            
+            z_offset_above_background = height_offset + height_adjustment + safety_margin
+            
+            self.get_logger().info(f'📋 抓取策略详情:')
+            self.get_logger().info(f'   物体高度: {object_height_mm:.1f}mm')
+            self.get_logger().info(f'   补偿背景Z: {background_z_compensated:.1f}mm')
+            self.get_logger().info(f'   基础pitch: {base_pitch:.1f}° → 最终pitch: {final_pitch:.1f}°')
+            self.get_logger().info(f'   高度偏移: {height_offset:.1f} + 调整{height_adjustment:.1f} + 安全{safety_margin:.1f} = {z_offset_above_background:.1f}mm')
+            
+            return {
+                'pitch': final_pitch,
+                'yaw': yaw,
+                'z_offset_above_background': z_offset_above_background,
+                'object_height': object_height_mm,
+                'background_z_compensated': background_z_compensated,
+                'safety_margin': safety_margin,
+                'height_offset': height_offset
+            }
+            
+        except Exception as e:
+            self.get_logger().error(f'抓取策略规划失败: {e}')
+            return {
+                'pitch': 0.0,
+                'yaw': yaw,
+                'z_offset_above_background': 50.0,
+                'object_height': 30.0,
+                'background_z_compensated': background_z_compensated,
+                'safety_margin': 15.0,
+                'height_offset': 20.0
+            }
+
+    def _execute_enhanced_grasp_sequence(self, x, y, z, strategy, yaw, pre_width, final_width, background_z_compensated, target):
+        """执行增强的抓取序列，使用补偿后的背景高度"""
+        try:
+            target_desc = target.get("description", "unknown object")
+            
+            # 1. 设置预抓取宽度
+            self.get_logger().info(f'📐 步骤1: 设置预抓取宽度: {pre_width}')
+            if not self.call_gripper_close(pre_width):
+                self.get_logger().warn(' 预抓取宽度设置可能失败，继续执行')
+            time.sleep(2)
+            
+            # 2. 🆕 计算多层安全高度（基于补偿后的背景）
+            # 高安全位置：补偿背景 + 物体高度 + 大余量
+            safe_z_high = max(background_z_compensated + strategy['object_height'] + 200,350)
+            safe_comp_x, safe_comp_y, safe_comp_z = self.calculate_pitch_compensation(
+                x, y, safe_z_high, 0, yaw
+            )
+            if yaw < -135 or -45 < y < 0:
+                y = y - 20
+                safe_comp_y = safe_comp_y - 20
+            self.get_logger().info(f'🔝 步骤2: 移动到高安全位置')
+            self.get_logger().info(f'   计算: {background_z_compensated:.1f} + {strategy["object_height"]:.1f} + 200 = {safe_z_high:.1f}mm')
+            self.get_logger().info(f'   坐标: [{safe_comp_x:.1f}, {safe_comp_y:.1f}, {safe_comp_z:.1f}]')
+            
+            if not self.move_to_pose(safe_comp_x, safe_comp_y, safe_comp_z, 180, 0, yaw):
+                self.get_logger().error(' 步骤2失败')
                 return False
             time.sleep(1)
-            self.get_logger().info(' Step 2 complete')
             
-            # 3. Descend to grasp position
-            self.get_logger().info(f' Step 3: Descending to grasp position: [{compensated_x:.1f}, {compensated_y:.1f}, {compensated_z:.1f}] pitch={strategy["pitch"]:.1f}°')
-            if not self.move_to_pose(compensated_x, compensated_y, compensated_z, 180, strategy['pitch'], yaw):
-                self.get_logger().error(' Step 3 failed')
+            # 3. 中等安全高度
+            mid_safe_z = max(background_z_compensated + strategy['object_height'] + 100,z + 50)
+            mid_pitch = strategy['pitch'] * 0.5
+            mid_comp_x, mid_comp_y, mid_comp_z = self.calculate_pitch_compensation(
+                x, y, mid_safe_z, mid_pitch, yaw
+            )
+            if yaw < -135 or -45 < y < 0:
+                mid_comp_y = mid_comp_y - 20
+            self.get_logger().info(f'🔄 步骤3: 移动到中等安全位置')
+            self.get_logger().info(f'   高度: {background_z_compensated:.1f} + {strategy["object_height"]:.1f} + 100 = {mid_safe_z:.1f}mm')
+            self.get_logger().info(f'   坐标: [{mid_comp_x:.1f}, {mid_comp_y:.1f}, {mid_comp_z:.1f}], pitch: {mid_pitch:.1f}°')
+            
+            if not self.move_to_pose(mid_comp_x, mid_comp_y, mid_comp_z, 180, mid_pitch, yaw):
+                self.get_logger().error(' 步骤3失败')
                 return False
             time.sleep(1)
-            self.get_logger().info(' Step 3 complete')
             
-            # 4.  Close gripper to calculated width
-            self.get_logger().info(f' Step 4: Closing gripper to width: {wid}')
-            if not self.call_gripper_close(wid):
-                self.get_logger().warn(' Gripper close might have failed, but continuing execution')
-            time.sleep(2)  #  Add wait time
-            self.get_logger().info(' Step 4 complete')
+            # 4. 下降到最终抓取位置
+            self.get_logger().info(f'⬇️ 步骤4: 下降到最终抓取位置')
+            self.get_logger().info(f'   目标坐标: [{x:.1f}, {y:.1f}, {z:.1f}]')
+            self.get_logger().info(f'   pitch: {strategy["pitch"]:.1f}°, yaw: {yaw:.1f}°')
             
-            # 5. Lift to safe height
-            self.get_logger().info(' Step 5: Lifting to safe height...')
-            if not self.move_to_pose(pre_comp_x, pre_comp_y, pre_comp_z, 180, 0, yaw):
-                self.get_logger().error(' Step 5 failed')
+            if not self.move_to_pose(x, y, z, 180, strategy['pitch'], yaw):
+                self.get_logger().error(' 步骤4失败')
+                return False
+            time.sleep(2)
+
+            # 5. 🆕 执行最终抓取（使用计算出的宽度）
+            self.get_logger().info(f'🤏 步骤5: 执行最终抓取')
+            self.get_logger().info(f'   抓取宽度: {final_width} (来自公式: real_width * 10 - 100)')
+            
+            grasp_success = False
+            
+            # 尝试标准抓取
+            if self.call_gripper_close(final_width):
+                time.sleep(3)  # 给更多时间确保抓取稳定
+                grasp_success = True
+                self.get_logger().info('✅ 标准抓取成功')
+            else:
+                # 备用尝试：稍微松一点
+                backup_width = final_width + 30
+                self.get_logger().warn(f'⚠️ 标准抓取可能失败，尝试备用宽度: {backup_width}')
+                if self.call_gripper_close(backup_width):
+                    time.sleep(3)
+                    grasp_success = True
+                    self.get_logger().info('✅ 备用抓取成功')
+            
+            if not grasp_success:
+                self.get_logger().error('❌ 步骤5: 所有抓取尝试都失败')
+                return False
+            
+            # 6. 智能提升检查
+            self.get_logger().info('🔍 步骤6: 轻微提升检查抓取效果')
+            
+            # 轻微提升检查是否抓住
+            check_z = z + 100
+            check_comp_x, check_comp_y, check_comp_z = self.calculate_pitch_compensation(
+                x, y, check_z, strategy['pitch'], yaw
+            )
+            
+            if not self.move_to_pose(check_comp_x, check_comp_y, check_comp_z, 180, strategy['pitch'], yaw):
+                self.get_logger().error(' 步骤6失败')
+                return False
+            time.sleep(2)
+            safe_com_z = max(check_comp_z + 50, 300)
+            # 继续提升到安全高度
+            self.get_logger().info('⬆️ 继续提升到安全高度')
+            if not self.move_to_pose(safe_comp_x, safe_comp_y, safe_com_z, 180, 0, yaw):
+                self.get_logger().error(' 提升到安全高度失败')
                 return False
             time.sleep(1)
-            self.get_logger().info(' Step 5 complete')
             
-            # 6-10. Placement steps
+            # 7-10. 🆕 放置序列（使用补偿后的背景高度）
             placement_x, placement_y, placement_z_safe = 300, 0, 350
-            self.get_logger().info(f' Step 6: Moving to placement area: [{placement_x}, {placement_y}, {placement_z_safe}]')
+            
+            self.get_logger().info(f'📦 步骤7: 移动到放置区域: [{placement_x}, {placement_y}, {placement_z_safe}]')
             if not self.move_to_pose(placement_x, placement_y, placement_z_safe, 180, 0, 0):
-                self.get_logger().error(' Step 6 failed')
+                self.get_logger().error(' 步骤7失败')
                 return False
             time.sleep(1)
-            self.get_logger().info(' Step 6 complete')
             
-            # Descend to release position
-            placement_z_release = compensated_z + 20
-            self.get_logger().info(f'⬇ Step 7: Descending to release position: [{placement_x}, {placement_y}, {placement_z_release}]')
+            # 🆕 使用补偿背景高度计算放置高度
+            # 假设放置区域的背景高度与抓取区域类似
+            placement_z_release = max(background_z_compensated + 40, 200)  # 至少50mm高度
+            
+            self.get_logger().info(f'⬇️ 步骤8: 下降到放置高度')
+            self.get_logger().info(f'   放置高度: max({background_z_compensated:.1f} + 40, 50) = {placement_z_release:.1f}mm')
+            
             if not self.move_to_pose(placement_x, placement_y, placement_z_release, 180, 0, 0):
-                self.get_logger().error(' Step 7 failed')
+                self.get_logger().error(' 步骤8失败')
                 return False
             time.sleep(1)
-            self.get_logger().info(' Step 7 complete')
             
-            # Release gripper
-            self.get_logger().info(' Step 8: Releasing object...')
-            if not self.call_gripper_open():
-                self.get_logger().error(' Step 8 failed')
+            # 9. 释放物体
+            self.get_logger().info('🔓 步骤9: 释放物体')
+            if not self.call_gripper_close(800):
+                self.get_logger().error(' 步骤9失败')
                 return False
-            time.sleep(1)
-            self.get_logger().info(' Step 8 complete')
+            time.sleep(3)
             
-            # Lift up
-            self.get_logger().info(' Step 9: Lifting up...')
-            if not self.move_to_pose(placement_x, placement_y, placement_z_safe, 180, 0, 0):
-                self.get_logger().error(' Step 9 failed')
-                return False
-            time.sleep(1)
-            self.get_logger().info(' Step 9 complete')
-            
-            # Return to initial position
-            self.get_logger().info(' Step 10: Returning to initial position...')
+            # 11. 回到初始位置
+            self.get_logger().info('🏠 步骤11: 返回初始位置')
             if not self.call_service(self.go_home_client):
-                self.get_logger().error(' Step 10 failed')
+                self.get_logger().error(' 步骤11失败')
                 return False
             
-            self.get_logger().info(f' Full grasp sequence successful: {target["description"]}')
+            self.get_logger().info(f'🎉 完整增强抓取序列成功: {target_desc}')
+            
+            # 🆕 记录成功的参数用于后续优化
+            self._log_successful_grasp_params(target, final_width, background_z_compensated, strategy)
+            
             return True
             
         except Exception as e:
-            self.get_logger().error(f'Single grasp sequence failed for {target.get("description", "unknown object")}: {e}')
+            self.get_logger().error(f'增强抓取序列执行失败: {e}')
+            import traceback
+            traceback.print_exc()
             return False
-    
+
+    def _log_successful_grasp_params(self, target, final_width, background_z_compensated, strategy):
+        """记录成功的抓取参数，用于后续优化"""
+        try:
+            success_data = {
+                'object_id': target.get('object_id'),
+                'class_name': target.get('class_name'),
+                'final_grasp_width': final_width,
+                'background_z_compensated': background_z_compensated,
+                'pitch_used': strategy['pitch'],
+                'z_offset_used': strategy['z_offset_above_background'],
+                'object_height': strategy['object_height']
+            }
+            
+            self.get_logger().info('📝 成功参数记录:')
+            for key, value in success_data.items():
+                self.get_logger().info(f'   {key}: {value}')
+                
+        except Exception as e:
+            self.get_logger().error(f'参数记录失败: {e}')    
     def move_to_pose(self, x, y, z, roll, pitch, yaw, timeout=10.0) -> bool:
         """Move to specified pose"""
         try:
@@ -530,8 +758,10 @@ class AutomatedStaticGraspSystem(Node):
         """Plan grasp strategy based on object height"""
         pitch = 0.0 
         grasp_offset_from_target_z = 0.0
-        
-        if height_mm < 80:
+        if height_mm < 40:
+            pitch = 0.0
+            grasp_offset_from_target_z = 140            
+        elif height_mm < 80:
             pitch = 0.0
             grasp_offset_from_target_z = 120
         elif height_mm < 120:

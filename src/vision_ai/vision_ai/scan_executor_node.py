@@ -14,39 +14,45 @@ import os
 from datetime import datetime
 import math
 from std_msgs.msg import String
+
 class ScanExecutorNode(Node):
+    """
+    A ROS2 node responsible for executing a scan plan, moving the robot arm
+    to specified waypoints, capturing color and depth images, and
+    initiating an image stitching process.
+    """
     def __init__(self):
         super().__init__('scan_executor_node')
         
-        # 状态管理
+        # State management variables
         self.current_scan_plan = None
         self.execution_active = False
         self.captured_images = []
         self.current_waypoint_index = 0
         
-        # CV Bridge
+        # CV Bridge for converting ROS Image messages to OpenCV images
         self.bridge = CvBridge()
-        self.current_arm_position = None
-        self.target_position = None
-        self.movement_completed = False
-        self.output_dir = None
+        self.current_arm_position = None # Current position of the robot arm
+        self.target_position = None      # Target position for movement
+        self.movement_completed = False  # Flag to indicate movement completion
+        self.output_dir = None           # Directory to save captured images
         
-        # 相机内参 (来自scan_planner_node)
+        # Camera intrinsic parameters (obtained from scan_planner_node)
         self.camera_intrinsics = {
             'fx': 912.694580078125,
             'fy': 910.309814453125,
-            'cx': 640,  # 1280/2
-            'cy': 360   # 720/2
+            'cx': 640,  # Center X (1280/2)
+            'cy': 360   # Center Y (720/2)
         }
         
-        # 创建服务
+        # Create the service for executing scans
         self.execute_service = self.create_service(
             ExecuteScan, 
             'execute_scan', 
             self.execute_scan_callback
         )
         
-        # 订阅者 - 机械臂位姿
+        # Subscriber for robot arm's current pose
         self.current_pose_sub = self.create_subscription(
             PoseStamped, 
             '/xarm/current_pose', 
@@ -54,7 +60,7 @@ class ScanExecutorNode(Node):
             10
         )
         
-        # 订阅者 - 彩色图像
+        # Subscriber for color images from the camera
         self.color_image_sub = self.create_subscription(
             Image,
             '/camera/color/image_raw',
@@ -62,7 +68,7 @@ class ScanExecutorNode(Node):
             10
         )
         
-        # 订阅者 - 深度图像
+        # Subscriber for depth images from the camera
         self.depth_image_sub = self.create_subscription(
             Image,
             '/camera/depth/image_raw',
@@ -70,107 +76,116 @@ class ScanExecutorNode(Node):
             10
         )
         
-        # 发布者 - 发送目标位姿给机械臂
+        # Publisher for sending target poses to the robot arm
         self.target_pose_pub = self.create_publisher(
             PoseStamped,
             '/xarm/target_pose',
             10
         )
         
-        # 服务客户端 - 机械臂控制
+        # Service client for robot arm control (e.g., enable/disable)
         self.arm_enable_client = self.create_client(
             SetBool, 
             '/xarm/enable'
         )
         
-        # 存储最新图像
+        # Store the latest received images
         self.latest_color_image = None
         self.latest_depth_image = None
         
-        self.get_logger().info('扫描执行节点已启动 (支持深度图采集)')
+        self.get_logger().info('The scan execution node has been started (supports depth map acquisition)')
         
-        # 等待硬件服务
+        # Wait for necessary hardware services to be available
         self._wait_for_hardware_services()
 
     def _wait_for_hardware_services(self):
-        """等待硬件服务可用"""
-        self.get_logger().info('等待硬件服务...')
+        """Waits for the necessary hardware services (e.g., robot arm enable) to be available."""
+        self.get_logger().info('Waiting for hardware service...')
         
-        # 等待机械臂服务
+        # Wait for the robot arm enable service
         if not self.arm_enable_client.wait_for_service(timeout_sec=15.0):
-            self.get_logger().warn('机械臂使能服务连接超时，但继续运行')
+            self.get_logger().warn('The robot enabling service connection timed out, but continues to run.')
         else:
-            self.get_logger().info('机械臂使能服务已连接')
+            self.get_logger().info('Robot arm enable service connected.')
         
-        self.get_logger().info('所有硬件服务已就绪')
+        self.get_logger().info('All hardware services are ready.')
 
     def execute_scan_callback(self, request, response):
-        """执行扫描服务回调"""
+        """
+        Callback for the execute_scan service.
+        Initiates the scanning process based on the provided scan plan.
+        """
         try:
             if self.execution_active:
                 response.success = False
-                response.message = "扫描执行中，请等待完成"
+                response.message = "Scan is already in progress, please wait for completion."
                 return response
             
-            # 存储扫描计划
+            # Store the received scan plan
             self.current_scan_plan = request.scan_plan
             
-            # 创建输出目录
+            # Create a unique output directory for this scan
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
             self.output_dir = f"scan_output_{timestamp}"
             os.makedirs(self.output_dir, exist_ok=True)
             
-            self.get_logger().info(f'开始执行扫描: {len(self.current_scan_plan.waypoints)} 个路径点')
-            self.get_logger().info(f'输出目录: {self.output_dir}')
+            self.get_logger().info(f'Starting scan execution: {len(self.current_scan_plan.waypoints)} waypoints.')
+            self.get_logger().info(f'Output directory: {self.output_dir}')
             
-            # 启动异步执行
+            # Start asynchronous execution
             self.execution_active = True
             self.captured_images = []
             self.current_waypoint_index = 0
             
-            # 创建定时器执行扫描序列
+            # Create a timer to step through the scan sequence
             self.scan_timer = self.create_timer(0.5, self.scan_sequence_step)
             
             response.success = True
-            response.message = f"扫描开始执行，预计 {len(self.current_scan_plan.waypoints)} 个路径点"
+            response.message = f"Scan execution started, {len(self.current_scan_plan.waypoints)} waypoints expected."
             
         except Exception as e:
             response.success = False
-            response.message = f"扫描执行失败: {str(e)}"
-            self.get_logger().error(f'扫描执行错误: {e}')
+            response.message = f"Scan execution failed: {str(e)}"
+            self.get_logger().error(f'Scan execution error: {e}')
         
         return response
 
     def color_image_callback(self, msg):
-        """彩色图像回调"""
+        """Callback for receiving color image messages."""
         self.latest_color_image = msg
 
     def depth_image_callback(self, msg):
-        """深度图像回调"""
+        """Callback for receiving depth image messages."""
         self.latest_depth_image = msg
 
     def scan_sequence_step(self):
-        """扫描序列的单步执行"""
+        """
+        Executes a single step in the scanning sequence.
+        Moves to the next waypoint, waits for movement, then captures images.
+        """
         if not self.execution_active or not self.current_scan_plan:
             return
         
-        # 检查是否完成所有路径点
+        # Check if all waypoints have been processed
         if self.current_waypoint_index >= len(self.current_scan_plan.waypoints):
             self._finish_scan_execution()
             return
         
-        # 只有在不忙碌时才执行下一个waypoint
+        # Only execute the next waypoint if not currently busy with a waypoint
         if not getattr(self, 'waypoint_busy', False):
             waypoint = self.current_scan_plan.waypoints[self.current_waypoint_index]
-            self.waypoint_busy = True
+            self.waypoint_busy = True # Set flag to indicate busy
             self._execute_waypoint(waypoint)
 
     def _execute_waypoint(self, waypoint):
-        """执行单个路径点 - 等待移动完成"""
+        """
+        Executes movement to a single waypoint and sets up a timer
+        to check for movement completion.
+        """
         try:
-            self.get_logger().info(f'🎯 执行路径点 {self.current_waypoint_index + 1}/{len(self.current_scan_plan.waypoints)}')
+            self.get_logger().info(f'🎯 Executing waypoint {self.current_waypoint_index + 1}/{len(self.current_scan_plan.waypoints)}')
             
-            # 存储目标位置用于检测到达
+            # Store the target position for movement completion detection
             self.target_position = [
                 waypoint.pose.position.x,
                 waypoint.pose.position.y, 
@@ -179,35 +194,38 @@ class ScanExecutorNode(Node):
             
             target_pose = PoseStamped()
             target_pose.header.stamp = self.get_clock().now().to_msg()
-            target_pose.header.frame_id = "base_link"
+            target_pose.header.frame_id = "base_link" # Assuming "base_link" as the robot's base frame
             target_pose.pose = waypoint.pose
             
-            self.target_pose_pub.publish(target_pose)
+            self.target_pose_pub.publish(target_pose) # Publish the target pose
             
-            # 开始移动完成检测
+            # Start movement completion detection
             self.waypoint_data = waypoint
             self.movement_start_time = time.time()
             self.movement_completed = False
             
-            # 创建检测定时器，0.5秒检查一次
+            # Create a timer to check movement completion every 0.5 seconds
             self.movement_check_timer = self.create_timer(0.5, self.check_movement_completion)
             
         except Exception as e:
-            self.get_logger().error(f'waypoint执行失败: {e}')
-            self.waypoint_busy = False
+            self.get_logger().error(f'Waypoint execution failed: {e}')
+            self.waypoint_busy = False # Release busy flag on error
 
     def check_movement_completion(self):
-        """检查移动是否完成"""
+        """
+        Checks if the robot arm has reached the target position.
+        Includes a timeout mechanism.
+        """
         if not hasattr(self, 'target_position') or self.target_position is None:
             return
             
-        # 超时检查（30秒）
+        # Timeout check (50 seconds)
         if time.time() - self.movement_start_time > 50:
-            self.get_logger().warn('移动超时，强制继续')
+            self.get_logger().warn('Movement timed out, forcing continuation.')
             self._on_movement_completed()
             return
         
-        # 检查是否到达目标位置
+        # Check if the target position has been reached
         if self.current_arm_position is not None:
             distance = math.sqrt(
                 (self.current_arm_position[0] - self.target_position[0])**2 +
@@ -215,127 +233,138 @@ class ScanExecutorNode(Node):
                 (self.current_arm_position[2] - self.target_position[2])**2
             )
             
-            # 到达阈值：5mm
+            # Arrival threshold: 5mm
             if distance < 5.0:
-                self.get_logger().info(f'✅ 到达目标位置，距离: {distance:.1f}mm')
+                self.get_logger().info(f'✅ Reached target position, distance: {distance:.1f}mm.')
                 self._on_movement_completed()
             else:
                 elapsed = time.time() - self.movement_start_time
-                self.get_logger().info(f'🚀 移动中... 距离目标: {distance:.1f}mm, 用时: {elapsed:.1f}s')
+                self.get_logger().info(f'🚀 Moving... Distance to target: {distance:.1f}mm, Time elapsed: {elapsed:.1f}s.')
 
     def _on_movement_completed(self):
-        """移动完成处理"""
-        # 停止检测定时器
+        """
+        Handles actions to be performed once movement to a waypoint is complete,
+        such as stopping the movement check timer and initiating image capture.
+        """
+        # Stop the movement check timer
         if hasattr(self, 'movement_check_timer'):
             self.movement_check_timer.destroy()
         
         self.movement_completed = True
         
-        self.get_logger().info('移动完成，开始图像采集')
+        self.get_logger().info('Movement completed, starting image capture.')
         self._capture_image_at_waypoint(self.waypoint_data)
         
-        # 完成当前waypoint
+        # Advance to the next waypoint
         self.current_waypoint_index += 1
-        self.waypoint_busy = False
-        self.target_position = None
+        self.waypoint_busy = False # Release busy flag
+        self.target_position = None # Clear target position
 
     def pose_callback(self, msg):
-        """机械臂位姿回调 - 用于移动检测"""
+        """
+        Callback for robot arm pose updates.
+        Used to track the current position for movement completion detection.
+        """
         try:
-            # 保存当前位置用于移动完成检测
+            # Save the current position for movement completion detection
             self.current_arm_position = [
                 msg.pose.position.x,
                 msg.pose.position.y, 
                 msg.pose.position.z
             ]
         except Exception as e:
-            self.get_logger().error(f'位姿回调错误: {e}')
+            self.get_logger().error(f'Pose callback error: {e}')
 
     def _capture_image_at_waypoint(self, waypoint):
-        """图像采集 - 包含深度图"""
+        """
+        Captures color and depth images at the current waypoint.
+        """
         try:
-            self.get_logger().info(f'📸 开始图像采集 (彩色+深度)')
+            self.get_logger().info(f'📸 Starting image capture (Color + Depth).')
             
-            # 检查图像可用性
+            # Check if both color and depth images are available
             if not self.latest_color_image or not self.latest_depth_image:
-                self.get_logger().error('彩色或深度图像不可用')
+                self.get_logger().error('Color or depth image not available.')
                 return
             
             self.current_waypoint_for_image = waypoint
             self.process_captured_images(self.latest_color_image, self.latest_depth_image)
                 
         except Exception as e:
-            self.get_logger().error(f'图像采集失败: {e}')
+            self.get_logger().error(f'Image capture failed: {e}')
 
-# scan_executor_node.py 中图像处理部分的修复
 
     def process_captured_images(self, color_msg, depth_msg):
-            """处理采集的彩色和深度图像 - 修复cv_bridge错误"""
+            """
+            Processes the captured color and depth images, converting them
+            to OpenCV format, saving them, and storing relevant metadata.
+            Includes error handling for cv_bridge conversions.
+            """
             try:
-                # 修复：安全的图像转换
+                # Fix: Safe image conversion
                 try:
-                    # 对于bgr8编码，直接转换后再变换颜色
+                    # For bgr8 encoding, convert directly then transform color
                     color_cv_image = self.bridge.imgmsg_to_cv2(color_msg, desired_encoding="passthrough")
                     
-                    # 检查图像通道和转换
+                    # Check image channels and convert
                     if len(color_cv_image.shape) == 3 and color_cv_image.shape[2] == 3:
                         # BGR -> RGB
                         color_rgb = cv2.cvtColor(color_cv_image, cv2.COLOR_BGR2RGB)
                     else:
-                        self.get_logger().error(f'不支持的图像格式: {color_cv_image.shape}')
+                        self.get_logger().error(f'Unsupported color image format: {color_cv_image.shape}')
                         return
                         
-                    self.get_logger().info(f'彩色图像转换成功: {color_rgb.shape}')
+                    self.get_logger().info(f'Color image conversion successful: {color_rgb.shape}')
                         
                 except Exception as color_error:
-                    self.get_logger().error(f'彩色图像转换失败: {color_error}')
-                    # 备用方案：尝试不同的转换方式
+                    self.get_logger().error(f'Color image conversion failed: {color_error}')
+                    # Fallback: Try a different conversion method
                     try:
                         color_cv_image = self.bridge.imgmsg_to_cv2(color_msg)
                         color_rgb = cv2.cvtColor(color_cv_image, cv2.COLOR_BGR2RGB)
-                        self.get_logger().info('使用备用方案转换彩色图像成功')
-                    except:
-                        self.get_logger().error('所有彩色图像转换方案都失败')
+                        self.get_logger().info('Color image conversion successful using fallback.')
+                    except Exception as fallback_error:
+                        self.get_logger().error(f'All color image conversion attempts failed: {fallback_error}')
                         return
                 
                 try:
-                    # 转换深度图像
+                    # Convert depth image
                     depth_raw = self.bridge.imgmsg_to_cv2(depth_msg, desired_encoding="passthrough")
                     
-                    # 确保深度图像是正确的格式
+                    # Ensure depth image is in the correct format (e.g., uint16)
                     if depth_raw.dtype != np.uint16:
                         depth_raw = depth_raw.astype(np.uint16)
                         
-                    self.get_logger().info(f'深度图像转换成功: {depth_raw.shape}')
+                    self.get_logger().info(f'Depth image conversion successful: {depth_raw.shape}')
                     
                 except Exception as depth_error:
-                    self.get_logger().error(f'深度图像转换失败: {depth_error}')
+                    self.get_logger().error(f'Depth image conversion failed: {depth_error}')
                     return
                 
-                # 确保数据有效
+                # Ensure valid image data
                 if color_rgb is None or color_rgb.size == 0:
-                    self.get_logger().error('彩色图像数据无效')
+                    self.get_logger().error('Invalid color image data.')
                     return
                     
                 if depth_raw is None or depth_raw.size == 0:
-                    self.get_logger().error('深度图像数据无效')
+                    self.get_logger().error('Invalid depth image data.')
                     return
                 
-                # 创建深度热度图用于保存
+                # Create a depth heatmap for visualization and saving
                 depth_normalized = cv2.normalize(depth_raw, None, 0, 255, cv2.NORM_MINMAX)
                 depth_heatmap = cv2.applyColorMap(depth_normalized.astype(np.uint8), cv2.COLORMAP_JET)
                 
-                # 保存图像文件
+                # Define filenames for saving
                 color_filename = os.path.join(self.output_dir, f"color_waypoint_{self.current_waypoint_index+1:03d}.jpg")
                 depth_heatmap_filename = os.path.join(self.output_dir, f"depth_heatmap_waypoint_{self.current_waypoint_index+1:03d}.jpg")
                 depth_raw_filename = os.path.join(self.output_dir, f"depth_raw_waypoint_{self.current_waypoint_index+1:03d}.npy")
                 
-                # 保存时使用BGR格式（OpenCV标准）
+                # Save images (OpenCV saves BGR by default for JPG)
                 cv2.imwrite(color_filename, cv2.cvtColor(color_rgb, cv2.COLOR_RGB2BGR))
                 cv2.imwrite(depth_heatmap_filename, depth_heatmap)
                 np.save(depth_raw_filename, depth_raw)
                 
-                # 构建waypoint位姿信息
+                # Construct waypoint pose information in 6D format
                 waypoint_pose_6d = {
                     'x': self.current_waypoint_for_image.pose.position.x,
                     'y': self.current_waypoint_for_image.pose.position.y, 
@@ -346,7 +375,7 @@ class ScanExecutorNode(Node):
                     'qw': self.current_waypoint_for_image.pose.orientation.w
                 }
                 
-                # 存储增强的图像数据
+                # Store enhanced image data with metadata
                 image_data = {
                     'waypoint_index': self.current_waypoint_index,
                     'waypoint': self.current_waypoint_for_image,
@@ -355,12 +384,12 @@ class ScanExecutorNode(Node):
                     'depth_raw_filename': depth_raw_filename,
                     'timestamp': self.get_clock().now().to_msg(),
                     
-                    # 图像数据
+                    # Image data (in RGB format for color, raw for depth)
                     'color_image': color_rgb,
                     'depth_raw': depth_raw,
-                    'depth_heatmap': cv2.cvtColor(depth_heatmap, cv2.COLOR_BGR2RGB),
+                    'depth_heatmap': cv2.cvtColor(depth_heatmap, cv2.COLOR_BGR2RGB), # Store RGB for consistency
                     
-                    # 相机和几何信息
+                    # Camera and geometric information
                     'camera_intrinsics': self.camera_intrinsics,
                     'object_height': self.current_scan_plan.object_height,
                     'scan_height': self.current_scan_plan.scan_height,
@@ -368,36 +397,39 @@ class ScanExecutorNode(Node):
                         {'x': p.x, 'y': p.y} for p in self.current_scan_plan.scan_region
                     ],
                     
-                    # waypoint完整6D位姿
+                    # Full 6D pose of the waypoint
                     'waypoint_pose_6d': waypoint_pose_6d
                 }
                 
                 self.captured_images.append(image_data)
                 
-                self.get_logger().info(f'✅ 图像已保存: waypoint_{self.current_waypoint_index+1:03d} (彩色+深度)')
-                self.get_logger().info(f'📁 彩色: {color_filename}')
-                self.get_logger().info(f'🔥 深度热度图: {depth_heatmap_filename}')
-                self.get_logger().info(f'🗂️  原始深度: {depth_raw_filename}')
+                self.get_logger().info(f'✅ Image saved: waypoint_{self.current_waypoint_index+1:03d} (Color + Depth).')
+                self.get_logger().info(f'📁 Color: {color_filename}')
+                self.get_logger().info(f'🔥 Depth Heatmap: {depth_heatmap_filename}')
+                self.get_logger().info(f'🗂️  Raw Depth: {depth_raw_filename}')
                 
             except Exception as e:
-                self.get_logger().error(f'图像处理失败: {e}')
-                import traceback
+                self.get_logger().error(f'Image processing failed: {e}')
+                import traceback # Print full traceback for debugging
                 traceback.print_exc()
 
     def _calculate_grid_layout(self):
-        """计算网格布局信息"""
+        """
+        Calculates and returns information about the grid layout of waypoints,
+        if the scan plan indicates a multi-point scan.
+        """
         try:
             if not self.current_scan_plan.waypoints:
                 return None
             
-            # 提取所有waypoint位置
+            # Extract all waypoint positions
             positions = []
             for wp in self.current_scan_plan.waypoints:
                 positions.append((wp.pose.position.x, wp.pose.position.y))
             
             positions = np.array(positions)
             
-            # 分析网格结构
+            # Analyze grid structure by finding unique X and Y coordinates
             unique_x = np.unique(np.round(positions[:, 0], 1))
             unique_y = np.unique(np.round(positions[:, 1], 1))
             
@@ -410,9 +442,9 @@ class ScanExecutorNode(Node):
                 'total_waypoints': len(self.current_scan_plan.waypoints)
             }
             
-            # 分析蛇形模式
+            # Analyze for zigzag pattern if it's a regular grid
             if grid_layout['is_regular_grid']:
-                grid_layout['snake_pattern'] = True
+                grid_layout['snake_pattern'] = True # Assuming zigzag for regular grids
                 grid_layout['current_grid_pos'] = self._find_grid_position(
                     self.current_waypoint_for_image.pose.position.x,
                     self.current_waypoint_for_image.pose.position.y,
@@ -422,13 +454,15 @@ class ScanExecutorNode(Node):
             return grid_layout
             
         except Exception as e:
-            self.get_logger().error(f'网格布局计算失败: {e}')
+            self.get_logger().error(f'Grid layout calculation failed: {e}')
             return None
 
     def _find_grid_position(self, x, y, grid_layout):
-        """找到当前waypoint在网格中的位置"""
+        """
+        Finds the grid position (row, column) of a given waypoint.
+        """
         try:
-            # 找到最接近的网格位置
+            # Find the closest grid position
             x_idx = None
             y_idx = None
             
@@ -449,25 +483,27 @@ class ScanExecutorNode(Node):
             return (x_idx, y_idx) if x_idx is not None and y_idx is not None else None
             
         except Exception as e:
-            self.get_logger().error(f'网格位置计算失败: {e}')
+            self.get_logger().error(f'Grid position calculation failed: {e}')
             return None
 
     def _calculate_overlap_info(self):
-        """计算重叠信息"""
+        """
+        Calculates and returns information about camera overlap between waypoints.
+        """
         try:
-            # 计算FOV实际覆盖尺寸
+            # Calculate actual FOV coverage dimensions
             scan_height = self.current_scan_plan.scan_height
             object_height = self.current_scan_plan.object_height
             effective_height = scan_height - object_height
             
-            # 相机FOV (从scan_planner获取)
+            # Camera FOV (from scan_planner)
             fx, fy = self.camera_intrinsics['fx'], self.camera_intrinsics['fy']
             camera_width, camera_height = 1280, 720
             
             fov_h = 2 * math.atan(camera_width / (2 * fx))
             fov_v = 2 * math.atan(camera_height / (2 * fy))
             
-            # 实际覆盖尺寸
+            # Actual coverage dimensions in millimeters
             fov_coverage_width = 2 * effective_height * math.tan(fov_h / 2)
             fov_coverage_height = 2 * effective_height * math.tan(fov_v / 2)
             
@@ -479,7 +515,7 @@ class ScanExecutorNode(Node):
                 'fov_v_degrees': math.degrees(fov_v)
             }
             
-            # 如果有相邻waypoint，计算实际重叠率
+            # If there are adjacent waypoints, calculate actual overlap ratio (simplified)
             current_pos = (
                 self.current_waypoint_for_image.pose.position.x,
                 self.current_waypoint_for_image.pose.position.y
@@ -488,12 +524,12 @@ class ScanExecutorNode(Node):
             adjacent_overlaps = []
             for wp in self.current_scan_plan.waypoints:
                 wp_pos = (wp.pose.position.x, wp.pose.position.y)
-                if wp_pos != current_pos:
+                if wp_pos != current_pos: # Don't compare with itself
                     distance = math.sqrt((wp_pos[0] - current_pos[0])**2 + (wp_pos[1] - current_pos[1])**2)
                     
-                    # 计算重叠率（简化版）
-                    if distance < fov_coverage_width:
-                        x_overlap = max(0, fov_coverage_width - abs(wp_pos[1] - current_pos[1]))
+                    # Simplified overlap ratio calculation (assuming movement primarily along one axis)
+                    if distance < fov_coverage_width: # Check for overlap in the dominant direction
+                        x_overlap = max(0, fov_coverage_width - abs(wp_pos[1] - current_pos[1])) # Simplified to Y-axis distance
                         overlap_ratio_x = x_overlap / fov_coverage_width
                         adjacent_overlaps.append({
                             'waypoint_pos': wp_pos,
@@ -506,104 +542,126 @@ class ScanExecutorNode(Node):
             return overlap_info
             
         except Exception as e:
-            self.get_logger().error(f'重叠信息计算失败: {e}')
+            self.get_logger().error(f'Overlap information calculation failed: {e}')
             return None
 
     def _finish_scan_execution(self):
-        """完成扫描执行"""
+        """
+        Finalizes the scan execution process, stopping timers and
+        initiating the stitching process.
+        """
         try:
-            # 停止扫描定时器
+            # Stop the scan timer
             if hasattr(self, 'scan_timer'):
                 self.scan_timer.destroy()
             
             self.execution_active = False
             
-            self.get_logger().info(f'扫描执行完成！')
-            self.get_logger().info(f'采集图像数量: {len(self.captured_images)}')
-            self.get_logger().info(f'输出目录: {self.output_dir}')
+            self.get_logger().info(f'Scan execution completed!')
+            self.get_logger().info(f'Number of images captured: {len(self.captured_images)}')
+            self.get_logger().info(f'Output directory: {self.output_dir}')
             
-            # 🆕 修复：无论单点还是多点，都通过拼接服务处理
+            # 🆕 Fix: Process all scans (single or multi-point) through the stitching service
             self._start_stitching_process()
                 
         except Exception as e:
-            self.get_logger().error(f'扫描完成处理失败: {e}')
+            self.get_logger().error(f'Scan completion handling failed: {e}')
 
     def _start_stitching_process(self):
-        """启动拼接处理 - 适配重构后的Smart Stitcher"""
+        """
+        Initiates the image stitching process by calling the ProcessStitching service.
+        Prepares image data and sends it to the stitching service.
+        """
         try:
-            # 🆕 移除单点判断，让所有情况都通过拼接服务
-            self.get_logger().info('开始智能图像拼接处理...')
+            # 🆕 Removed single-point check, all cases now go through stitching service
+            self.get_logger().info('Starting smart image stitching process...')
             
-            # 创建拼接服务客户端
+            # Create a client for the stitching service
             stitch_client = self.create_client(ProcessStitching, 'process_stitching')
             
             if not stitch_client.wait_for_service(timeout_sec=5.0):
-                self.get_logger().error('拼接服务不可用')
-                # 🆕 备用方案：如果拼接服务不可用，直接触发检测
+                self.get_logger().error('Stitching service not available.')
+                # 🆕 Fallback: If stitching service is unavailable, trigger detection directly
                 self._trigger_detection_for_fallback()
                 return
             
-            # 准备拼接请求
+            # Prepare the stitching request
             request = ProcessStitching.Request()
             request.scan_plan = self.current_scan_plan
             request.output_directory = self.output_dir
             
-            # 🆕 改进的图像数据准备
+            # 🆕 Improved image data preparation
             for img_data in self.captured_images:
                 image_msg = ImageData()
                 
-                # 使用完整的文件路径
+                # Use full file path
                 image_msg.filename = img_data.get('color_filename', f'waypoint_{img_data["waypoint_index"]}')
                 image_msg.timestamp = img_data['timestamp']
                 image_msg.waypoint = img_data['waypoint']
                 
-                # 转换图像为ROS消息
+                # Convert OpenCV image to ROS Image message
                 img_rgb = img_data['color_image']
                 img_msg = self.bridge.cv2_to_imgmsg(img_rgb, "rgb8")
                 image_msg.image = img_msg
                 
                 request.image_data.append(image_msg)
                 
-                # 记录调试信息
-                scan_type = "single_point" if len(self.captured_images) == 1 else "多点"
-                self.get_logger().info(f'准备{scan_type}图像数据: waypoint_{img_data["waypoint_index"]}')
-                self.get_logger().info(f'  - 彩色文件: {img_data.get("color_filename", "N/A")}')
-                self.get_logger().info(f'  - 深度文件: {img_data.get("depth_raw_filename", "N/A")}')
+                # Log debug information
+                scan_type_log = "single_point" if len(self.captured_images) == 1 else "multi-point"
+                self.get_logger().info(f'Preparing {scan_type_log} image data: waypoint_{img_data["waypoint_index"]}.')
+                self.get_logger().info(f'  - Color file: {img_data.get("color_filename", "N/A")}')
+                self.get_logger().info(f'  - Depth file: {img_data.get("depth_raw_filename", "N/A")}')
             
-            scan_type = "单点扫描" if len(self.captured_images) == 1 else "multi_point"
-            self.get_logger().info(f'📤 发送{scan_type}数据到拼接服务: {len(request.image_data)} 张图像')
+            scan_type_msg = "Single-point scan" if len(self.captured_images) == 1 else "Multi-point scan"
+            self.get_logger().info(f'📤 Sending {scan_type_msg} data to stitching service: {len(request.image_data)} images.')
             
-            # 异步调用拼接服务
+            # Asynchronously call the stitching service
             future = stitch_client.call_async(request)
             future.add_done_callback(self.stitching_response_callback)
             
         except Exception as e:
-            self.get_logger().error(f'拼接处理启动失败: {e}')
+            self.get_logger().error(f'Stitching process initiation failed: {e}')
             import traceback
             traceback.print_exc()
-            # 🆕 出错时的备用方案
+            # 🆕 Fallback in case of error
             self._trigger_detection_for_fallback()
+
+    def _trigger_detection_for_fallback(self):
+        """
+        Fallback method to trigger detection directly if stitching service is unavailable or fails.
+        (Implementation for this fallback is not provided in the original code,
+        this is a placeholder for future expansion if needed).
+        """
+        self.get_logger().warn("Stitching service unavailable or failed. Triggering direct detection (fallback not fully implemented).")
+        # TODO: Implement actual direct detection logic here if stitching fails
+        pass
 
 
     def stitching_response_callback(self, future):
-        """拼接服务响应回调"""
+        """
+        Callback for the stitching service response.
+        Logs the success or failure of the stitching process.
+        """
         try:
             response = future.result()
             if response.success:
-                self.get_logger().info(f'拼接完成: {response.message}')
-                self.get_logger().info(f'结果文件: {response.result.output_path}')
+                self.get_logger().info(f'Stitching completed: {response.message}')
+                self.get_logger().info(f'Result file: {response.result.output_path}')
             else:
-                self.get_logger().error(f'拼接失败: {response.message}')
+                self.get_logger().error(f'Stitching failed: {response.message}')
         except Exception as e:
-            self.get_logger().error(f'拼接响应处理失败: {e}')
+            self.get_logger().error(f'Stitching response processing failed: {e}')
 
 
 def main(args=None):
-    rclpy.init(args=args)
-    node = ScanExecutorNode()
-    rclpy.spin(node)
-    node.destroy_node()
-    rclpy.shutdown()
+    """
+    Main function to initialize and run the ScanExecutorNode.
+    """
+    rclpy.init(args=args) # Initialize ROS2 client library
+    node = ScanExecutorNode() # Create an instance of the node
+    rclpy.spin(node) # Keep the node alive and processing callbacks
+    node.destroy_node() # Destroy the node gracefully
+    rclpy.shutdown() # Shutdown ROS2 client library
 
 if __name__ == '__main__':
     main()
