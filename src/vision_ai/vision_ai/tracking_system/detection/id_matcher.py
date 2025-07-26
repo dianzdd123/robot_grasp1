@@ -463,19 +463,15 @@ class ImprovedIDMatcher:
             
             total_score = 0.0
             valid_weight_sum = 0.0
-            # 在方法开始处添加
-            self._log_info(f"🔍 调试特征数据:")
-            self._log_info(f"  检测特征keys: {list(detected_features.keys())}")
-            self._log_info(f"  参考特征keys: {list(reference_features.keys())}")
 
-            if 'shape' in detected_features:
-                shape_keys = list(detected_features['shape'].keys())
-                self._log_info(f"  检测shape keys: {shape_keys}")
+            # if 'shape' in detected_features:
+            #     shape_keys = list(detected_features['shape'].keys())
+            #     self._log_info(f"  检测shape keys: {shape_keys}")
                 
-            if 'color' in detected_features:
-                color_keys = list(detected_features['color'].keys())
-                hist_len = len(detected_features['color'].get('histogram', []))
-                self._log_info(f"  检测color keys: {color_keys}, histogram长度: {hist_len}")
+            # if 'color' in detected_features:
+            #     color_keys = list(detected_features['color'].keys())
+            #     hist_len = len(detected_features['color'].get('histogram', []))
+            #     self._log_info(f"  检测color keys: {color_keys}, histogram长度: {hist_len}")
             # 1. 改进的Hu矩相似度计算
             hu_weight = self.feature_weights.get('hu_moments', 0.3)
             if hu_weight > 0:
@@ -832,26 +828,48 @@ class ImprovedIDMatcher:
             self._log_error(f"❌ 更新追踪历史失败: {e}")
     
     def _save_match_debug(self, debug_info: Dict[str, Any]):
-        """保存匹配调试信息"""
+        """保存匹配调试信息 - 修复序列化问题"""
         try:
+            # 🆕 清理调试信息，确保可JSON序列化
+            clean_debug_info = self._clean_for_json_serialization(debug_info)
+            
             timestamp = int(time.time())
             debug_file = os.path.join(self.debug_output_dir, f'match_debug_{timestamp}.json')
             
             with open(debug_file, 'w', encoding='utf-8') as f:
-                json.dump(debug_info, f, indent=2, ensure_ascii=False)
+                json.dump(clean_debug_info, f, indent=2, ensure_ascii=False)
             
             # 同时保存最新的调试信息
             latest_file = os.path.join(self.debug_output_dir, 'latest_match_debug.json')
             with open(latest_file, 'w', encoding='utf-8') as f:
-                json.dump(debug_info, f, indent=2, ensure_ascii=False)
+                json.dump(clean_debug_info, f, indent=2, ensure_ascii=False)
             
             self._log_debug(f"💾 匹配调试信息已保存: {debug_file}")
             
         except Exception as e:
             self._log_error(f"❌ 保存匹配调试信息失败: {e}")
     
+    def _clean_for_json_serialization(self, data):
+        """递归清理数据使其可JSON序列化"""
+        if isinstance(data, dict):
+            return {k: self._clean_for_json_serialization(v) for k, v in data.items()}
+        elif isinstance(data, list):
+            return [self._clean_for_json_serialization(item) for item in data]
+        elif isinstance(data, tuple):
+            return list(data)
+        elif isinstance(data, np.ndarray):
+            return data.tolist()
+        elif isinstance(data, (np.integer, np.int64, np.int32)):
+            return int(data)
+        elif isinstance(data, (np.floating, np.float64, np.float32)):
+            return float(data)
+        elif isinstance(data, (np.bool_, bool)):
+            return bool(data)
+        else:
+            return data
+        
     def save_all_debug_history(self):
-        """保存所有调试历史"""
+        """保存所有调试历史 - 修复序列化问题"""
         try:
             if not self.debug_output_dir:
                 return
@@ -868,8 +886,11 @@ class ImprovedIDMatcher:
                 'match_history': self.match_debug_history
             }
             
+            # 🆕 清理数据
+            clean_history = self._clean_for_json_serialization(complete_history)
+            
             with open(history_file, 'w', encoding='utf-8') as f:
-                json.dump(complete_history, f, indent=2, ensure_ascii=False)
+                json.dump(clean_history, f, indent=2, ensure_ascii=False)
             
             self._log_info(f"💾 完整调试历史已保存: {history_file}")
             

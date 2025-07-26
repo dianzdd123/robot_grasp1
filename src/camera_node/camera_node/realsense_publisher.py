@@ -28,7 +28,7 @@ class RealSensePublisher(Node):
         self.config = rs.config()
         
         # 配置流
-        self.config.enable_stream(rs.stream.depth, 848, 480, rs.format.z16, 30)
+        self.config.enable_stream(rs.stream.depth, 1280, 720, rs.format.z16, 30)
         self.config.enable_stream(rs.stream.color, 1280, 720, rs.format.bgr8, 30)
         
         # 启动pipeline
@@ -101,7 +101,18 @@ class RealSensePublisher(Node):
                 return
             
             # 转换为numpy数组
+            
             depth_image = np.asanyarray(aligned_depth_frame.get_data())
+            
+            # 添加调试信息
+            # self.get_logger().info(f"Original depth dtype: {depth_image.dtype}")
+            # self.get_logger().info(f"Original depth shape: {depth_image.shape}")
+            # self.get_logger().info(f"Original depth range: min={depth_image.min()}, max={depth_image.max()}")
+            
+            # 确保深度图像是uint16格式
+            if depth_image.dtype != np.uint16:
+                depth_image = depth_image.astype(np.uint16)
+
             color_image = np.asanyarray(color_frame.get_data())
             
             # 创建ROS图像消息
@@ -114,7 +125,7 @@ class RealSensePublisher(Node):
             self.color_pub.publish(color_msg)
             
             # 发布深度图像
-            depth_msg = self.bridge.cv2_to_imgmsg(depth_image, "16UC1")
+            depth_msg = self.bridge.cv2_to_imgmsg(depth_image, encoding="passthrough")
             depth_msg.header.stamp = current_time
             depth_msg.header.frame_id = "camera_depth_optical_frame"
             self.depth_pub.publish(depth_msg)

@@ -142,10 +142,16 @@ class RealtimeDetector:
         """
         try:
             # 检查图像格式并统一为RGB
+            # 🆕 添加图像格式调试
+            self._log_debug(f"输入图像格式: shape={image.shape}, dtype={image.dtype}")
+            self._log_debug(f"图像值范围: min={image.min()}, max={image.max()}")
+
+            # 检查图像格式并统一为RGB
             if len(image.shape) != 3 or image.shape[2] != 3:
                 self._log_error(f"❌ 无效图像格式: {image.shape}")
                 return []
             
+            # 🆕 假设输入已经是RGB格式（从tracking_node转换过来）
             input_image = image
             
             # YOLO检测
@@ -345,8 +351,8 @@ class RealtimeDetector:
             return (0.0, 0.0)
     
     def _calculate_centroid_3d(self, centroid_2d: Tuple[float, float], 
-                              depth_image: np.ndarray = None) -> Tuple[float, float, float]:
-        """计算3D质心"""
+                            depth_image: np.ndarray = None) -> Tuple[float, float, float]:
+        """计算3D质心 - 修复深度处理"""
         try:
             if depth_image is None:
                 return (centroid_2d[0], centroid_2d[1], 0.0)
@@ -361,6 +367,9 @@ class RealtimeDetector:
             # 获取深度值
             depth_value = depth_image[y_pixel, x_pixel]
             
+            # 添加调试信息
+            self._log_debug(f'深度计算: pixel=({x_pixel}, {y_pixel}), raw_depth={depth_value}')
+            
             if depth_value == 0:
                 # 如果深度值为0，使用周围像素的平均深度
                 window_size = 5
@@ -374,30 +383,39 @@ class RealtimeDetector:
                 
                 if len(valid_depths) > 0:
                     depth_value = np.mean(valid_depths)
+                    self._log_debug(f'使用周围像素平均深度: {depth_value}')
                 else:
-                    depth_value = 300.0  # 默认深度值（毫米）
+                    depth_value = 500.0  # 默认深度值（毫米）
+                    self._log_debug(f'使用默认深度值: {depth_value}')
             
-            # 深度值转换（根据相机配置）
-            depth_scale = self.camera_config.get('depth_scale', 0.001)
-            depth_mm = depth_value * depth_scale * 1000  # 转换为毫米
+            # 🆕 修复深度值处理 - 假设深度值已经是毫米单位
+            # 如果你的深度图像已经通过realsense_publisher正确处理，应该已经是毫米
+            if depth_value > 10000:  # 如果深度值过大，可能需要缩放
+                depth_mm = depth_value * 0.001  # 从微米转毫米
+            else:
+                depth_mm = depth_value  # 已经是毫米
+            
+            self._log_debug(f'最终深度值: {depth_mm}mm')
             
             # 像素坐标转相机坐标
             intrinsics = self.camera_config.get('intrinsics', {})
-            fx = intrinsics.get('fx', 640.0)
-            fy = intrinsics.get('fy', 640.0)
-            cx = intrinsics.get('cx', 320.0)
-            cy = intrinsics.get('cy', 240.0)
+            fx = intrinsics.get('fx', 912.694580078125)  # 使用实际的相机内参
+            fy = intrinsics.get('fy', 910.309814453125)
+            cx = intrinsics.get('cx', 640.0)
+            cy = intrinsics.get('cy', 360.0)
             
             # 计算相机坐标系下的3D坐标
             x_camera = (x_pixel - cx) * depth_mm / fx
             y_camera = (y_pixel - cy) * depth_mm / fy
             z_camera = depth_mm
             
+            self._log_debug(f'3D坐标: ({x_camera:.1f}, {y_camera:.1f}, {z_camera:.1f})')
+            
             return (x_camera, y_camera, z_camera)
             
         except Exception as e:
             self._log_error(f"❌ 计算3D质心失败: {e}")
-            return (centroid_2d[0], centroid_2d[1], 300.0)
+            return (centroid_2d[0], centroid_2d[1], 500.0)
     
     def _extract_features(self, input_image: np.ndarray, mask: np.ndarray, 
                          bbox: np.ndarray) -> Dict[str, Any]:
@@ -421,16 +439,16 @@ class RealtimeDetector:
             return {}
     
     def _extract_color_features(self, input_image: np.ndarray, mask: np.ndarray) -> Dict[str, Any]:
-        """提取颜色特征"""
+        """提取颜色特征 - 与detection_pipeline格式一致"""
         try:
             # 获取mask区域的像素
             masked_pixels = input_image[mask > 0]
             
             if len(masked_pixels) == 0:
-                return {'histogram': [], 'mean_color': [0, 0, 0], 'dominant_color': [0, 0, 0]}
+                return {'histogram': [0.0] * 96, 'mean_color': [0, 0, 0], 'dominant_color': [0, 0, 0]}
             
-            # 计算颜色直方图
-            bins = self.feature_config.get('color', {}).get('histogram_bins', 64)
+            # 🆕 使用32 bins而不是64，与detection_pipeline一致
+            bins = 32  # 修改为32
             
             # 分别计算RGB三个通道的直方图
             hist_r = np.histogram(masked_pixels[:, 0], bins=bins, range=(0, 256))[0]
@@ -443,13 +461,13 @@ class RealtimeDetector:
             hist_g = hist_g.astype(float) / total_pixels
             hist_b = hist_b.astype(float) / total_pixels
             
-            # 合并三个通道的直方图
+            # 合并三个通道的直方图 (32*3 = 96维)
             combined_histogram = np.concatenate([hist_r, hist_g, hist_b]).tolist()
             
             # 计算平均颜色
             mean_color = np.mean(masked_pixels, axis=0).tolist()
             
-            # 计算主导颜色（最频繁的颜色）
+            # 计算主导颜色
             dominant_color = np.median(masked_pixels, axis=0).astype(int).tolist()
             
             return {
@@ -460,11 +478,14 @@ class RealtimeDetector:
             
         except Exception as e:
             self._log_error(f"❌ 颜色特征提取失败: {e}")
-            return {'histogram': [], 'mean_color': [0, 0, 0], 'dominant_color': [0, 0, 0]}
+            return {'histogram': [0.0] * 96, 'mean_color': [0, 0, 0], 'dominant_color': [0, 0, 0]}
     
     def _extract_shape_features(self, mask: np.ndarray) -> Dict[str, Any]:
-        """提取形状特征"""
+        """提取形状特征 - 与detection_pipeline格式一致"""
         try:
+            # 🆕 保存原始mask
+            mask_bool = mask > 0 if mask.dtype != bool else mask
+            
             # 找到轮廓
             contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             
@@ -478,31 +499,25 @@ class RealtimeDetector:
             area = cv2.contourArea(largest_contour)
             perimeter = cv2.arcLength(largest_contour, True)
             
-            # 计算Hu矩
+            # 🆕 计算传统Hu矩
             moments = cv2.moments(largest_contour)
             if moments['m00'] != 0:
                 hu_moments = cv2.HuMoments(moments).flatten()
-                # 对数变换，使Hu矩更稳定
                 hu_moments = [-np.sign(h) * np.log10(abs(h) + 1e-10) for h in hu_moments]
             else:
                 hu_moments = [0.0] * 7
             
-            # 只使用前3个Hu矩（根据配置）
-            hu_count = self.feature_config.get('shape', {}).get('hu_moments_count', 3)
-            hu_moments = hu_moments[:hu_count]
+            # 🆕 提取改进特征
+            robust_features = self._extract_robust_shape_features_realtime(mask_bool)
             
             # 计算最小外接矩形
             if len(largest_contour) >= 5:
                 min_area_rect = cv2.minAreaRect(largest_contour)
                 center, (width, height), angle = min_area_rect
                 
-                # 计算长宽比
                 aspect_ratio = max(width, height) / (min(width, height) + 1e-10)
-                
-                # 计算圆形度
                 circularity = 4 * np.pi * area / (perimeter * perimeter + 1e-10)
                 
-                # 计算凸包和凸性
                 hull = cv2.convexHull(largest_contour)
                 hull_area = cv2.contourArea(hull)
                 solidity = area / (hull_area + 1e-10)
@@ -515,7 +530,8 @@ class RealtimeDetector:
                 circularity = 0.0
                 solidity = 1.0
             
-            return {
+            # 🆕 组合所有特征，与detection_pipeline格式一致
+            shape_features = {
                 'hu_moments': hu_moments,
                 'area': float(area),
                 'perimeter': float(perimeter),
@@ -526,18 +542,106 @@ class RealtimeDetector:
                     'center': [float(center[0]), float(center[1])],
                     'size': [float(width), float(height)],
                     'angle': float(angle)
-                }
+                },
+                # 🆕 添加改进特征
+                'raw_mask': mask_bool,  # 保存原始mask
+                'hu_moments_robust': robust_features['hu_moments_robust'],
+                'shape_descriptors': robust_features['shape_descriptors'],
+                'fourier_descriptors': robust_features['fourier_descriptors']
             }
+            
+            return shape_features
             
         except Exception as e:
             self._log_error(f"❌ 形状特征提取失败: {e}")
             return self._get_default_shape_features()
+
+    # 🆕 添加新方法到类中
+    def _extract_robust_shape_features_realtime(self, mask, smooth_kernel_size=7):
+        """提取鲁棒形状特征 - 与detection_pipeline保持一致"""
+        try:
+            # 确保mask是uint8格式
+            if mask.dtype == bool:
+                mask_uint8 = mask.astype(np.uint8) * 255
+            else:
+                mask_uint8 = (mask * 255).astype(np.uint8)
+            
+            # 形态学处理
+            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (smooth_kernel_size, smooth_kernel_size))
+            mask_smooth = cv2.morphologyEx(mask_uint8, cv2.MORPH_CLOSE, kernel)
+            mask_smooth = cv2.morphologyEx(mask_smooth, cv2.MORPH_OPEN, kernel)
+            
+            features = {}
+            
+            # 1. 鲁棒Hu矩
+            moments = cv2.moments(mask_smooth)
+            if moments['m00'] > 0:
+                hu_moments = cv2.HuMoments(moments).flatten()
+                hu_log = -np.sign(hu_moments) * np.log10(np.abs(hu_moments) + 1e-8)
+                features['hu_moments_robust'] = hu_log.tolist()
+            else:
+                features['hu_moments_robust'] = [0.0] * 7
+            
+            # 2. 轮廓特征
+            contours, _ = cv2.findContours(mask_smooth, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            if contours:
+                largest_contour = max(contours, key=cv2.contourArea)
+                contour_area = cv2.contourArea(largest_contour)
+                hull_area = cv2.contourArea(cv2.convexHull(largest_contour))
+                solidity = contour_area / hull_area if hull_area > 0 else 0
+                
+                perimeter = cv2.arcLength(largest_contour, True)
+                circularity = 4 * np.pi * contour_area / (perimeter * perimeter) if perimeter > 0 else 0
+                
+                rect = cv2.minAreaRect(largest_contour)
+                width, height = rect[1]
+                aspect_ratio = max(width, height) / (min(width, height) + 1e-8)
+                
+                if len(largest_contour) >= 5:
+                    ellipse = cv2.fitEllipse(largest_contour)
+                    ellipse_aspect = max(ellipse[1]) / (min(ellipse[1]) + 1e-8)
+                else:
+                    ellipse_aspect = aspect_ratio
+                    
+                features['shape_descriptors'] = [solidity, circularity, aspect_ratio, ellipse_aspect]
+            else:
+                features['shape_descriptors'] = [0.0, 0.0, 0.0, 0.0]
+            
+            # 3. 傅里叶描述子
+            if contours:
+                largest_contour = max(contours, key=cv2.contourArea)
+                if len(largest_contour) > 10:
+                    contour_points = largest_contour.reshape(-1, 2)
+                    cx, cy = np.mean(contour_points, axis=0)
+                    distances = np.sqrt((contour_points[:, 0] - cx)**2 + (contour_points[:, 1] - cy)**2)
+                    
+                    if len(distances) > 1:
+                        fft_desc = np.fft.fft(distances)
+                        fourier_desc = np.abs(fft_desc[1:9])
+                        if fourier_desc[0] > 1e-8:
+                            fourier_desc = fourier_desc / fourier_desc[0]
+                        features['fourier_descriptors'] = fourier_desc.tolist()
+                    else:
+                        features['fourier_descriptors'] = [0.0] * 8
+                else:
+                    features['fourier_descriptors'] = [0.0] * 8
+            else:
+                features['fourier_descriptors'] = [0.0] * 8
+            
+            return features
+            
+        except Exception as e:
+            self._log_error(f"❌ 鲁棒形状特征提取失败: {e}")
+            return {
+                'hu_moments_robust': [0.0] * 7,
+                'shape_descriptors': [0.0, 0.0, 0.0, 0.0],
+                'fourier_descriptors': [0.0] * 8
+            }
     
     def _get_default_shape_features(self) -> Dict[str, Any]:
-        """获取默认形状特征"""
-        hu_count = self.feature_config.get('shape', {}).get('hu_moments_count', 3)
+        """获取默认形状特征 - 改进版本"""
         return {
-            'hu_moments': [0.0] * hu_count,
+            'hu_moments': [0.0] * 7,
             'area': 0.0,
             'perimeter': 0.0,
             'aspect_ratio': 1.0,
@@ -547,7 +651,12 @@ class RealtimeDetector:
                 'center': [0.0, 0.0],
                 'size': [0.0, 0.0],
                 'angle': 0.0
-            }
+            },
+            # 🆕 添加改进特征的默认值
+            'raw_mask': np.zeros((100, 100), dtype=bool),
+            'hu_moments_robust': [0.0] * 7,
+            'shape_descriptors': [0.0, 0.0, 0.0, 0.0],
+            'fourier_descriptors': [0.0] * 8
         }
     
     def _extract_spatial_features(self, bbox: np.ndarray, mask: np.ndarray) -> Dict[str, Any]:

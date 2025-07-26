@@ -233,7 +233,7 @@ class XArmControllerNode(Node):
         try:
             self.get_logger().info('移动到初始位置...')
             initial_pose = [380, 0, 380, 180, 0, 0]
-            code = self.arm.set_position(*initial_pose, speed=50, wait=True)
+            code = self.arm.set_position(*initial_pose, speed=80, wait=True)
             
             if code == 0:
                 self.get_logger().info('✅ 已到达初始位置')

@@ -327,21 +327,44 @@ class ScanExecutorNode(Node):
                         self.get_logger().error(f'All color image conversion attempts failed: {fallback_error}')
                         return
                 
+                # 深度图像处理 - 修复数据截断问题
                 try:
-                    # Convert depth image
-                    depth_raw = self.bridge.imgmsg_to_cv2(depth_msg, desired_encoding="passthrough")
+                    self.get_logger().info(f'Received depth message encoding: {depth_msg.encoding}')
+                    self.get_logger().info(f'Received depth message step: {depth_msg.step}')
+                    self.get_logger().info(f'Expected step for 16UC1: {depth_msg.width * 2}')
                     
-                    # Ensure depth image is in the correct format (e.g., uint16)
-                    if depth_raw.dtype != np.uint16:
-                        depth_raw = depth_raw.astype(np.uint16)
-                        
-                    self.get_logger().info(f'Depth image conversion successful: {depth_raw.shape}')
+                    # 直接从原始字节数据重建16位深度图像
+                    if depth_msg.step == depth_msg.width * 2:  # 正确的16位步长
+                        raw_data = np.frombuffer(depth_msg.data, dtype=np.uint16)
+                        depth_raw = raw_data.reshape((depth_msg.height, depth_msg.width))
+                        self.get_logger().info('Using direct uint16 reconstruction')
+                    else:
+                        # 如果步长不对，可能需要重新解释数据
+                        raw_data = np.frombuffer(depth_msg.data, dtype=np.uint8)
+                        # 将连续的两个uint8重新组合为uint16
+                        depth_raw = raw_data.view(np.uint16).reshape((depth_msg.height, depth_msg.width))
+                        self.get_logger().info('Using uint8->uint16 reinterpretation')
+                    
+                    self.get_logger().info(f'Fixed depth image: {depth_raw.shape}, dtype: {depth_raw.dtype}')
+                    self.get_logger().info(f'Fixed depth range: min={depth_raw.min()}, max={depth_raw.max()}')
                     
                 except Exception as depth_error:
-                    self.get_logger().error(f'Depth image conversion failed: {depth_error}')
-                    return
+                    self.get_logger().error(f'Depth image reconstruction failed: {depth_error}')
+                    # 降级到cv_bridge方法
+                    try:
+                        depth_raw = self.bridge.imgmsg_to_cv2(depth_msg, desired_encoding="passthrough")
+                        if depth_raw.dtype != np.uint16:
+                            depth_raw = depth_raw.astype(np.uint16)
+                        self.get_logger().info('Fallback to cv_bridge conversion')
+                    except Exception as fallback_error:
+                        self.get_logger().error(f'All depth conversion methods failed: {fallback_error}')
+                        return
                 
-                # Ensure valid image data
+                # 验证深度数据合理性
+                if depth_raw.max() < 1000:  # 深度值应该至少有几百毫米
+                    self.get_logger().warn(f'Depth values seem too small: max={depth_raw.max()}')
+                
+                # 确保有效的图像数据
                 if color_rgb is None or color_rgb.size == 0:
                     self.get_logger().error('Invalid color image data.')
                     return
@@ -353,6 +376,7 @@ class ScanExecutorNode(Node):
                 # Create a depth heatmap for visualization and saving
                 depth_normalized = cv2.normalize(depth_raw, None, 0, 255, cv2.NORM_MINMAX)
                 depth_heatmap = cv2.applyColorMap(depth_normalized.astype(np.uint8), cv2.COLORMAP_JET)
+
                 
                 # Define filenames for saving
                 color_filename = os.path.join(self.output_dir, f"color_waypoint_{self.current_waypoint_index+1:03d}.jpg")

@@ -105,7 +105,7 @@ class TrackingConfig:
             # ============ YOLO配置 ============
             'yolo': {
                 'model_path': '/home/qi/下载/best2.pt',
-                'confidence_threshold': 0.5,  # 降低阈值用于测试
+                'confidence_threshold': 0.6,  # 降低阈值用于测试
                 'iou_threshold': 0.5,
                 'device': 'cuda',
                 'imgsz': 640,
@@ -120,18 +120,18 @@ class TrackingConfig:
             
             # ============ 特征匹配配置 ============
             'features': {
-                'match_threshold': 0.3,          # 从0.6改为0.3
+                'match_threshold': 0.6,          # 从0.6改为0.3
                 'weights': {
                     'class_id': 1.0,             
-                    'hu_moments': 0.3,           # 从0.6改为0.3
-                    'color_histogram': 0.7,      # 从0.8改为0.7
+                    'hu_moments': 0.5,           # 从0.6改为0.3
+                    'color_histogram': 0.5,      # 从0.8改为0.7
                     'spatial_continuity': 0.2    
                 },
                 'color': {
-                    'histogram_bins': 64,        
+                    'histogram_bins': 96,        
                 },
                 'shape': {
-                    'hu_moments_count': 7,       
+                    'hu_moments_count': 4,       
                 },
             },
             

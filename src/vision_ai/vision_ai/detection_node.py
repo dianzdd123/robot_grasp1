@@ -792,7 +792,7 @@ class BypassCvBridgeDetectionNode(Node):
         result = {
             'centroid_3d_camera': (cam_x, cam_y, cam_z),
             'world_coordinates': (world_x, world_y, world_z),
-            'scan_detail': (cam_orientation),
+            'scan_detail': (cam_position,cam_orientation),
             'distance_to_camera': cam_z,
             'mask_area_pixels': int(mask_area),
             'bbox_area_pixels': int(bbox_area),
@@ -1422,7 +1422,7 @@ class BypassCvBridgeDetectionNode(Node):
                 # 确保3D坐标被正确保存
                 spatial_features = obj.get('features', {}).get('spatial', {})
                 world_coordinates = spatial_features.get('world_coordinates', [0, 0, 0])
-                scan_detail = spatial_features.get('scan_detail', [0, 0, 0])
+                scan_detail = spatial_features.get('scan_detail', [0,0,0,0, 0, 0])
                 # 构建对象数据
                 obj_data = {
                     'object_id': obj['object_id'],
