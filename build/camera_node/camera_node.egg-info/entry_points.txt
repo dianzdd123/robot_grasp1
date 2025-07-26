@@ -1,3 +1,0 @@
-[console_scripts]
-camera_viewer = camera_node.camera_viewer:main
-realsense_publisher = camera_node.realsense_publisher:main

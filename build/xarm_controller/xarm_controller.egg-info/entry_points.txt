@@ -1,2 +1,0 @@
-[console_scripts]
-xarm_controller = xarm_controller.xarm_controller_node:main

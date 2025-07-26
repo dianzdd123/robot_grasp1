@@ -60,3 +60,7 @@ results/scan_output_*/
 scan_output_*
 scan_output_*/
 scan_output_*/
+build/
+install/
+log/
+scan_output_*/
