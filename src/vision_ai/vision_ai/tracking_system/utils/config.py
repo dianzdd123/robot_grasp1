@@ -125,7 +125,7 @@ class TrackingConfig:
                     'class_id': 1.0,             
                     'hu_moments': 0.5,           # 从0.6改为0.3
                     'color_histogram': 0.5,      # 从0.8改为0.7
-                    'spatial_continuity': 0.2    
+                    'spatial_continuity': 0.1    
                 },
                 'color': {
                     'histogram_bins': 96,        
@@ -140,8 +140,8 @@ class TrackingConfig:
                 'intrinsics': {
                     'fx': 912.694580078125,
                     'fy': 910.309814453125,
-                    'cx': 640.0,
-                    'cy': 360.0
+                    'cx': 624.051574707031,  # 更新
+                    'cy': 320.749542236328   # 更新
                 },
                 'image_size': {
                     'width': 1280,

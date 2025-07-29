@@ -155,7 +155,7 @@ class GuiConfigNode(Node):
         """Display GUI for manual input"""
         window = tk.Tk()
         window.title("Manual Input")
-        window.geometry("350x350")
+        window.geometry("350x400") # Adjust window size for more space if needed
 
         # Object height
         tk.Label(window, text="Object Height (mm):").pack(pady=5)
@@ -177,6 +177,10 @@ class GuiConfigNode(Node):
             y_entry = tk.Entry(frame, width=8)
             y_entry.pack(side=tk.LEFT)
             entries.append((x_entry, y_entry))
+        
+        # Add a note for coordinate range
+        tk.Label(window, text="Note: X, Y coordinates must be between -900 and 900 mm.", 
+                 font=("Arial", 8), fg="red").pack(pady=5)
 
         tk.Button(window, text="Preview Region", 
                  command=lambda: self.preview_region(self.get_manual_points(entries))).pack(pady=10)
@@ -207,6 +211,12 @@ class GuiConfigNode(Node):
         if not points or len(points) != 4:
             messagebox.showwarning("Warning", "Please enter all 4 points first")
             return
+        
+        # Validate points for preview as well
+        for x, y in points:
+            if not (-900 <= x <= 900 and -900 <= y <= 900):
+                messagebox.showerror("Error", "All X, Y coordinates must be within ±900mm for preview.")
+                return
         
         self.get_logger().info(f'Preview region: {points}')
         
@@ -340,22 +350,32 @@ Area: {area/1000:.1f} cm²"""
                 
             points = []
             for x_entry, y_entry in entries:
-                x = float(x_entry.get().strip())
-                y = float(y_entry.get().strip())
-                if abs(x) > 1000 or abs(y) > 1000:
-                    messagebox.showerror("Error", "Coordinates must be within ±1000mm")
+                x_str = x_entry.get().strip()
+                y_str = y_entry.get().strip()
+
+                if not x_str or not y_str:
+                    messagebox.showerror("Error", "Please enter all 4 points.")
                     return
+
+                x = float(x_str)
+                y = float(y_str)
+
+                # Validate X, Y coordinates
+                if not (-900 <= x <= 900 and -900 <= y <= 900):
+                    messagebox.showerror("Input Error", f"Coordinates ({x}, {y}) are out of range. X and Y must be between -900mm and 900mm. Please re-enter.")
+                    return # Do not destroy window, allow user to correct
                 points.append((x, y))
             
             if len(points) != 4:
-                messagebox.showerror("Error", "Please enter all 4 points")
+                messagebox.showerror("Error", "Please enter all 4 points.")
                 return
             
-            window.destroy()  # Only destroy window after validation
+            # If all validations pass, then destroy window and call service
+            window.destroy()  
             self.call_planning_service("manual", height, points)
             
         except ValueError:
-            messagebox.showerror("Error", "Please enter valid numbers")
+            messagebox.showerror("Error", "Please enter valid numbers for coordinates and height.")
             # Keep window open for user correction
 
     def cancel(self, window):

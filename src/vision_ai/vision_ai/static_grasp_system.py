@@ -282,7 +282,7 @@ class AutomatedStaticGraspSystem(Node):
             self.get_logger().info(f"🔧 Rect: w={width:.1f}, h={height:.1f}, angle={angle:.1f}°, scan_yaw={scan_yaw:.1f}°")
             
             # Calculate yaw angle and gripper width
-            if width > height:
+            if width < height:
                 dis = max(150, min(500, int(height * 2 - 50)))  # Calculate gripper width based on shorter one
                 yaw_angle = -angle + 90 + scan_yaw
             else:

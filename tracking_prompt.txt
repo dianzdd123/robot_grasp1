@@ -6,33 +6,30 @@
 ### **核心架构**
 
 ```
-/home/qi/ros2_ws/src/vision_ai/vision_ai/tracking_system/
-├── core/
+/home/qi/ros2_ws/src/vision_ai/vision_ai/detection
+├── detection_pipeline.py
+├── __init__.py
+├── detectors/
 │   ├── __init__.py
-│   ├── tracking_core.py           # 核心追踪逻辑 ✅
-│   ├── state_machine.py           # 简化状态机管理 ✅
-│   └── phase_controller.py        # [未实现]
-├── vision/
+│   ├── yolo_detector.py           
+├── features/
 │   ├── __init__.py
-│   ├── visual_tracker.py          # 视觉追踪(卡尔曼滤波) ✅
-│   ├── feature_manager.py         # 特征管理 ✅
-│   └── motion_predictor.py        # [未实现]
-├── control/
+│   ├── color_features.py         
+│   ├── shape_features.py        
+│   └── spatial_features.py        
+├── interfaces/
 │   ├── __init__.py
-│   ├── pose_controller.py         # 位姿控制 ✅
-│   ├── gripper_controller.py      # [未实现]
-│   └── safety_monitor.py          # [未实现]
-├── recovery/
+│   ├── detector_interface.py         
+│   ├── segmentor_interface.py      
+├── segementors/
 │   ├── __init__.py
-│   ├── recovery_manager.py        # [未实现]
-│   └── fallback_strategies.py     # [未实现]
+│   ├── sam2_segmentor.py     
 └── utils/
     ├── __init__.py
-    ├── coordinate_transform.py    # [未实现]
-    ├── visualization.py           # [未实现]
-    └── config.py                  # 配置管理 ✅
+    ├── config_manager.py   
+    ├── model_factory.py           
 
-主节点: tracking_node.py ✅
+主节点: /home/qi/ros2_ws/src/vision_ai/vision_ai/detection_node 
 ```
 
 ### **简化状态机设计**
@@ -272,7 +269,7 @@ def _manual_imgmsg_to_cv2(self, msg, encoding):
 
 ### **当前状态与已知问题**
 
-**✅ 已实现功能:**
+** 已实现功能:**
 - 完整的实时YOLO+SAM2检测
 - ID匹配算法(class+hu_moments+color_histogram)
 - 简化状态机(6状态)

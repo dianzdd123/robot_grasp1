@@ -1,6 +1,3 @@
-#!/usr/bin/env python3
-# bypass_cvbridge_detection_node.py - 绕过cv_bridge问题的检测节点
-
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Image
@@ -11,9 +8,10 @@ import time
 import os
 import json
 from datetime import datetime
-
+from scipy.spatial.transform import Rotation as R
 # 导入检测管道
 from vision_ai.detection.detection_pipeline import DetectionPipeline
+from .improved_coordinate_functions import HandEyeCalibratedCoordinateCalculator
 
 class BypassCvBridgeDetectionNode(Node):
     def __init__(self):
@@ -22,13 +20,14 @@ class BypassCvBridgeDetectionNode(Node):
         # 检测管道
         self.detection_pipeline = None
         self._initialize_detection_pipeline()
-        
+        self.coordinate_calculator = HandEyeCalibratedCoordinateCalculator()
         # 状态管理
         self.processing_active = False
         self.latest_reference_image = None
         self.latest_depth_image = None
         self.current_scan_output_dir = None
-        
+        self.last_detection_result = None
+        self.result_republish_timer = None
         # 订阅者 - 监听拼接完成消息
         self.stitching_complete_sub = self.create_subscription(
             String,
@@ -60,6 +59,12 @@ class BypassCvBridgeDetectionNode(Node):
             10
         )
         
+        # 发布者 - 发布检测结果
+        self.detection_complete_pub = self.create_publisher(
+            String,
+            '/detection_complete',
+            10
+        )
         # 发布者 - 发布可视化图像
         self.visualization_pub = self.create_publisher(
             Image,
@@ -67,7 +72,7 @@ class BypassCvBridgeDetectionNode(Node):
             10
         )
         
-        self.get_logger().info('🔍 绕过cv_bridge的检测节点已启动，等待拼接完成信号...')
+        self.get_logger().info('🔍 Detection node (bypass cv_bridge) started, waiting for stitching complete signal...')
 
     def _initialize_detection_pipeline(self):
         """初始化检测管道"""
@@ -79,16 +84,16 @@ class BypassCvBridgeDetectionNode(Node):
             self.detection_pipeline = None
 
     def stitching_complete_callback(self, msg):
-        """拼接完成回调"""
+        """Stitching complete callback"""
         try:
             self.current_scan_output_dir = msg.data
-            self.get_logger().info(f'🎯 收到拼接完成信号: {self.current_scan_output_dir}')
+            self.get_logger().info(f'🎯 Received stitching complete signal: {self.current_scan_output_dir}')
             
-            # 直接从文件加载图像，绕过ROS消息传递
+            # Load images directly, bypass ROS message transfer
             self._load_images_directly()
             
         except Exception as e:
-            self.get_logger().error(f'处理拼接完成信号失败: {e}')
+            self.get_logger().error(f'Failed to process stitching complete signal: {e}')
 
     def reference_image_callback(self, msg):
         """接收最终参考图像（备用方法）"""
@@ -99,7 +104,6 @@ class BypassCvBridgeDetectionNode(Node):
         """接收深度信息（备用方法）"""
         self.latest_depth_image = msg
         self.get_logger().info('📏 收到深度信息（备用）')
-
 
     def _load_images_directly(self):
         """直接从文件加载图像，绕过ROS消息"""
@@ -296,30 +300,114 @@ class BypassCvBridgeDetectionNode(Node):
             is_single_point = fusion_params.get('single_point', False)
             
             if is_single_point:
-                # 单点扫描：直接使用主waypoint的深度数据
-                depth_info = self._get_depth_info_single_point(detection_obj)
+                # 🆕 单点扫描：获取waypoint数据和深度数据
+                waypoint_contributions = self.fusion_mapping_data['waypoint_contributions']
+                main_waypoint_idx = list(waypoint_contributions.keys())[0]
+                waypoint_data = waypoint_contributions[main_waypoint_idx]['waypoint_data']
+                
+                # 加载深度数据
+                depth_file = waypoint_data.get('depth_raw_filename')
+                if not depth_file:
+                    self.get_logger().warn(f'对象 {detection_obj["object_id"]} 无深度文件')
+                    return detection_obj
+                
+                depth_full_path = os.path.join(self.current_scan_output_dir, os.path.basename(depth_file))
+                if not os.path.exists(depth_full_path):
+                    self.get_logger().warn(f'深度文件不存在: {depth_full_path}')
+                    return detection_obj
+                
+                depth_data = np.load(depth_full_path)
+                
+                # 🆕 使用增强的高度计算（传入正确的参数）
+                depth_result = self._calculate_object_height_corrected_sin(
+                    mask, depth_data, bbox, waypoint_data
+                )
+                
+                # 计算3D空间信息（包含抓夹宽度）
+                spatial_3d = self._calculate_3d_spatial_features_sin(
+                    mask, depth_data, waypoint_data, bbox
+                )
+                
             else:
                 # 多点扫描：分析对象的来源waypoint分布
                 source_analysis = self._analyze_object_sources(bbox, mask)
-                depth_info = self._get_depth_info_from_waypoint(detection_obj, source_analysis)
+                
+                if not source_analysis['coverage_threshold_met']:
+                    self.get_logger().warn(f'对象 {detection_obj["object_id"]} 跨越多个waypoint，使用主要来源')
+                
+                dominant_wp_idx = source_analysis['dominant_waypoint']
+                waypoint_data = self.fusion_mapping_data['waypoint_contributions'][dominant_wp_idx]['waypoint_data']
+                
+                # 加载该waypoint的深度数据
+                depth_file = waypoint_data.get('depth_raw_filename')
+                if not depth_file:
+                    self.get_logger().warn(f'Waypoint {dominant_wp_idx} 无深度文件')
+                    return detection_obj
+                
+                depth_full_path = os.path.join(self.current_scan_output_dir, os.path.basename(depth_file))
+                if not os.path.exists(depth_full_path):
+                    self.get_logger().warn(f'Waypoint {dominant_wp_idx} 深度文件不存在: {depth_full_path}')
+                    return detection_obj
+                
+                depth_data = np.load(depth_full_path)
+                
+                # 🆕 对于多点扫描，需要将融合图像中的检测结果映射回原始图像坐标
+                # 这里需要进行坐标映射（简化版本，假设尺寸匹配）
+                depth_result = self._calculate_object_height_corrected_sin(
+                    mask, depth_data, bbox, waypoint_data
+                )
+                
+                spatial_3d = self._calculate_3d_spatial_features_sin(
+                    mask, depth_data, waypoint_data, bbox
+                )
             
-            if depth_info:
-                # 增强对象信息
+            # 🆕 应用增强信息到检测对象
+            if depth_result:
+                # 更新空间特征
                 if 'spatial' not in detection_obj['features']:
                     detection_obj['features']['spatial'] = {}
                 
-                detection_obj['features']['spatial'].update(depth_info['spatial_features'])
-                detection_obj['features']['depth_info'] = depth_info['depth_analysis']
+                detection_obj['features']['spatial'].update(spatial_3d)
+                
+                # 🆕 更新深度信息，包含背景深度和抓夹宽度
+                detection_obj['features']['depth_info'] = {
+                    'height_mm': depth_result['height_mm'],
+                    'background_world_z': depth_result['background_world_z'],
+                    'background_depth_m': depth_result['background_depth_m'],
+                    'depth_confidence': depth_result['confidence'],
+                    'source_waypoint': main_waypoint_idx if is_single_point else dominant_wp_idx,
+                    'coverage_ratio': 1.0 if is_single_point else source_analysis['coverage_ratio'],
+                    'scan_type': 'single_point' if is_single_point else 'multi_point'
+                }
+                
+                # 🆕 添加抓夹宽度信息
+                gripper_info = spatial_3d.get('gripper_width_info')
+                if gripper_info:
+                    detection_obj['features']['grasp_info'] = {
+                        'recommended_width': gripper_info['recommended_gripper_width'],
+                        'real_width_mm': gripper_info['real_width_mm'],
+                        'grasp_angle': gripper_info['angle'],
+                        'pixel_width': gripper_info['pixel_width'],
+                        'depth_used': gripper_info['depth_used']
+                    }
                 
                 # 更新描述
                 detection_obj['description'] = self._generate_enhanced_description(
-                    detection_obj, depth_info
+                    detection_obj, {'depth_analysis': depth_result, 'spatial_features': spatial_3d}
                 )
                 
                 self.get_logger().info(
                     f'✅ 对象 {detection_obj["object_id"]} 深度增强完成: '
-                    f'高度={depth_info["depth_analysis"].get("height_mm", "N/A")}mm'
+                    f'高度={depth_result["height_mm"]:.1f}mm, '
+                    f'背景Z={depth_result["background_world_z"]:.1f}mm'
                 )
+                
+                # 如果有抓夹信息，也记录一下
+                if gripper_info:
+                    self.get_logger().info(
+                        f'🤏 抓夹信息: 推荐宽度={gripper_info["recommended_gripper_width"]}mm, '
+                        f'实际宽度={gripper_info["real_width_mm"]:.1f}mm'
+                    )
             else:
                 self.get_logger().warn(f'⚠️ 对象 {detection_obj["object_id"]} 深度增强失败')
             
@@ -327,6 +415,8 @@ class BypassCvBridgeDetectionNode(Node):
             
         except Exception as e:
             self.get_logger().error(f'对象深度增强失败: {e}')
+            import traceback
+            traceback.print_exc()
             return detection_obj
 
 
@@ -358,12 +448,12 @@ class BypassCvBridgeDetectionNode(Node):
             mask = detection_obj['mask']
             
             # 🆕 使用你的三种高度计算方法
-            height_mm = self._calculate_object_height_corrected(
+            height_mm = self._calculate_object_height_corrected_sin(
                 mask, depth_data, bbox, waypoint_data
             )
             
             # 计算3D空间信息
-            spatial_3d = self._calculate_3d_spatial_features(
+            spatial_3d = self._calculate_3d_spatial_features_sin(
                 mask, depth_data, waypoint_data, bbox
             )
             
@@ -381,309 +471,196 @@ class BypassCvBridgeDetectionNode(Node):
         except Exception as e:
             self.get_logger().error(f'单点深度信息获取失败: {e}')
             return None
-    
-    def _get_depth_info_from_waypoint(self, detection_obj, source_analysis):
-        """从特定waypoint获取深度信息"""
-        try:
-            if not source_analysis['coverage_threshold_met']:
-                self.get_logger().warn('对象跨越多个waypoint，使用简化深度处理')
-                return None
-            
-            dominant_wp_idx = source_analysis['dominant_waypoint']
-            waypoint_data = self.fusion_mapping_data['waypoint_contributions'][dominant_wp_idx]['waypoint_data']
-            
-            # 加载该waypoint的深度数据
-            depth_file = waypoint_data.get('depth_raw_filename')
-            if not depth_file or not os.path.exists(depth_file):
-                self.get_logger().warn(f'Waypoint {dominant_wp_idx} 深度文件不存在: {depth_file}')
-                return None
-            
-            depth_data = np.load(depth_file)
-            
-            # 将融合图像中的检测结果映射回原始图像坐标
-            original_bbox, original_mask = self._map_detection_to_original(
-                detection_obj, dominant_wp_idx
-            )
-            
-            if original_bbox is None or original_mask is None:
-                return None
-            
-            # 🆕 使用你的三种高度计算方法
-            height_mm = self._calculate_object_height_corrected(
-                original_mask, depth_data, original_bbox, waypoint_data
-            )
-            
-            # 计算3D空间信息
-            spatial_3d = self._calculate_3d_spatial_features(
-                original_mask, depth_data, waypoint_data
-            )
-            
-            return {
-                'depth_analysis': {
-                    'height_mm': height_mm,
-                    'source_waypoint': dominant_wp_idx,
-                    'coverage_ratio': source_analysis['coverage_ratio'],
-                    'depth_confidence': min(source_analysis['coverage_ratio'] * 2, 1.0)
-                },
-                'spatial_features': spatial_3d
-            }
-            
-        except Exception as e:
-            self.get_logger().error(f'获取waypoint深度信息失败: {e}')
-            return None
 
     def _calculate_object_height_corrected(self, mask, depth_data, bbox, waypoint_data):
-        """集成你的三种高度计算方法（来自gaisp.py）"""
+        """集成三种高度估计方法，使用融合映射回原图坐标"""
         try:
+            fusion_mapping = self.fusion_mapping_data['fusion_mapping']
             x1, y1, x2, y2 = map(int, bbox)
-            
-            # 确保bbox在图像范围内
-            h, w = depth_data.shape
+
+            # 保证 bbox 有效范围
+            h, w = mask.shape
             x1, y1 = max(0, x1), max(0, y1)
             x2, y2 = min(w, x2), min(h, y2)
-            
-            # 计算bbox中心点
+
             center_x, center_y = (x1 + x2) // 2, (y1 + y2) // 2
-            
             self.get_logger().info(f'🔍 计算高度: bbox=[{x1},{y1},{x2},{y2}], center=[{center_x},{center_y}]')
-            
-            # 方法1: bbox内对比
-            method1_height = self._calculate_height_method1(mask, depth_data, [x1, y1, x2, y2])
-            
-            # 方法2: 扩展背景采样
-            method2_height = self._calculate_height_method2(mask, depth_data, [x1, y1, x2, y2])
-            
+
+            def _get_depth_from_mapping(x, y):
+                mapping = fusion_mapping.get((x, y))
+                if not mapping:
+                    return None
+                src_x, src_y = mapping['source_pixel']
+                depth_file = mapping['waypoint_data'].get('depth_raw_filename')
+                if not os.path.exists(depth_file):
+                    return None
+                depth_img = np.load(depth_file)
+                if 0 <= src_x < depth_img.shape[1] and 0 <= src_y < depth_img.shape[0]:
+                    depth_val = depth_img[src_y, src_x] / 1000.0  # mm → m
+                    return depth_val if depth_val > 0.01 else None
+                return None
+
+            # 方法1: bbox对比
+            method1_depths_mask, method1_depths_bg = [], []
+            for y in range(y1, y2):
+                for x in range(x1, x2):
+                    if 0 <= y < h and 0 <= x < w:
+                        depth_val = _get_depth_from_mapping(x, y)
+                        if depth_val is None:
+                            continue
+                        if mask[y, x] > 0:
+                            method1_depths_mask.append(depth_val)
+                        else:
+                            method1_depths_bg.append(depth_val)
+
+            # 方法2: 扩展框外背景
+            expand_px = 30
+            method2_depths_bg = []
+            for y in range(y1 - expand_px, y2 + expand_px):
+                for x in range(x1 - expand_px, x2 + expand_px):
+                    if not (x1 <= x < x2 and y1 <= y < y2):
+                        depth_val = _get_depth_from_mapping(x, y)
+                        if depth_val:
+                            method2_depths_bg.append(depth_val)
+
             # 方法3: 中心点对比
-            method3_height = self._calculate_height_method3(mask, depth_data, (center_x, center_y))
-            
-            # 综合评估（与你的原算法相同）
-            valid_heights = []
-            if method1_height is not None and 5 <= method1_height <= 500:
-                valid_heights.append(("bbox内对比", method1_height))
-            if method2_height is not None and 5 <= method2_height <= 500:
-                valid_heights.append(("扩展背景", method2_height))
-            if method3_height is not None and 5 <= method3_height <= 500:
-                valid_heights.append(("中心点对比", method3_height))
-            
-            self.get_logger().info(f'📊 高度计算结果: {len(valid_heights)} 个有效值')
-            for method_name, height in valid_heights:
-                self.get_logger().info(f'  - {method_name}: {height:.1f}mm')
-            
-            if not valid_heights:
+            center_depth = _get_depth_from_mapping(center_x, center_y)
+            center_bg_samples = []
+            for dy in range(-50, 51, 5):
+                for dx in range(-50, 51, 5):
+                    sx, sy = center_x + dx, center_y + dy
+                    if 0 <= sx < w and 0 <= sy < h and mask[sy, sx] == 0:
+                        depth_val = _get_depth_from_mapping(sx, sy)
+                        if depth_val:
+                            center_bg_samples.append(depth_val)
+
+            # 计算各自方法高度
+            results = []
+            if len(method1_depths_mask) >= 10 and len(method1_depths_bg) >= 5:
+                h1 = abs(np.median(method1_depths_mask) - np.median(method1_depths_bg)) * 1000
+                if 5 <= h1 <= 500:
+                    results.append(("bbox内对比", h1))
+
+            if len(method2_depths_bg) >= 20 and len(method1_depths_mask) >= 10:
+                h2 = abs(np.median(method1_depths_mask) - np.median(method2_depths_bg)) * 1000
+                if 5 <= h2 <= 500:
+                    results.append(("扩展背景", h2))
+
+            if center_depth and len(center_bg_samples) >= 10:
+                h3 = abs(center_depth - np.median(center_bg_samples)) * 1000
+                if 5 <= h3 <= 500:
+                    results.append(("中心点对比", h3))
+
+            self.get_logger().info(f'📊 高度计算结果: {len(results)} 个有效值')
+            for name, val in results:
+                self.get_logger().info(f'  - {name}: {val:.1f}mm')
+
+            if not results:
                 self.get_logger().warn('所有高度计算方法都失败，使用默认值')
-                return 30.0  # 默认值
-            
-            if len(valid_heights) == 1:
-                final_height = valid_heights[0][1]
-                self.get_logger().info(f'✅ 使用单一方法: {final_height:.1f}mm')
-                return final_height
-            
-            # 多值处理逻辑
-            heights = [h[1] for h in valid_heights]
-            if max(heights) - min(heights) < 20:
-                final_height = np.mean(heights)
-                self.get_logger().info(f'✅ 使用平均值: {final_height:.1f}mm')
-                return final_height
+                return 30.0
+
+            heights = [r[1] for r in results]
+            if len(heights) == 1 or max(heights) - min(heights) < 20:
+                final = np.mean(heights)
+                self.get_logger().info(f'✅ 使用平均值: {final:.1f}mm')
+                return final
             else:
-                final_height = np.median(heights)
-                self.get_logger().info(f'✅ 使用中位数: {final_height:.1f}mm')
-                return final_height
-                
+                final = np.median(heights)
+                self.get_logger().info(f'✅ 使用中位数: {final:.1f}mm')
+                return final
+
         except Exception as e:
             self.get_logger().error(f'高度计算失败: {e}')
             return 30.0
 
-    def _calculate_height_method1(self, mask, depth_data, bbox):
-        """方法1: bbox内对比（适配ROS深度数据）"""
-        try:
-            x1, y1, x2, y2 = bbox
-            mask_depths = []
-            non_mask_depths = []
-            
-            for y in range(y1, y2):
-                for x in range(x1, x2):
-                    if 0 <= y < mask.shape[0] and 0 <= x < mask.shape[1]:
-                        # ROS深度数据通常以米为单位
-                        depth_val = depth_data[y, x] / 1000.0  # 转换为米
-                        if depth_val > 0.01:  # 有效深度值
-                            if mask[y, x] > 0:
-                                mask_depths.append(depth_val)
-                            else:
-                                non_mask_depths.append(depth_val)
-            
-            if len(mask_depths) < 10 or len(non_mask_depths) < 5:
-                return None
-            
-            mask_avg = np.median(mask_depths)
-            bg_avg = np.median(non_mask_depths)
-            height_mm = abs(mask_avg - bg_avg) * 1000  # 转换为毫米
-            
-            return height_mm if 5 <= height_mm <= 500 else None
-            
-        except Exception:
-            return None
-
-    def _calculate_height_method2(self, mask, depth_data, bbox):
-        """方法2: 扩展背景采样"""
-        try:
-            x1, y1, x2, y2 = bbox
-            h, w = mask.shape
-            
-            # 扩展bbox
-            expand_pixels = 30
-            expanded_x1 = max(0, x1 - expand_pixels)
-            expanded_y1 = max(0, y1 - expand_pixels)
-            expanded_x2 = min(w, x2 + expand_pixels)
-            expanded_y2 = min(h, y2 + expand_pixels)
-            
-            # 收集物体深度
-            mask_depths = []
-            for y in range(y1, y2):
-                for x in range(x1, x2):
-                    if 0 <= y < h and 0 <= x < w and mask[y, x] > 0:
-                        depth_val = depth_data[y, x] / 1000.0
-                        if depth_val > 0.01:
-                            mask_depths.append(depth_val)
-            
-            # 收集背景深度
-            background_depths = []
-            for y in range(expanded_y1, expanded_y2):
-                for x in range(expanded_x1, expanded_x2):
-                    if not (x1 <= x < x2 and y1 <= y < y2):
-                        depth_val = depth_data[y, x] / 1000.0
-                        if depth_val > 0.01:
-                            background_depths.append(depth_val)
-            
-            if len(mask_depths) < 10 or len(background_depths) < 20:
-                return None
-            
-            mask_avg = np.median(mask_depths)
-            bg_avg = np.median(background_depths)
-            height_mm = abs(mask_avg - bg_avg) * 1000
-            
-            return height_mm if 5 <= height_mm <= 500 else None
-            
-        except Exception:
-            return None
-
-    def _calculate_height_method3(self, mask, depth_data, click_point):
-        """方法3: 基于中心点的高度估算"""
-        try:
-            center_x, center_y = click_point
-            h, w = mask.shape
-            
-            # 获取中心点深度
-            if not (0 <= center_x < w and 0 <= center_y < h):
-                return None
-            
-            center_depth = depth_data[center_y, center_x] / 1000.0
-            if center_depth <= 0.01:
-                return None
-            
-            # 在中心点周围采样背景深度
-            sample_radius = 50
-            background_depths = []
-            
-            for dy in range(-sample_radius, sample_radius + 1, 5):
-                for dx in range(-sample_radius, sample_radius + 1, 5):
-                    sample_x = center_x + dx
-                    sample_y = center_y + dy
-                    
-                    if 0 <= sample_x < w and 0 <= sample_y < h:
-                        if mask[sample_y, sample_x] == 0:  # 背景区域
-                            depth_val = depth_data[sample_y, sample_x] / 1000.0
-                            if depth_val > 0.01:
-                                background_depths.append(depth_val)
-            
-            if len(background_depths) < 10:
-                return None
-            
-            bg_avg = np.median(background_depths)
-            height_mm = abs(center_depth - bg_avg) * 1000
-            
-            return height_mm if 5 <= height_mm <= 500 else None
-            
-        except Exception:
-            return None
-
     def _calculate_3d_spatial_features(self, mask, depth_data, waypoint_data, bbox):
-        """计算3D空间特征（结合test_rel.py的坐标转换逻辑）"""
         try:
-            # 计算对象的3D中心点
-            center_3d = self._calculate_object_3d_center(mask, depth_data)
-            
-            if center_3d is None:
+            # 找到 mask 中心点
+            mask_indices = np.argwhere(mask > 0)
+            if len(mask_indices) == 0:
                 return {}
+
+            center_y, center_x = np.median(mask_indices, axis=0).astype(int)
+
+            # 使用融合映射回查原图坐标
+            fusion_mapping = self.fusion_mapping_data['fusion_mapping']
+            mapping = fusion_mapping.get((center_x, center_y))
+            if not mapping:
+                self.get_logger().warn(f'无法从融合映射中找到中心点 ({center_x}, {center_y})')
+                return {}
+
+            src_x, src_y = mapping['source_pixel']
+            depth_path = mapping['waypoint_data']['depth_raw_filename']
+            depth_array = np.load(depth_path)
+            depth_val = depth_array[src_y, src_x] / 1000.0
+            if depth_val <= 0.01:
+                return {}
+
+            # 相机内参（如果你有动态配置可替换）
+            fx, fy = 912.7, 910.3
+            cx, cy = 624.051574707031, 320.749542236328
+            z = depth_val * 1000
+            x = (src_x - cx) * z / fx * 1000
+            y = (src_y - cy) * z / fy * 1000
+
+            # 世界坐标转换
+            cam_pos = np.array(waypoint_data['world_pos'])  # (x, y, z)
+            rpy_deg = [abs(waypoint_data['roll'])-180, waypoint_data['pitch'], waypoint_data['yaw']]
+            cam_to_obj = np.array([(y + 70), (x - 40), -(z)])  # 轴调换+偏移
             
-            cam_x, cam_y, cam_z = center_3d
-            
-            # 使用waypoint的位姿信息进行坐标转换
-            world_pos = waypoint_data.get('world_pos', (0, 0))
-            yaw_deg = waypoint_data.get('yaw', 0)
-            
-            # 简化的世界坐标转换（基于test_rel.py的逻辑）
-            # 注意：这里需要机械臂的当前位置信息，暂时使用waypoint位置
-            world_x = world_pos[0] + cam_y * 1000 + 65  # 坐标轴重排 + 偏移
-            world_y = world_pos[1] + cam_x * 1000 - 30
-            world_z = 350 - cam_z * 1000  # 假设相机高度350mm
-            
-            # 计算对象的空间属性
+            R_wc = R.from_euler('XYZ', rpy_deg, degrees=True).as_matrix()
+            world_xyz = R_wc @ cam_to_obj + cam_pos
+            self.get_logger().info(f'3D: {world_xyz}')
+            # 面积等
             bbox_area = (bbox[2] - bbox[0]) * (bbox[3] - bbox[1])
             mask_area = np.sum(mask > 0)
             coverage_ratio = mask_area / bbox_area if bbox_area > 0 else 0
-            
+
             return {
-                'centroid_3d_camera': (cam_x, cam_y, cam_z),
-                'world_coordinates': (world_x, world_y, world_z),
-                'distance_to_camera': cam_z,
+                'centroid_3d_camera': (x, y, z),
+                'world_coordinates': tuple(world_xyz),
+                'distance_to_camera': z,
                 'mask_area_pixels': int(mask_area),
                 'bbox_area_pixels': int(bbox_area),
                 'mask_coverage_ratio': float(coverage_ratio),
-                'estimated_real_area_mm2': float(mask_area * (cam_z * 1000) ** 2 / 1000000),  # 粗略估算
+                'estimated_real_area_mm2': float(mask_area * (z * 1000) ** 2 / 1000000),
             }
-            
+
         except Exception as e:
             self.get_logger().error(f'3D空间特征计算失败: {e}')
             return {}
 
-    def _calculate_object_3d_center(self, mask, depth_data):
-        """计算对象的3D中心点"""
+    def _calculate_3d_spatial_features_sin(self, mask, depth_data, waypoint_data, bbox):
+        """使用官方标定计算夹爪目标坐标"""
         try:
-            # 找到mask中的有效像素
-            mask_indices = np.where(mask > 0)
-            if len(mask_indices[0]) == 0:
-                return None
+            # 使用新的校准计算器
+            from .improved_coordinate_functions import calculate_3d_spatial_features_calibrated
             
-            # 收集有效的3D点
-            valid_points = []
+            result = calculate_3d_spatial_features_calibrated(
+                mask, depth_data, waypoint_data, bbox, self.coordinate_calculator
+            )
             
-            for i in range(len(mask_indices[0])):
-                y, x = mask_indices[0][i], mask_indices[1][i]
-                depth_val = depth_data[y, x] / 1000.0  # 转换为米
-                
-                if depth_val > 0.01:  # 有效深度
-                    # 简化的像素到3D点转换（假设标准相机内参）
-                    fx, fy = 912.7, 910.3  # 相机内参
-                    cx, cy = 640, 360
-                    
-                    cam_x = (x - cx) * depth_val / fx
-                    cam_y = (y - cy) * depth_val / fy
-                    cam_z = depth_val
-                    
-                    valid_points.append((cam_x, cam_y, cam_z))
-            
-            if len(valid_points) < 5:
-                return None
-            
-            # 计算3D中心点（中位数，更抗噪声）
-            points_array = np.array(valid_points)
-            center_3d = np.median(points_array, axis=0)
-            
-            return tuple(center_3d)
+            return result
             
         except Exception as e:
-            self.get_logger().error(f'3D中心点计算失败: {e}')
-            return None
+            print(f"[ERROR] 校准坐标计算异常: {e}")
+        
+    
+    def _calculate_object_height_corrected_sin(self, mask, depth_data, bbox, waypoint_data):
+        """集成高度计算方法并保存背景深度信息（使用校准）"""
+        try:
+            from .improved_coordinate_functions import calculate_object_height_with_background_depth
+            
+            result = calculate_object_height_with_background_depth(
+                mask, depth_data, bbox, waypoint_data, self.coordinate_calculator
+            )
+            
+            if result:
+                return result
+                
+        except Exception as e:
+            print(f"[ERROR] 校准高度计算异常: {e}")
+            
 
     def _generate_enhanced_description(self, detection_obj, depth_info):
         """生成增强的描述（包含深度信息）"""
@@ -714,9 +691,9 @@ class BypassCvBridgeDetectionNode(Node):
             if height_mm is not None:
                 if height_mm < 20:
                     description_parts.append("(flat)")
-                elif height_mm < 50:
+                elif height_mm < 80:
                     description_parts.append("(low)")
-                elif height_mm < 100:
+                elif height_mm < 120:
                     description_parts.append("(medium height)")
                 else:
                     description_parts.append("(tall)")
@@ -813,8 +790,72 @@ class BypassCvBridgeDetectionNode(Node):
         except Exception as e:
             self.get_logger().error(f'获取waypoint深度信息失败: {e}')
             return None
-           
+        
+    def _calculate_real_gripper_width(self, mask, depth_data, waypoint_data):
+        """计算真实抓夹宽度"""
+        try:
+            # 找到mask的最小外接矩形
+            contours, _ = cv2.findContours(mask.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            if not contours:
+                return None
+            
+            largest_contour = max(contours, key=cv2.contourArea)
+            rect = cv2.minAreaRect(largest_contour)
+            _, (width, height), angle = rect
+            
+            # 选择较短的边作为抓夹宽度参考
+            shorter_side_pixels = min(width, height)
+            
+            # 获取物体中心深度
+            center_depth = self._get_object_center_depth(mask, depth_data)
+            if center_depth is None:
+                return None
+            
+            # 相机内参（你可能需要根据实际情况调整）
+            fx = 912.694580078125  # 根据你的相机内参
+            
+            # 像素到毫米转换
+            # real_width_mm = pixel_width * (depth_m / focal_length) * 1000
+            real_width_mm = shorter_side_pixels * (center_depth / fx) * 1000
 
+            
+            return {
+                'real_width_mm': real_width_mm,
+                'pixel_width': shorter_side_pixels,
+                'depth_used': center_depth,
+                'angle': angle
+            }
+            
+        except Exception as e:
+            self.get_logger().error(f'抓夹宽度计算失败: {e}')
+            return None
+                   
+    def _get_object_center_depth(self, mask, depth_data):
+        """获取物体中心的深度值"""
+        try:
+            # 找到mask中心
+            mask_indices = np.where(mask > 0)
+            if len(mask_indices[0]) == 0:
+                return None
+            
+            center_y = int(np.median(mask_indices[0]))
+            center_x = int(np.median(mask_indices[1]))
+            
+            # 获取中心点周围的深度值
+            depth_samples = []
+            for dy in range(-3, 4):
+                for dx in range(-3, 4):
+                    y, x = center_y + dy, center_x + dx
+                    if 0 <= y < depth_data.shape[0] and 0 <= x < depth_data.shape[1]:
+                        if mask[y, x] > 0:  # 确保在物体内
+                            depth_val = depth_data[y, x] / 1000.0
+                            if depth_val > 0.01:
+                                depth_samples.append(depth_val)
+            
+            return np.median(depth_samples) if depth_samples else None
+            
+        except Exception:
+            return None
     def _analyze_object_sources(self, bbox, mask):
         """分析对象的来源waypoint分布"""
         try:
@@ -1014,46 +1055,174 @@ class BypassCvBridgeDetectionNode(Node):
             self.processing_active = False
         
     def _publish_detection_result_json(self, result):
-        """发布检测结果（JSON格式）"""
+        """发布检测结果 - 保存mask和3D坐标用于静态抓取"""
         try:
             result_data = {
                 'detection_count': result['detection_count'],
                 'processing_time': result.get('processing_time', 0.0),
                 'output_directory': self.detection_pipeline.output_dir,
+                'timestamp': datetime.now().isoformat(),
                 'objects': []
             }
             
             for obj in result.get('objects', []):
+                # 🆕 保存mask用于yaw计算
+                mask_data = None
+                if 'mask' in obj and obj['mask'] is not None:
+                    mask = obj['mask']
+                    if isinstance(mask, np.ndarray):
+                        # 保存mask的轮廓点，用于重建和yaw计算
+                        try:
+                            contours, _ = cv2.findContours(mask.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                            if contours:
+                                largest_contour = max(contours, key=cv2.contourArea)
+                                # 简化轮廓，减少数据量
+                                epsilon = 0.02 * cv2.arcLength(largest_contour, True)
+                                simplified_contour = cv2.approxPolyDP(largest_contour, epsilon, True)
+                                contour_points = simplified_contour.reshape(-1, 2).tolist()
+                                
+                                # 保存mask信息
+                                mask_data = {
+                                    'contour_points': contour_points,
+                                    'mask_shape': mask.shape,
+                                    'mask_area': int(np.sum(mask > 0)),
+                                    # 🆕 保存最小外接矩形信息，用于yaw计算
+                                    'min_area_rect': {
+                                        'center': cv2.minAreaRect(largest_contour)[0],
+                                        'size': cv2.minAreaRect(largest_contour)[1], 
+                                        'angle': cv2.minAreaRect(largest_contour)[2]
+                                    }
+                                }
+                        except Exception as e:
+                            self.get_logger().warn(f'处理mask失败: {e}')
+                            mask_data = None
+                
+                # 确保3D坐标被正确保存
+                spatial_features = obj.get('features', {}).get('spatial', {})
+                world_coordinates = spatial_features.get('world_coordinates', [0, 0, 0])
+                scan_detail = spatial_features.get('scan_detail', [0,0,0,0, 0, 0])
+                # 构建对象数据
                 obj_data = {
                     'object_id': obj['object_id'],
                     'class_id': int(obj['class_id']),
                     'class_name': obj['class_name'],
                     'confidence': float(obj['confidence']),
                     'description': obj['description'],
-                    'bounding_box': obj.get('bounding_box', [0, 0, 0, 0])
-                }
-                
-                if 'spatial' in obj.get('features', {}):
-                    spatial = obj['features']['spatial']
-                    centroid = spatial.get('centroid_2d', (0, 0))
-                    obj_data['center_x'] = float(centroid[0])
-                    obj_data['center_y'] = float(centroid[1])
+                    'bounding_box': obj.get('bounding_box', [0, 0, 0, 0]),
                     
-                    world_coords = spatial.get('world_coordinates', (0, 0, 0))
-                    obj_data['world_x'] = float(world_coords[0])
-                    obj_data['world_y'] = float(world_coords[1])
-                    obj_data['world_z'] = float(world_coords[2])
+                    # 🆕 保存mask信息用于yaw计算
+                    'mask_info': mask_data,
+                    
+                    # 确保特征格式正确
+                    'features': {
+                        'color': {
+                            'color_name': obj.get('features', {}).get('color', {}).get('color_name', 'unknown'),
+                            'histogram': obj.get('features', {}).get('color', {}).get('histogram', []),
+                            **obj.get('features', {}).get('color', {})
+                        },
+                        'shape': {
+                            'hu_moments': obj.get('features', {}).get('shape', {}).get('hu_moments', []),
+                            'contours': obj.get('features', {}).get('shape', {}).get('contours', []),
+                            'area': obj.get('features', {}).get('shape', {}).get('area', 0),
+                            'orientation': obj.get('features', {}).get('shape', {}).get('orientation', 0),
+                            **obj.get('features', {}).get('shape', {})
+                        },
+                        'spatial': {
+                            'centroid_2d': obj.get('features', {}).get('spatial', {}).get('centroid_2d', [0, 0]),
+                            'region_position': obj.get('features', {}).get('spatial', {}).get('region_position', 'unknown'),
+                            'scan_info':scan_detail,
+                            # 🆕 确保3D坐标被保存
+                            'world_coordinates': world_coordinates,
+                            'centroid_3d_camera': obj.get('features', {}).get('spatial', {}).get('centroid_3d_camera', [0, 0, 0]),
+                            **obj.get('features', {}).get('spatial', {})
+                        },
+                        'depth_info': obj.get('features', {}).get('depth_info', {})
+                    }
+                }
                 
                 result_data['objects'].append(obj_data)
             
+            # 发布
             json_msg = String()
             json_msg.data = json.dumps(result_data, indent=2)
             self.detection_result_pub.publish(json_msg)
             
-            self.get_logger().info('📤 检测结果已发布（JSON格式）')
+            # 🆕 同时保存mask信息到单独文件，供静态抓取使用
+            self._save_masks_for_grasp(result_data)
+            self._save_final_detection_results(result_data)
+            self.get_logger().info('📤 Detection result published with mask and 3D coordinates')
             
         except Exception as e:
-            self.get_logger().error(f'发布检测结果失败: {e}')
+            self.get_logger().error(f'Failed to publish detection result: {e}')
+            import traceback
+            traceback.print_exc()
+
+    def _save_final_detection_results(self, result_data):
+        """
+        保存最终的检测结果到 detection_results.json 文件，包含深度和世界坐标信息。
+        它将覆盖 detection_pipeline 之前可能保存的同名文件。
+        """
+        try:
+            # 确保输出目录与 detection_pipeline 使用的目录一致
+            final_results_file = os.path.join(self.detection_pipeline.output_dir, "detection_results.json")
+            
+            # 在保存前，确保所有 mask 都是列表，并且 world_coordinates 也是可序列化的
+            # 遍历对象，处理 mask 和 spatial features
+            processed_objects = []
+            for obj in result_data.get('objects', []):
+                # 创建一个对象的副本，以避免直接修改原始对象，影响其他使用
+                processed_obj = obj.copy()
+
+                # 处理 mask (从 numpy array 到 list)
+                if 'mask' in processed_obj and isinstance(processed_obj['mask'], np.ndarray):
+                    processed_obj['mask'] = processed_obj['mask'].tolist()
+                
+                # 处理 world_coordinates (确保是 list 或 tuple)
+                if 'features' in processed_obj and 'spatial' in processed_obj['features']:
+                    if 'world_coordinates' in processed_obj['features']['spatial']:
+                        wc = processed_obj['features']['spatial']['world_coordinates']
+                        if isinstance(wc, np.ndarray):
+                            processed_obj['features']['spatial']['world_coordinates'] = wc.tolist()
+                        # 如果已经是 tuple (如你的日志所示)，则无需转换
+                
+                processed_objects.append(processed_obj)
+            
+            # 构建最终的 JSON 结构
+            final_json_data = {
+                'objects': processed_objects,
+                'scan_info': result_data.get('scan_info', {}) # 包含扫描信息等元数据
+                # 你可以根据需要添加其他顶级键
+            }
+
+            with open(final_results_file, 'w', encoding='utf-8') as f:
+                json.dump(final_json_data, f, indent=4, ensure_ascii=False) # 使用 indent 4 使 JSON 更可读
+            
+            self.get_logger().info(f'💾 最终检测结果已保存并覆盖: {final_results_file}')
+            
+        except TypeError as e:
+            self.get_logger().error(f"类型错误：无法将最终检测结果序列化到 JSON: {e}")
+            self.get_logger().error(f"检查数据结构，特别是mask和world_coordinates是否已正确转换。")
+        except Exception as e:
+            self.get_logger().error(f'保存最终检测结果失败: {e}', exc_info=True)
+
+
+    def _save_masks_for_grasp(self, result_data):
+        """保存masks到单独文件，供静态抓取系统使用"""
+        try:
+            masks_file = os.path.join(self.detection_pipeline.output_dir, "object_masks.json")
+            
+            masks_data = {}
+            for obj in result_data['objects']:
+                if obj.get('mask_info'):
+                    masks_data[obj['object_id']] = obj['mask_info']
+            
+            with open(masks_file, 'w') as f:
+                json.dump(masks_data, f, indent=2)
+            
+            self.get_logger().info(f'💾 Masks saved to: {masks_file}')
+            
+        except Exception as e:
+            self.get_logger().error(f'Failed to save masks: {e}')
 
     def _publish_visualization_from_file(self, output_dir):
         """从文件发布可视化图像"""
@@ -1084,7 +1253,52 @@ class BypassCvBridgeDetectionNode(Node):
                 
         except Exception as e:
             self.get_logger().error(f'发布可视化图像失败: {e}')
-
+    def _collect_scan_info(self):
+        """收集扫描信息用于tracking回退策略"""
+        try:
+            scan_info = {
+                'center_pose': None,
+                'bounds': None,
+                'waypoint_poses': []
+            }
+            
+            if self.fusion_mapping_data:
+                waypoint_contributions = self.fusion_mapping_data.get('waypoint_contributions', {})
+                
+                # 收集所有waypoint位姿
+                poses = []
+                for wp_data in waypoint_contributions.values():
+                    waypoint_info = wp_data.get('waypoint_data', {})
+                    world_pos = waypoint_info.get('world_pos')
+                    if world_pos:
+                        poses.append({
+                            'position': {'x': world_pos[0], 'y': world_pos[1], 'z': world_pos[2]},
+                            'orientation': {
+                                'roll': waypoint_info.get('roll', 0),
+                                'pitch': waypoint_info.get('pitch', 0), 
+                                'yaw': waypoint_info.get('yaw', 0)
+                            }
+                        })
+                
+                scan_info['waypoint_poses'] = poses
+                
+                # 计算扫描中心
+                if poses:
+                    center_x = sum(p['position']['x'] for p in poses) / len(poses)
+                    center_y = sum(p['position']['y'] for p in poses) / len(poses)
+                    center_z = 350  # 固定追踪高度
+                    
+                    scan_info['center_pose'] = {
+                        'position': {'x': center_x, 'y': center_y, 'z': center_z},
+                        'orientation': {'roll': 179, 'pitch': 0, 'yaw': waypoint_info.get('yaw', 0)}
+                    }
+            
+            return scan_info
+            
+        except Exception as e:
+            self.get_logger().error(f'Failed to collect scan info: {e}')
+            return {'center_pose': None, 'bounds': None, 'waypoint_poses': []}
+    
     def _display_detection_results(self, result):
         """显示检测结果"""
         objects = result.get('objects', [])
@@ -1103,6 +1317,11 @@ class BypassCvBridgeDetectionNode(Node):
         
         self.get_logger().info(f"{'='*60}")
 
+    def republish_detection_results(self):
+        """持续发布检测结果供tracking使用"""
+        if self.last_detection_result:
+            self._publish_detection_result_json(self.last_detection_result)
+
     def _start_target_selection(self, result):
         """启动目标选择流程"""
         try:
@@ -1111,13 +1330,141 @@ class BypassCvBridgeDetectionNode(Node):
             success = self.detection_pipeline.select_tracking_targets()
             
             if success:
-                selected_ids = self.detection_pipeline.get_selected_tracking_ids()
-                self.get_logger().info(f'✅ 已选择 {len(selected_ids)} 个追踪目标')
+                # 保存检测结果
+                self.last_detection_result = result
+                
+                # 收集扫描信息用于tracking
+                scan_info = self._collect_scan_info()
+                
+                # 发布完成信号（安全版）
+                self._publish_detection_complete_signal(scan_info, result)
             else:
                 self.get_logger().warn('目标选择失败或被跳过')
                 
         except Exception as e:
             self.get_logger().error(f'目标选择流程失败: {e}')
+
+    def _serialize_pose_data(self, pose_data):
+        """安全地序列化位姿数据"""
+        try:
+            if not isinstance(pose_data, dict):
+                return None
+            
+            serialized = {}
+            
+            # 处理位置信息
+            position = pose_data.get('position', {})
+            if isinstance(position, dict):
+                serialized['position'] = {
+                    'x': float(position.get('x', 0.0)),
+                    'y': float(position.get('y', 0.0)),
+                    'z': float(position.get('z', 0.0))
+                }
+            else:
+                serialized['position'] = {'x': 0.0, 'y': 0.0, 'z': 0.0}
+            
+            # 处理姿态信息
+            orientation = pose_data.get('orientation', {})
+            if isinstance(orientation, dict):
+                serialized['orientation'] = {
+                    'roll': float(orientation.get('roll', 0.0)),
+                    'pitch': float(orientation.get('pitch', 0.0)),
+                    'yaw': float(orientation.get('yaw', 0.0))
+                }
+            else:
+                serialized['orientation'] = {'roll': 0.0, 'pitch': 0.0, 'yaw': 0.0}
+            
+            return serialized
+            
+        except Exception as e:
+            self.get_logger().error(f'位姿数据序列化失败: {e}')
+            return None
+
+    def _serialize_bounds_data(self, bounds_data):
+        """安全地序列化边界数据"""
+        try:
+            if isinstance(bounds_data, dict):
+                return {
+                    'min_x': float(bounds_data.get('min_x', 0.0)),
+                    'max_x': float(bounds_data.get('max_x', 0.0)),
+                    'min_y': float(bounds_data.get('min_y', 0.0)),
+                    'max_y': float(bounds_data.get('max_y', 0.0)),
+                    'min_z': float(bounds_data.get('min_z', 0.0)),
+                    'max_z': float(bounds_data.get('max_z', 0.0))
+                }
+            elif isinstance(bounds_data, (list, tuple)) and len(bounds_data) >= 6:
+                return {
+                    'min_x': float(bounds_data[0]),
+                    'max_x': float(bounds_data[1]),
+                    'min_y': float(bounds_data[2]),
+                    'max_y': float(bounds_data[3]),
+                    'min_z': float(bounds_data[4]),
+                    'max_z': float(bounds_data[5])
+                }
+            else:
+                return None
+                
+        except Exception as e:
+            self.get_logger().error(f'边界数据序列化失败: {e}')
+            return None
+
+    def _publish_detection_complete_signal(self, scan_info, result):
+        """发布检测完成信号 - 添加参考特征数据库信息"""
+        try:
+            complete_data = {
+                'scan_directory': str(self.current_scan_output_dir),
+                'detection_count': len(result.get('objects', [])),
+                'status': 'completed',
+                'total_objects': len(result.get('objects', [])),
+                'timestamp': datetime.now().isoformat(),
+                
+                # tracking 系统需要的扫描信息
+                'scan_center_pose': self._serialize_pose_data(scan_info.get('center_pose')),
+                'scan_bounds': self._serialize_bounds_data(scan_info.get('bounds')),
+                'waypoint_poses': [
+                    self._serialize_pose_data(pose) for pose in scan_info.get('waypoint_poses', [])
+                    if isinstance(pose, dict)
+                ],
+                
+                # 🆕 参考特征数据库信息
+                'reference_features_path': self.detection_pipeline.output_dir,  # detection_pipeline 的输出目录
+                'detection_results_file': os.path.join(self.detection_pipeline.output_dir, 'detection_results.json'),
+                'selected_targets_file': os.path.join(self.detection_pipeline.output_dir, 'tracking_selection.txt')
+            }
+            
+            # 发布信号
+            try:
+                json_str = json.dumps(complete_data, indent=2, ensure_ascii=False)
+                complete_msg = String()
+                complete_msg.data = json_str
+                self.detection_complete_pub.publish(complete_msg)
+                
+                self.get_logger().info('✅ Detection complete signal published')
+                
+            except (TypeError, ValueError) as json_error:
+                self.get_logger().error(f'JSON serialization failed: {json_error}')
+                self._publish_minimal_complete_signal(result)
+                
+        except Exception as e:
+            self.get_logger().error(f'Failed to publish detection complete signal: {e}')
+
+    def _publish_minimal_complete_signal(self):
+        """发布最小化完成信号"""
+        try:
+            minimal_data = {
+                'status': 'completed',
+                'scan_directory': str(self.current_scan_output_dir),
+                'detection_count': 0
+            }
+            
+            complete_msg = String()
+            complete_msg.data = json.dumps(minimal_data)
+            self.detection_complete_pub.publish(complete_msg)
+            
+            self.get_logger().warn('⚠️ 发布了最小化检测完成信号')
+            
+        except Exception as e:
+            self.get_logger().error(f'最小化信号发布失败: {e}')
 
 
 def main(args=None):

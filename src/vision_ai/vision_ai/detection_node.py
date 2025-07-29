@@ -1,3 +1,4 @@
+# detection_node.py - 重构版本，使用新的增强组件
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Image
@@ -8,17 +9,26 @@ import time
 import os
 import json
 from datetime import datetime
-from scipy.spatial.transform import Rotation as R
-# 导入检测管道
-from vision_ai.detection.detection_pipeline import DetectionPipeline
 
-class BypassCvBridgeDetectionNode(Node):
+# 🆕 导入新的增强组件
+from vision_ai.detection.enhanced_detection_pipeline import EnhancedDetectionPipeline
+from vision_ai.detection.utils.coordinate_calculator import CoordinateCalculator, ObjectAnalyzer
+from vision_ai.detection.utils.adaptive_learner import AdaptiveThresholdManager
+from vision_ai.detection.utils.enhanced_config_manager import EnhancedConfigManager
+
+class EnhancedDetectionNode(Node):
     def __init__(self):
-        super().__init__('detection_node')
+        super().__init__('enhanced_detection_node')
         
-        # 检测管道
-        self.detection_pipeline = None
-        self._initialize_detection_pipeline()
+        # 🆕 使用增强的配置管理器
+        config_path = os.path.join(os.path.dirname(__file__), 'config', 'enhanced_detection_config.json')
+        self.config_manager = EnhancedConfigManager(config_path)
+        
+        # 显示配置摘要
+        self.get_logger().info(f"\n{self.config_manager.get_config_summary()}")
+        
+        # 🆕 初始化增强组件
+        self._initialize_enhanced_components()
         
         # 状态管理
         self.processing_active = False
@@ -26,1568 +36,436 @@ class BypassCvBridgeDetectionNode(Node):
         self.latest_depth_image = None
         self.current_scan_output_dir = None
         self.last_detection_result = None
-        self.result_republish_timer = None
-        # 订阅者 - 监听拼接完成消息
+        self.fusion_mapping_data = None
+        
+        # ROS订阅者和发布者
+        self._setup_ros_interfaces()
+        
+        self.get_logger().info('🚀 增强检测节点启动完成')
+    
+    def _initialize_enhanced_components(self):
+        """初始化增强组件"""
+        try:
+            # 🆕 增强检测管道
+            self.enhanced_pipeline = EnhancedDetectionPipeline(
+                config_file=self.config_manager.config_file,
+                output_dir=None  # 将在处理时动态设置
+            )
+            
+            # 🆕 坐标计算器
+            camera_config = self.config_manager.get_camera_config()
+            calibration_data = {
+                'camera_intrinsics': camera_config.get('intrinsics', {}),
+                'hand_eye_translation': camera_config.get('hand_eye_calibration', {}).get('translation'),
+                'hand_eye_quaternion': camera_config.get('hand_eye_calibration', {}).get('quaternion')
+            }
+            self.coordinate_calculator = CoordinateCalculator(calibration_data)
+            
+            # 🆕 物体分析器
+            self.object_analyzer = ObjectAnalyzer(self.coordinate_calculator)
+            
+            # 🆕 自适应学习管理器
+            adaptive_config = self.config_manager.get_adaptive_learning_config()
+            if adaptive_config.get('enabled', True):
+                learning_file = adaptive_config.get('learning_data_file', 'data/adaptive_learning.json')
+                learning_file = os.path.join(os.path.dirname(__file__), learning_file)
+                self.adaptive_manager = AdaptiveThresholdManager(learning_file)
+                self.get_logger().info('✅ 自适应学习已启用')
+            else:
+                self.adaptive_manager = None
+                self.get_logger().info('⚠️ 自适应学习已禁用')
+            
+            self.get_logger().info('✅ 增强组件初始化成功')
+            
+        except Exception as e:
+            self.get_logger().error(f'❌ 增强组件初始化失败: {e}')
+            raise RuntimeError(f"组件初始化失败: {e}") from e
+    
+    def _setup_ros_interfaces(self):
+        """设置ROS接口"""
+        # 订阅者
         self.stitching_complete_sub = self.create_subscription(
-            String,
-            '/stitching_complete',
-            self.stitching_complete_callback,
-            10
+            String, '/stitching_complete', self.stitching_complete_callback, 10
         )
-        
-        # 订阅者 - 接收最终参考图像
         self.reference_image_sub = self.create_subscription(
-            Image,
-            '/reference_image',
-            self.reference_image_callback,
-            10
+            Image, '/reference_image', self.reference_image_callback, 10
         )
-        
-        # 订阅者 - 接收深度信息
         self.reference_depth_sub = self.create_subscription(
-            Image,
-            '/reference_depth',
-            self.reference_depth_callback,
-            10
+            Image, '/reference_depth', self.reference_depth_callback, 10
         )
         
-        # 发布者 - 发布检测结果
-        self.detection_result_pub = self.create_publisher(
-            String,
-            '/detection_result',
-            10
-        )
-        
-        # 发布者 - 发布检测结果
-        self.detection_complete_pub = self.create_publisher(
-            String,
-            '/detection_complete',
-            10
-        )
-        # 发布者 - 发布可视化图像
-        self.visualization_pub = self.create_publisher(
-            Image,
-            '/detection_visualization',
-            10
-        )
-        
-        self.get_logger().info('🔍 Detection node (bypass cv_bridge) started, waiting for stitching complete signal...')
-
-    def _initialize_detection_pipeline(self):
-        """初始化检测管道"""
-        try:
-            self.detection_pipeline = DetectionPipeline(config_file=None)
-            self.get_logger().info('✅ 检测管道初始化成功')
-        except Exception as e:
-            self.get_logger().error(f'❌ 检测管道初始化失败: {e}')
-            self.detection_pipeline = None
-
+        # 发布者
+        self.detection_result_pub = self.create_publisher(String, '/detection_result', 10)
+        self.detection_complete_pub = self.create_publisher(String, '/detection_complete', 10)
+        self.visualization_pub = self.create_publisher(Image, '/detection_visualization', 10)
+    
     def stitching_complete_callback(self, msg):
-        """Stitching complete callback"""
+        """拼接完成回调 - 使用增强管道处理"""
         try:
+            self.get_logger().info(f'🔔 收到stitching_complete消息: {msg.data}')  # 添加这行调试
             self.current_scan_output_dir = msg.data
-            self.get_logger().info(f'🎯 Received stitching complete signal: {self.current_scan_output_dir}')
+            self.get_logger().info(f'🎯 收到拼接完成信号: {self.current_scan_output_dir}')
             
-            # Load images directly, bypass ROS message transfer
-            self._load_images_directly()
+            # 🆕 使用增强的加载和处理逻辑
+            self._load_and_process_enhanced()
             
         except Exception as e:
-            self.get_logger().error(f'Failed to process stitching complete signal: {e}')
-
-    def reference_image_callback(self, msg):
-        """接收最终参考图像（备用方法）"""
-        self.latest_reference_image = msg
-        self.get_logger().info('📸 收到参考图像（备用）')
-
-    def reference_depth_callback(self, msg):
-        """接收深度信息（备用方法）"""
-        self.latest_depth_image = msg
-        self.get_logger().info('📏 收到深度信息（备用）')
-
-    def _load_images_directly(self):
-        """直接从文件加载图像，绕过ROS消息"""
+            self.get_logger().error(f'拼接完成处理失败: {e}')
+            import traceback
+            traceback.print_exc()  # 添加完整错误堆栈
+    
+    def _load_and_process_enhanced(self):
+        """加载并使用增强管道处理"""
         try:
             if not os.path.exists(self.current_scan_output_dir):
                 self.get_logger().error(f'扫描目录不存在: {self.current_scan_output_dir}')
                 return
             
-            # 🆕 加载和测试融合映射信息
+            # 🆕 加载融合映射信息
             self.get_logger().info('🔄 开始加载融合映射信息...')
             self.fusion_mapping_data = self._load_fusion_mapping()
             
             if self.fusion_mapping_data:
-                self.get_logger().info('✅ 映射信息加载和验证完成')
+                self.get_logger().info('✅ 映射信息加载成功')
             else:
                 self.get_logger().warn('⚠️ 映射信息加载失败，将使用简化模式')
             
+            # 🆕 查找并加载图像
+            image_rgb, depth_data, waypoint_data = self._load_scan_data()
+            
+            if image_rgb is None:
+                self.get_logger().error('无法加载扫描数据')
+                return
+            
+            # 🆕 使用增强管道构建参考特征库
+            self._process_with_enhanced_pipeline(image_rgb, depth_data, waypoint_data)
+            
+        except Exception as e:
+            self.get_logger().error(f'增强处理失败: {e}')
+            import traceback
+            traceback.print_exc()
+    
+    def _load_scan_data(self):
+        """加载扫描数据"""
+        try:
             # 查找融合后的最终彩色图像
             color_files = []
             for file in os.listdir(self.current_scan_output_dir):
                 if file.startswith('final_') and file.endswith('.jpg'):
-                    color_files.insert(0, file)  # 优先使用融合结果
+                    color_files.insert(0, file)
                 elif file.startswith('color_waypoint_') and file.endswith('.jpg'):
                     color_files.append(file)
             
             if not color_files:
                 self.get_logger().error('没有找到彩色图像文件')
-                return
+                return None, None, None
             
-            # 加载最终融合图像
+            # 加载图像
             color_file = os.path.join(self.current_scan_output_dir, color_files[0])
             image_bgr = cv2.imread(color_file)
             if image_bgr is None:
                 self.get_logger().error(f'无法加载图像: {color_file}')
-                return
+                return None, None, None
             
             image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
-            self.get_logger().info(f'融合图像加载成功: {image_rgb.shape}')
+            self.get_logger().info(f'图像加载成功: {image_rgb.shape}')
             
-            # 🆕 如果有映射信息，测试一下映射功能
-            if self.fusion_mapping_data:
-                self._test_detection_mapping_simulation(image_rgb)
+            # 🆕 获取深度数据和waypoint信息
+            depth_data, waypoint_data = self._extract_depth_and_waypoint_data()
             
-            # 为深度映射创建虚拟深度数据（用于接口兼容）
-            placeholder_depth = np.ones((image_rgb.shape[0], image_rgb.shape[1]), dtype=np.uint16) * 1000
-            
-            # 处理检测（暂时使用原有流程）
-            self._process_detection_with_mapping(image_rgb, placeholder_depth)  # 这个方法有深度增强
+            return image_rgb, depth_data, waypoint_data
             
         except Exception as e:
-            self.get_logger().error(f'直接加载图像失败: {e}')
-            import traceback
-            traceback.print_exc()
-
-    def _test_detection_mapping_simulation(self, image_rgb):
-        """模拟检测结果的映射测试"""
-        try:
-            self.get_logger().info('🧪 开始模拟检测映射测试...')
-            
-            # 创建一个模拟的检测框（图像中心区域）
-            h, w = image_rgb.shape[:2]
-            test_bbox = [w//4, h//4, 3*w//4, 3*h//4]  # 中心区域的框
-            
-            self.get_logger().info(f'📦 测试检测框: {test_bbox}')
-            
-            # 分析这个区域的waypoint来源
-            source_analysis = self._analyze_region_sources(test_bbox)
-            
-            if source_analysis:
-                self.get_logger().info(f'✅ 模拟映射分析成功:')
-                self.get_logger().info(f'  - 主要来源: Waypoint {source_analysis["dominant_waypoint"]}')
-                self.get_logger().info(f'  - 覆盖率: {source_analysis["coverage_ratio"]:.1%}')
-                self.get_logger().info(f'  - 阈值达成: {source_analysis["coverage_threshold_met"]}')
-            else:
-                self.get_logger().warn('⚠️ 模拟映射分析失败')
-                
-        except Exception as e:
-            self.get_logger().error(f'模拟映射测试失败: {e}')
-
-    def _analyze_region_sources(self, bbox):
-        """分析指定区域的waypoint来源分布（模拟版本）"""
+            self.get_logger().error(f'扫描数据加载失败: {e}')
+            return None, None, None
+    
+    def _extract_depth_and_waypoint_data(self):
+        """提取深度数据和waypoint信息"""
         try:
             if not self.fusion_mapping_data:
-                return None
+                # 简化模式：创建占位符数据
+                placeholder_depth = np.ones((480, 640), dtype=np.uint16) * 1000
+                placeholder_waypoint = {
+                    'world_pos': [0, 0, 350],
+                    'roll': 179, 'pitch': 0, 'yaw': 0
+                }
+                return placeholder_depth, placeholder_waypoint
             
-            x1, y1, x2, y2 = map(int, bbox)
-            fusion_mapping = self.fusion_mapping_data['fusion_mapping']
-            
-            # 统计区域中每个waypoint的像素贡献
-            waypoint_pixels = {}
-            total_pixels = 0
-            
-            for y in range(y1, y2, 5):  # 每隔5个像素采样，减少计算量
-                for x in range(x1, x2, 5):
-                    total_pixels += 1
-                    
-                    # 查找像素来源
-                    mapping_info = fusion_mapping.get((x, y))
-                    if mapping_info:
-                        wp_idx = mapping_info['source_waypoint']
-                        waypoint_pixels[wp_idx] = waypoint_pixels.get(wp_idx, 0) + 1
-            
-            # 找到主要来源waypoint
-            if waypoint_pixels:
-                dominant_waypoint = max(waypoint_pixels.items(), key=lambda x: x[1])
-                dominant_wp_idx = dominant_waypoint[0]
-                dominant_pixel_count = dominant_waypoint[1]
-                coverage_ratio = dominant_pixel_count / total_pixels if total_pixels > 0 else 0
-            else:
-                dominant_wp_idx = None
-                coverage_ratio = 0
-            
-            return {
-                'dominant_waypoint': dominant_wp_idx,
-                'coverage_ratio': coverage_ratio,
-                'waypoint_distribution': waypoint_pixels,
-                'total_pixels': total_pixels,
-                'coverage_threshold_met': coverage_ratio >= 0.7
-            }
-            
-        except Exception as e:
-            self.get_logger().error(f'分析区域来源失败: {e}')
-            return None
-    
-    def _process_detection_with_mapping(self, image_rgb, placeholder_depth):
-        """使用映射信息处理检测"""
-        try:
-            if not self.detection_pipeline:
-                self.get_logger().error('检测管道未初始化')
-                return
-            
-            self.processing_active = True
-            self.get_logger().info('🚀 开始基于映射的检测处理...')
-            
-            # 更新检测管道的输出目录
-            detection_output_dir = os.path.join(self.current_scan_output_dir, "detection_results")
-            os.makedirs(detection_output_dir, exist_ok=True)
-            self.detection_pipeline.output_dir = detection_output_dir
-            
-            # 执行检测（先获取基本检测结果）
-            result = self.detection_pipeline.process_reference_image(
-                image_rgb, 
-                placeholder_depth,  # 传入占位符深度
-                generate_visualization=True,
-                auto_display=True
-            )
-            
-            if result['success']:
-                # 🆕 为每个检测结果增强深度信息
-                enhanced_objects = []
-                for i, obj in enumerate(result['objects']):
-                    self.get_logger().info(f'🧬 开始增强对象 {i+1}/{len(result["objects"])}: {obj["object_id"]}')
-                    enhanced_obj = self._enhance_object_with_depth_mapping(obj)
-                    enhanced_objects.append(enhanced_obj)
-                
-                # 更新结果
-                result['objects'] = enhanced_objects
-                
-                self.get_logger().info(f'✅ 检测完成，发现 {result["detection_count"]} 个目标')
-                self.get_logger().info(f'🧬 深度信息增强完成')
-                
-                # 发布增强后的检测结果
-                self._publish_detection_result_json(result)
-                self._publish_visualization_from_file(detection_output_dir)
-                self._display_detection_results(result)
-                self._start_target_selection(result)
-                
-            else:
-                self.get_logger().error(f'❌ 检测失败: {result.get("message", "未知错误")}')
-            
-        except Exception as e:
-            self.get_logger().error(f'基于映射的检测处理失败: {e}')
-            import traceback
-            traceback.print_exc()
-        finally:
-            self.processing_active = False
-
-    def _enhance_object_with_depth_mapping(self, detection_obj):
-        """使用映射信息增强单个检测对象的深度信息"""
-        try:
-            if self.fusion_mapping_data is None:
-                self.get_logger().warn('无融合映射数据，跳过深度增强')
-                return detection_obj
-            
-            bbox = detection_obj['bounding_box']
-            mask = detection_obj.get('mask')
-            
-            if mask is None:
-                self.get_logger().warn(f'对象 {detection_obj["object_id"]} 无mask，跳过深度增强')
-                return detection_obj
-            
-            # 检查是否是单点扫描
+            # 🆕 从融合映射数据中提取
             fusion_params = self.fusion_mapping_data.get('fusion_params', {})
             is_single_point = fusion_params.get('single_point', False)
             
             if is_single_point:
-                # 🆕 单点扫描：获取waypoint数据和深度数据
+                # 单点扫描
                 waypoint_contributions = self.fusion_mapping_data['waypoint_contributions']
                 main_waypoint_idx = list(waypoint_contributions.keys())[0]
                 waypoint_data = waypoint_contributions[main_waypoint_idx]['waypoint_data']
                 
                 # 加载深度数据
                 depth_file = waypoint_data.get('depth_raw_filename')
-                if not depth_file:
-                    self.get_logger().warn(f'对象 {detection_obj["object_id"]} 无深度文件')
-                    return detection_obj
-                
-                depth_full_path = os.path.join(self.current_scan_output_dir, os.path.basename(depth_file))
-                if not os.path.exists(depth_full_path):
-                    self.get_logger().warn(f'深度文件不存在: {depth_full_path}')
-                    return detection_obj
-                
-                depth_data = np.load(depth_full_path)
-                
-                # 🆕 使用增强的高度计算（传入正确的参数）
-                depth_result = self._calculate_object_height_corrected_sin(
-                    mask, depth_data, bbox, waypoint_data
-                )
-                
-                # 计算3D空间信息（包含抓夹宽度）
-                spatial_3d = self._calculate_3d_spatial_features_sin(
-                    mask, depth_data, waypoint_data, bbox
-                )
-                
-            else:
-                # 多点扫描：分析对象的来源waypoint分布
-                source_analysis = self._analyze_object_sources(bbox, mask)
-                
-                if not source_analysis['coverage_threshold_met']:
-                    self.get_logger().warn(f'对象 {detection_obj["object_id"]} 跨越多个waypoint，使用主要来源')
-                
-                dominant_wp_idx = source_analysis['dominant_waypoint']
-                waypoint_data = self.fusion_mapping_data['waypoint_contributions'][dominant_wp_idx]['waypoint_data']
-                
-                # 加载该waypoint的深度数据
-                depth_file = waypoint_data.get('depth_raw_filename')
-                if not depth_file:
-                    self.get_logger().warn(f'Waypoint {dominant_wp_idx} 无深度文件')
-                    return detection_obj
-                
-                depth_full_path = os.path.join(self.current_scan_output_dir, os.path.basename(depth_file))
-                if not os.path.exists(depth_full_path):
-                    self.get_logger().warn(f'Waypoint {dominant_wp_idx} 深度文件不存在: {depth_full_path}')
-                    return detection_obj
-                
-                depth_data = np.load(depth_full_path)
-                
-                # 🆕 对于多点扫描，需要将融合图像中的检测结果映射回原始图像坐标
-                # 这里需要进行坐标映射（简化版本，假设尺寸匹配）
-                depth_result = self._calculate_object_height_corrected_sin(
-                    mask, depth_data, bbox, waypoint_data
-                )
-                
-                spatial_3d = self._calculate_3d_spatial_features_sin(
-                    mask, depth_data, waypoint_data, bbox
-                )
-            
-            # 🆕 应用增强信息到检测对象
-            if depth_result:
-                # 更新空间特征
-                if 'spatial' not in detection_obj['features']:
-                    detection_obj['features']['spatial'] = {}
-                
-                detection_obj['features']['spatial'].update(spatial_3d)
-                
-                # 🆕 更新深度信息，包含背景深度和抓夹宽度
-                detection_obj['features']['depth_info'] = {
-                    'height_mm': depth_result['height_mm'],
-                    'background_world_z': depth_result['background_world_z'],
-                    'background_depth_m': depth_result['background_depth_m'],
-                    'depth_confidence': depth_result['confidence'],
-                    'source_waypoint': main_waypoint_idx if is_single_point else dominant_wp_idx,
-                    'coverage_ratio': 1.0 if is_single_point else source_analysis['coverage_ratio'],
-                    'scan_type': 'single_point' if is_single_point else 'multi_point'
-                }
-                
-                # 🆕 添加抓夹宽度信息
-                gripper_info = spatial_3d.get('gripper_width_info')
-                if gripper_info:
-                    detection_obj['features']['grasp_info'] = {
-                        'recommended_width': gripper_info['recommended_gripper_width'],
-                        'real_width_mm': gripper_info['real_width_mm'],
-                        'grasp_angle': gripper_info['angle'],
-                        'pixel_width': gripper_info['pixel_width'],
-                        'depth_used': gripper_info['depth_used']
-                    }
-                
-                # 更新描述
-                detection_obj['description'] = self._generate_enhanced_description(
-                    detection_obj, {'depth_analysis': depth_result, 'spatial_features': spatial_3d}
-                )
-                
-                self.get_logger().info(
-                    f'✅ 对象 {detection_obj["object_id"]} 深度增强完成: '
-                    f'高度={depth_result["height_mm"]:.1f}mm, '
-                    f'背景Z={depth_result["background_world_z"]:.1f}mm'
-                )
-                
-                # 如果有抓夹信息，也记录一下
-                if gripper_info:
-                    self.get_logger().info(
-                        f'🤏 抓夹信息: 推荐宽度={gripper_info["recommended_gripper_width"]}mm, '
-                        f'实际宽度={gripper_info["real_width_mm"]:.1f}mm'
-                    )
-            else:
-                self.get_logger().warn(f'⚠️ 对象 {detection_obj["object_id"]} 深度增强失败')
-            
-            return detection_obj
-            
-        except Exception as e:
-            self.get_logger().error(f'对象深度增强失败: {e}')
-            import traceback
-            traceback.print_exc()
-            return detection_obj
-
-
-    def _get_depth_info_single_point(self, detection_obj):
-        """为单点扫描获取深度信息"""
-        try:
-            waypoint_contributions = self.fusion_mapping_data['waypoint_contributions']
-            
-            # 单点扫描只有一个waypoint
-            main_waypoint_idx = list(waypoint_contributions.keys())[0]
-            waypoint_data = waypoint_contributions[main_waypoint_idx]['waypoint_data']
-            
-            self.get_logger().info(f'🔍 单点扫描，使用Waypoint {main_waypoint_idx}')
-            
-            # 加载深度数据
-            depth_file = waypoint_data.get('depth_raw_filename')
-            if not depth_file:
-                return None
-            
-            depth_full_path = os.path.join(self.current_scan_output_dir, os.path.basename(depth_file))
-            if not os.path.exists(depth_full_path):
-                self.get_logger().warn(f'深度文件不存在: {depth_full_path}')
-                return None
-            
-            depth_data = np.load(depth_full_path)
-            
-            # 对于单点扫描，检测结果的坐标直接对应原始图像坐标
-            bbox = detection_obj['bounding_box']
-            mask = detection_obj['mask']
-            
-            # 🆕 使用你的三种高度计算方法
-            height_mm = self._calculate_object_height_corrected_sin(
-                mask, depth_data, bbox, waypoint_data
-            )
-            
-            # 计算3D空间信息
-            spatial_3d = self._calculate_3d_spatial_features_sin(
-                mask, depth_data, waypoint_data, bbox
-            )
-            
-            return {
-                'depth_analysis': {
-                    'height_mm': height_mm,
-                    'source_waypoint': main_waypoint_idx,
-                    'coverage_ratio': 1.0,  # 单点扫描100%覆盖
-                    'depth_confidence': 1.0,
-                    'scan_type': 'single_point'
-                },
-                'spatial_features': spatial_3d
-            }
-            
-        except Exception as e:
-            self.get_logger().error(f'单点深度信息获取失败: {e}')
-            return None
-
-    def _calculate_object_height_corrected(self, mask, depth_data, bbox, waypoint_data):
-        """集成三种高度估计方法，使用融合映射回原图坐标"""
-        try:
-            fusion_mapping = self.fusion_mapping_data['fusion_mapping']
-            x1, y1, x2, y2 = map(int, bbox)
-
-            # 保证 bbox 有效范围
-            h, w = mask.shape
-            x1, y1 = max(0, x1), max(0, y1)
-            x2, y2 = min(w, x2), min(h, y2)
-
-            center_x, center_y = (x1 + x2) // 2, (y1 + y2) // 2
-            self.get_logger().info(f'🔍 计算高度: bbox=[{x1},{y1},{x2},{y2}], center=[{center_x},{center_y}]')
-
-            def _get_depth_from_mapping(x, y):
-                mapping = fusion_mapping.get((x, y))
-                if not mapping:
-                    return None
-                src_x, src_y = mapping['source_pixel']
-                depth_file = mapping['waypoint_data'].get('depth_raw_filename')
-                if not os.path.exists(depth_file):
-                    return None
-                depth_img = np.load(depth_file)
-                if 0 <= src_x < depth_img.shape[1] and 0 <= src_y < depth_img.shape[0]:
-                    depth_val = depth_img[src_y, src_x] / 1000.0  # mm → m
-                    return depth_val if depth_val > 0.01 else None
-                return None
-
-            # 方法1: bbox对比
-            method1_depths_mask, method1_depths_bg = [], []
-            for y in range(y1, y2):
-                for x in range(x1, x2):
-                    if 0 <= y < h and 0 <= x < w:
-                        depth_val = _get_depth_from_mapping(x, y)
-                        if depth_val is None:
-                            continue
-                        if mask[y, x] > 0:
-                            method1_depths_mask.append(depth_val)
-                        else:
-                            method1_depths_bg.append(depth_val)
-
-            # 方法2: 扩展框外背景
-            expand_px = 30
-            method2_depths_bg = []
-            for y in range(y1 - expand_px, y2 + expand_px):
-                for x in range(x1 - expand_px, x2 + expand_px):
-                    if not (x1 <= x < x2 and y1 <= y < y2):
-                        depth_val = _get_depth_from_mapping(x, y)
-                        if depth_val:
-                            method2_depths_bg.append(depth_val)
-
-            # 方法3: 中心点对比
-            center_depth = _get_depth_from_mapping(center_x, center_y)
-            center_bg_samples = []
-            for dy in range(-50, 51, 5):
-                for dx in range(-50, 51, 5):
-                    sx, sy = center_x + dx, center_y + dy
-                    if 0 <= sx < w and 0 <= sy < h and mask[sy, sx] == 0:
-                        depth_val = _get_depth_from_mapping(sx, sy)
-                        if depth_val:
-                            center_bg_samples.append(depth_val)
-
-            # 计算各自方法高度
-            results = []
-            if len(method1_depths_mask) >= 10 and len(method1_depths_bg) >= 5:
-                h1 = abs(np.median(method1_depths_mask) - np.median(method1_depths_bg)) * 1000
-                if 5 <= h1 <= 500:
-                    results.append(("bbox内对比", h1))
-
-            if len(method2_depths_bg) >= 20 and len(method1_depths_mask) >= 10:
-                h2 = abs(np.median(method1_depths_mask) - np.median(method2_depths_bg)) * 1000
-                if 5 <= h2 <= 500:
-                    results.append(("扩展背景", h2))
-
-            if center_depth and len(center_bg_samples) >= 10:
-                h3 = abs(center_depth - np.median(center_bg_samples)) * 1000
-                if 5 <= h3 <= 500:
-                    results.append(("中心点对比", h3))
-
-            self.get_logger().info(f'📊 高度计算结果: {len(results)} 个有效值')
-            for name, val in results:
-                self.get_logger().info(f'  - {name}: {val:.1f}mm')
-
-            if not results:
-                self.get_logger().warn('所有高度计算方法都失败，使用默认值')
-                return 30.0
-
-            heights = [r[1] for r in results]
-            if len(heights) == 1 or max(heights) - min(heights) < 20:
-                final = np.mean(heights)
-                self.get_logger().info(f'✅ 使用平均值: {final:.1f}mm')
-                return final
-            else:
-                final = np.median(heights)
-                self.get_logger().info(f'✅ 使用中位数: {final:.1f}mm')
-                return final
-
-        except Exception as e:
-            self.get_logger().error(f'高度计算失败: {e}')
-            return 30.0
-
-    def _calculate_height_method1_enhanced(self, mask, depth_data, bbox, background_depths):
-        """方法1: bbox内对比（增强版，保存背景深度）"""
-        try:
-            x1, y1, x2, y2 = bbox
-            mask_depths = []
-            non_mask_depths = []
-            
-            for y in range(y1, y2):
-                for x in range(x1, x2):
-                    if 0 <= y < mask.shape[0] and 0 <= x < mask.shape[1]:
-                        depth_val = depth_data[y, x] / 1000.0  # 转换为米
-                        if depth_val > 0.01:  # 有效深度值
-                            if mask[y, x] > 0:
-                                mask_depths.append(depth_val)
-                            else:
-                                non_mask_depths.append(depth_val)
-                                background_depths.append(depth_val)  # 收集背景深度
-            
-            if len(mask_depths) < 10 or len(non_mask_depths) < 5:
-                return None
-            
-            mask_median = np.median(mask_depths)
-            bg_median = np.median(non_mask_depths)
-            height_mm = abs(mask_median - bg_median) * 1000
-            
-            return {
-                'height': height_mm,
-                'background_depth': bg_median,
-                'object_depth': mask_median
-            } if 5 <= height_mm <= 500 else None
-            
-        except Exception:
-            return None
-
-    def _calculate_height_method2_enhanced(self, mask, depth_data, bbox, background_depths):
-        """方法2: 扩展背景采样（增强版）"""
-        try:
-            x1, y1, x2, y2 = bbox
-            h, w = mask.shape
-            
-            # 扩展bbox
-            expand_pixels = 30
-            expanded_x1 = max(0, x1 - expand_pixels)
-            expanded_y1 = max(0, y1 - expand_pixels)
-            expanded_x2 = min(w, x2 + expand_pixels)
-            expanded_y2 = min(h, y2 + expand_pixels)
-            
-            # 收集物体深度
-            mask_depths = []
-            for y in range(y1, y2):
-                for x in range(x1, x2):
-                    if 0 <= y < h and 0 <= x < w and mask[y, x] > 0:
-                        depth_val = depth_data[y, x] / 1000.0
-                        if depth_val > 0.01:
-                            mask_depths.append(depth_val)
-            
-            # 收集扩展区域背景深度
-            extended_bg_depths = []
-            for y in range(expanded_y1, expanded_y2):
-                for x in range(expanded_x1, expanded_x2):
-                    if not (x1 <= x < x2 and y1 <= y < y2):
-                        depth_val = depth_data[y, x] / 1000.0
-                        if depth_val > 0.01:
-                            extended_bg_depths.append(depth_val)
-                            background_depths.append(depth_val)  # 收集背景深度
-            
-            if len(mask_depths) < 10 or len(extended_bg_depths) < 20:
-                return None
-            
-            mask_median = np.median(mask_depths)
-            bg_median = np.median(extended_bg_depths)
-            height_mm = abs(mask_median - bg_median) * 1000
-            
-            return {
-                'height': height_mm,
-                'background_depth': bg_median,
-                'object_depth': mask_median
-            } if 5 <= height_mm <= 500 else None
-            
-        except Exception:
-            return None
-
-    def _calculate_height_method3_enhanced(self, mask, depth_data, click_point, background_depths):
-        """方法3: 基于中心点的高度估算（增强版）"""
-        try:
-            center_x, center_y = click_point
-            h, w = mask.shape
-            
-            if not (0 <= center_x < w and 0 <= center_y < h):
-                return None
-            
-            center_depth = depth_data[center_y, center_x] / 1000.0
-            if center_depth <= 0.01:
-                return None
-            
-            # 在中心点周围采样背景深度
-            sample_radius = 50
-            surrounding_bg_depths = []
-            
-            for dy in range(-sample_radius, sample_radius + 1, 5):
-                for dx in range(-sample_radius, sample_radius + 1, 5):
-                    sample_x = center_x + dx
-                    sample_y = center_y + dy
-                    
-                    if 0 <= sample_x < w and 0 <= sample_y < h:
-                        if mask[sample_y, sample_x] == 0:  # 背景区域
-                            depth_val = depth_data[sample_y, sample_x] / 1000.0
-                            if depth_val > 0.01:
-                                surrounding_bg_depths.append(depth_val)
-                                background_depths.append(depth_val)  # 收集背景深度
-            
-            if len(surrounding_bg_depths) < 10:
-                return None
-            
-            bg_median = np.median(surrounding_bg_depths)
-            height_mm = abs(center_depth - bg_median) * 1000
-            
-            return {
-                'height': height_mm,
-                'background_depth': bg_median,
-                'object_depth': center_depth
-            } if 5 <= height_mm <= 500 else None
-            
-        except Exception:
-            return None
-
-    def _calculate_3d_spatial_features(self, mask, depth_data, waypoint_data, bbox):
-        try:
-            # 找到 mask 中心点
-            mask_indices = np.argwhere(mask > 0)
-            if len(mask_indices) == 0:
-                return {}
-
-            center_y, center_x = np.median(mask_indices, axis=0).astype(int)
-
-            # 使用融合映射回查原图坐标
-            fusion_mapping = self.fusion_mapping_data['fusion_mapping']
-            mapping = fusion_mapping.get((center_x, center_y))
-            if not mapping:
-                self.get_logger().warn(f'无法从融合映射中找到中心点 ({center_x}, {center_y})')
-                return {}
-
-            src_x, src_y = mapping['source_pixel']
-            depth_path = mapping['waypoint_data']['depth_raw_filename']
-            depth_array = np.load(depth_path)
-            depth_val = depth_array[src_y, src_x] / 1000.0
-            if depth_val <= 0.01:
-                return {}
-
-            # 相机内参（如果你有动态配置可替换）
-            fx, fy = 912.7, 910.3
-            cx, cy = 640, 360
-            z = depth_val * 1000
-            x = (src_x - cx) * z / fx * 1000
-            y = (src_y - cy) * z / fy * 1000
-
-            # 世界坐标转换
-            cam_pos = np.array(waypoint_data['world_pos'])  # (x, y, z)
-            rpy_deg = [abs(waypoint_data['roll'])-180, waypoint_data['pitch'], waypoint_data['yaw']]
-            cam_to_obj = np.array([(y + 70), (x - 40), -(z)])  # 轴调换+偏移
-            
-            R_wc = R.from_euler('XYZ', rpy_deg, degrees=True).as_matrix()
-            world_xyz = R_wc @ cam_to_obj + cam_pos
-            self.get_logger().info(f'3D: {world_xyz}')
-            # 面积等
-            bbox_area = (bbox[2] - bbox[0]) * (bbox[3] - bbox[1])
-            mask_area = np.sum(mask > 0)
-            coverage_ratio = mask_area / bbox_area if bbox_area > 0 else 0
-
-            return {
-                'centroid_3d_camera': (x, y, z),
-                'world_coordinates': tuple(world_xyz),
-                'distance_to_camera': z,
-                'mask_area_pixels': int(mask_area),
-                'bbox_area_pixels': int(bbox_area),
-                'mask_coverage_ratio': float(coverage_ratio),
-                'estimated_real_area_mm2': float(mask_area * (z * 1000) ** 2 / 1000000),
-            }
-
-        except Exception as e:
-            self.get_logger().error(f'3D空间特征计算失败: {e}')
-            return {}
-
-        
-    def _calculate_3d_spatial_features_sin(self, mask, depth_data, waypoint_data, bbox):
-        """使用完整位姿计算夹爪目标坐标"""
-        
-        # 获取完整的当前位姿
-        cam_position = waypoint_data['world_pos']  # (x, y, z)
-        cam_orientation = [
-            abs(waypoint_data['roll'])-180, 
-            waypoint_data['pitch'], 
-            waypoint_data['yaw']
-        ]
-        
-        # 计算相机坐标
-        center_3d = self._calculate_object_3d_center(mask, depth_data)
-        camera_point = [center_3d[0]*1000, center_3d[1]*1000, center_3d[2]*1000]
-        cam_x, cam_y, cam_z = center_3d
-        # 🆕 使用完整的test_rel变换（包含夹爪偏移）
-        camera_point_reordered = np.array([
-            (camera_point[1] + 70),   # y_c + 65
-            (camera_point[0] - 40),   # x_c - 30  
-            -(camera_point[2])  # -(z_c - 100)
-        ])
-        
-        # 应用旋转变换
-        rotation = R.from_euler('XYZ', cam_orientation, degrees=True)
-        R_wc = rotation.as_matrix()
-        gripper_info = self._calculate_real_gripper_width(mask, depth_data, waypoint_data)
-        # 最终的夹爪目标世界坐标
-        gripper_world_target = R_wc @ camera_point_reordered + np.array(cam_position)
-        world_x, world_y, world_z = gripper_world_target
-        self.get_logger().info(f'3D中心点坐标: {gripper_world_target}')
-        bbox_area = (bbox[2] - bbox[0]) * (bbox[3] - bbox[1])
-        mask_area = np.sum(mask > 0)
-        coverage_ratio = mask_area / bbox_area if bbox_area > 0 else 0
-        result = {
-            'centroid_3d_camera': (cam_x, cam_y, cam_z),
-            'world_coordinates': (world_x, world_y, world_z),
-            'scan_detail': (cam_position,cam_orientation),
-            'distance_to_camera': cam_z,
-            'mask_area_pixels': int(mask_area),
-            'bbox_area_pixels': int(bbox_area),
-            'mask_coverage_ratio': float(coverage_ratio),
-            'estimated_real_area_mm2': float(mask_area * (cam_z * 1000) ** 2 / 1000000),
-        }
-        
-        # 🆕 添加抓夹信息
-        if gripper_info:
-            result.update({
-                'gripper_width_info': gripper_info
-            })
-        
-        return result
-    def _calculate_object_height_corrected_sin(self, mask, depth_data, bbox, waypoint_data):
-        """集成高度计算方法并保存背景深度信息"""
-        try:
-            x1, y1, x2, y2 = map(int, bbox)
-            
-            # 确保bbox在图像范围内
-            h, w = depth_data.shape
-            x1, y1 = max(0, x1), max(0, y1)
-            x2, y2 = min(w, x2), min(h, y2)
-            
-            # 计算bbox中心点
-            center_x, center_y = (x1 + x2) // 2, (y1 + y2) // 2
-            
-            self.get_logger().info(f'🔍 计算高度和背景深度: bbox=[{x1},{y1},{x2},{y2}], center=[{center_x},{center_y}]')
-            
-            # 存储背景深度值用于后续计算
-            background_depths = []
-            
-            # 方法1: bbox内对比
-            method1_result = self._calculate_height_method1_enhanced(mask, depth_data, [x1, y1, x2, y2], background_depths)
-            
-            # 方法2: 扩展背景采样
-            method2_result = self._calculate_height_method2_enhanced(mask, depth_data, [x1, y1, x2, y2], background_depths)
-            
-            # 方法3: 中心点对比
-            method3_result = self._calculate_height_method3_enhanced(mask, depth_data, (center_x, center_y), background_depths)
-            
-            # 综合评估
-            valid_results = []
-            if method1_result and 5 <= method1_result['height'] <= 500:
-                valid_results.append(("bbox内对比", method1_result))
-            if method2_result and 5 <= method2_result['height'] <= 500:
-                valid_results.append(("扩展背景", method2_result))
-            if method3_result and 5 <= method3_result['height'] <= 500:
-                valid_results.append(("中心点对比", method3_result))
-            
-            self.get_logger().info(f'📊 高度计算结果: {len(valid_results)} 个有效值')
-            
-            if not valid_results:
-                self.get_logger().warn('所有高度计算方法都失败，使用默认值')
-                # 计算默认背景深度
-                default_bg_depth = self._calculate_default_background_depth(background_depths)
-                bg_world_z = self._convert_depth_to_world_z(default_bg_depth, waypoint_data)
-                return {
-                    'height_mm': 30.0,
-                    'background_world_z': bg_world_z,
-                    'background_depth_m': default_bg_depth,
-                    'confidence': 0.3
-                }
-            
-            # 选择最佳结果
-            if len(valid_results) == 1:
-                final_result = valid_results[0][1]
-                self.get_logger().info(f'✅ 使用单一方法: {final_result["height"]:.1f}mm')
-            else:
-                heights = [r[1]['height'] for r in valid_results]
-                bg_depths = [r[1]['background_depth'] for r in valid_results]
-                
-                if max(heights) - min(heights) < 20:
-                    final_height = np.mean(heights)
-                    final_bg_depth = np.median(bg_depths)
-                    self.get_logger().info(f'✅ 使用平均值: {final_height:.1f}mm')
-                else:
-                    final_height = np.median(heights)
-                    final_bg_depth = np.median(bg_depths)
-                    self.get_logger().info(f'✅ 使用中位数: {final_height:.1f}mm')
-                
-                final_result = {
-                    'height': final_height,
-                    'background_depth': final_bg_depth
-                }
-            
-            # 转换背景深度到世界坐标
-            bg_world_z = self._convert_depth_to_world_z(final_result['background_depth'], waypoint_data)
-            
-            self.get_logger().info(f'🌍 背景深度转换: {final_result["background_depth"]:.3f}m → 世界Z: {bg_world_z:.1f}mm')
-            
-            return {
-                'height_mm': final_result['height'],
-                'background_world_z': bg_world_z,
-                'background_depth_m': final_result['background_depth'],
-                'confidence': 0.8 if len(valid_results) >= 2 else 0.6
-            }
-                
-        except Exception as e:
-            self.get_logger().error(f'高度和背景深度计算失败: {e}')
-            return {
-                'height_mm': 30.0,
-                'background_world_z': 0.0,
-                'background_depth_m': 0.3,
-                'confidence': 0.2
-            }
-    def _convert_depth_to_world_z(self, depth_m, waypoint_data):
-        """将相机坐标系深度转换为世界坐标Z"""
-        try:
-            # 获取相机在世界坐标系中的位置和姿态
-            cam_world_pos = np.array(waypoint_data['world_pos'])  # [x, y, z]
-            cam_orientation = [
-                abs(waypoint_data['roll']) - 180, 
-                waypoint_data['pitch'], 
-                waypoint_data['yaw']
-            ]
-            
-            # 相机坐标系中的点 (0, 0, depth)
-            camera_point = np.array([0, 0, depth_m])
-            
-            # 应用旋转变换到世界坐标系
-            from scipy.spatial.transform import Rotation as R
-            rotation = R.from_euler('XYZ', cam_orientation, degrees=True)
-            R_wc = rotation.as_matrix()
-            
-            # 转换到世界坐标系
-            world_point = R_wc @ camera_point + cam_world_pos
-            world_z = world_point[2]
-            
-            self.get_logger().info(f'深度转换: 相机深度={depth_m:.3f}m → 世界Z={world_z:.3f}m')
-            return world_z
-            
-        except Exception as e:
-            self.get_logger().error(f'深度到世界坐标转换失败: {e}')
-            return waypoint_data['world_pos'][2] - depth_m  # 简化计算
-
-    def _calculate_default_background_depth(self, background_depths):
-        """计算默认背景深度"""
-        if background_depths:
-            return np.median(background_depths)
-        return 0.2  # 默认30cm
-        
-    def _calculate_object_3d_center(self, mask, depth_data):
-        """计算对象的3D中心点"""
-        try:
-            # 找到mask中的有效像素
-            mask_indices = np.where(mask > 0)
-            if len(mask_indices[0]) == 0:
-                return None
-            
-            # 收集有效的3D点
-            valid_points = []
-            
-            for i in range(len(mask_indices[0])):
-                y, x = mask_indices[0][i], mask_indices[1][i]
-                depth_val = depth_data[y, x] / 1000.0  # 转换为米
-                
-                if depth_val > 0.01:  # 有效深度
-                    # 简化的像素到3D点转换（假设标准相机内参）
-                    fx, fy = 912.7, 910.3  # 相机内参
-                    cx, cy = 640, 320
-                    
-                    cam_x = (x - cx) * depth_val / fx
-                    cam_y = (y - cy) * depth_val / fy
-                    cam_z = depth_val
-                    
-                    valid_points.append((cam_x, cam_y, cam_z))
-            
-            if len(valid_points) < 5:
-                return None
-            
-            # 计算3D中心点（中位数，更抗噪声）
-            points_array = np.array(valid_points)
-            center_3d = np.median(points_array, axis=0)
-            
-            return tuple(center_3d)
-            
-        except Exception as e:
-            self.get_logger().error(f'3D中心点计算失败: {e}')
-            return None
-
-    def _generate_enhanced_description(self, detection_obj, depth_info):
-        """生成增强的描述（包含深度信息）"""
-        try:
-            # 基础信息
-            class_name = detection_obj['class_name']
-            confidence = detection_obj['confidence']
-            
-            # 深度信息
-            depth_analysis = depth_info.get('depth_analysis', {})
-            height_mm = depth_analysis.get('height_mm')
-            spatial_features = depth_info.get('spatial_features', {})
-            distance = spatial_features.get('distance_to_camera')
-            
-            # 构建增强描述
-            description_parts = []
-            
-            # 颜色信息（如果有）
-            color_info = detection_obj.get('features', {}).get('color', {})
-            color_name = color_info.get('color_name', '')
-            if color_name and color_name != 'unknown':
-                description_parts.append(color_name.capitalize())
-            
-            # 基础对象名称
-            description_parts.append(class_name)
-            
-            # 高度信息
-            if height_mm is not None:
-                if height_mm < 20:
-                    description_parts.append("(flat)")
-                elif height_mm < 80:
-                    description_parts.append("(low)")
-                elif height_mm < 120:
-                    description_parts.append("(medium height)")
-                else:
-                    description_parts.append("(tall)")
-            
-            # 距离信息
-            if distance is not None:
-                if distance < 0.3:
-                    description_parts.append("nearby")
-                elif distance < 0.6:
-                    description_parts.append("at medium distance")
-                else:
-                    description_parts.append("far")
-            
-            # 位置信息（原有的region_position）
-            region_position = detection_obj.get('features', {}).get('spatial', {}).get('region_position')
-            if region_position and region_position != 'unknown':
-                region_desc = region_position.replace('-', ' ').replace('_', ' ')
-                if region_desc == 'center':
-                    region_desc = 'center area'
-                elif 'center' not in region_desc:
-                    region_desc = f"{region_desc} area"
-                description_parts.append(f"in {region_desc}")
-            
-            # 置信度（如果较低）
-            if confidence < 0.8:
-                description_parts.append(f"(conf: {confidence:.2f})")
-            
-            enhanced_description = ' '.join(description_parts)
-            
-            # 添加详细的技术信息（用于调试）
-            tech_info = []
-            if height_mm is not None:
-                tech_info.append(f"h={height_mm:.1f}mm")
-            if distance is not None:
-                tech_info.append(f"d={distance*1000:.0f}mm")
-            
-            if tech_info:
-                enhanced_description += f" [{', '.join(tech_info)}]"
-            
-            return enhanced_description
-            
-        except Exception as e:
-            self.get_logger().error(f'增强描述生成失败: {e}')
-            return detection_obj.get('description', f"{detection_obj['class_name']}_{detection_obj.get('object_id', '')}")
-
-    # 🆕 为多点扫描增加支持（如果需要的话）
-    def _get_depth_info_from_waypoint(self, detection_obj, source_analysis):
-        """从特定waypoint获取深度信息（多点扫描）"""
-        try:
-            if not source_analysis['coverage_threshold_met']:
-                self.get_logger().warn(f'对象 {detection_obj["object_id"]} 跨越多个waypoint，使用主要来源')
-            
-            dominant_wp_idx = source_analysis['dominant_waypoint']
-            waypoint_data = self.fusion_mapping_data['waypoint_contributions'][dominant_wp_idx]['waypoint_data']
-            
-            # 加载该waypoint的深度数据
-            depth_file = waypoint_data.get('depth_raw_filename')
-            if not depth_file:
-                return None
-            
-            depth_full_path = os.path.join(self.current_scan_output_dir, os.path.basename(depth_file))
-            if not os.path.exists(depth_full_path):
-                self.get_logger().warn(f'Waypoint {dominant_wp_idx} 深度文件不存在: {depth_full_path}')
-                return None
-            
-            depth_data = np.load(depth_full_path)
-            
-            # 对于多点扫描，需要将融合图像中的检测结果映射回原始图像坐标
-            # 这里是简化版本，假设尺寸匹配
-            bbox = detection_obj['bounding_box']
-            mask = detection_obj['mask']
-            
-            # 🆕 使用三种高度计算方法
-            height_mm = self._calculate_object_height_corrected(
-                mask, depth_data, bbox, waypoint_data
-            )
-            
-            # 计算3D空间信息
-            spatial_3d = self._calculate_3d_spatial_features(
-                mask, depth_data, waypoint_data, bbox
-            )
-            
-            return {
-                'depth_analysis': {
-                    'height_mm': height_mm,
-                    'source_waypoint': dominant_wp_idx,
-                    'coverage_ratio': source_analysis['coverage_ratio'],
-                    'depth_confidence': min(source_analysis['coverage_ratio'] * 2, 1.0),
-                    'scan_type': 'multi_point'
-                },
-                'spatial_features': spatial_3d
-            }
-            
-        except Exception as e:
-            self.get_logger().error(f'获取waypoint深度信息失败: {e}')
-            return None
-        
-    def _calculate_real_gripper_width(self, mask, depth_data, waypoint_data):
-        """计算真实抓夹宽度"""
-        try:
-            # 找到mask的最小外接矩形
-            contours, _ = cv2.findContours(mask.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-            if not contours:
-                return None
-            
-            largest_contour = max(contours, key=cv2.contourArea)
-            rect = cv2.minAreaRect(largest_contour)
-            _, (width, height), angle = rect
-            
-            # 选择较短的边作为抓夹宽度参考
-            shorter_side_pixels = min(width, height)
-            
-            # 获取物体中心深度
-            center_depth = self._get_object_center_depth(mask, depth_data)
-            if center_depth is None:
-                return None
-            
-            # 相机内参（你可能需要根据实际情况调整）
-            fx = 912.7  # 根据你的相机内参
-            
-            # 像素到毫米转换
-            # real_width_mm = pixel_width * (depth_m / focal_length) * 1000
-            real_width_mm = shorter_side_pixels * (center_depth / fx) * 1000
-            
-            # 添加安全余量（建议比实际宽度大20-30%）
-            safety_margin = 1.25
-            recommended_width = real_width_mm * safety_margin
-            
-            # 限制在合理范围内
-            recommended_width = max(100, min(800, recommended_width))
-            
-            self.get_logger().info(f'🤏 抓夹宽度计算: 像素={shorter_side_pixels:.1f}, 深度={center_depth:.3f}m')
-            self.get_logger().info(f'   实际宽度={real_width_mm:.1f}mm, 推荐={recommended_width:.1f}mm')
-            
-            return {
-                'real_width_mm': real_width_mm,
-                'recommended_gripper_width': int(recommended_width),
-                'pixel_width': shorter_side_pixels,
-                'depth_used': center_depth,
-                'angle': angle
-            }
-            
-        except Exception as e:
-            self.get_logger().error(f'抓夹宽度计算失败: {e}')
-            return None
-                   
-    def _get_object_center_depth(self, mask, depth_data):
-        """获取物体中心的深度值"""
-        try:
-            # 找到mask中心
-            mask_indices = np.where(mask > 0)
-            if len(mask_indices[0]) == 0:
-                return None
-            
-            center_y = int(np.median(mask_indices[0]))
-            center_x = int(np.median(mask_indices[1]))
-            
-            # 获取中心点周围的深度值
-            depth_samples = []
-            for dy in range(-3, 4):
-                for dx in range(-3, 4):
-                    y, x = center_y + dy, center_x + dx
-                    if 0 <= y < depth_data.shape[0] and 0 <= x < depth_data.shape[1]:
-                        if mask[y, x] > 0:  # 确保在物体内
-                            depth_val = depth_data[y, x] / 1000.0
-                            if depth_val > 0.01:
-                                depth_samples.append(depth_val)
-            
-            return np.median(depth_samples) if depth_samples else None
-            
-        except Exception:
-            return None
-    def _analyze_object_sources(self, bbox, mask):
-        """分析对象的来源waypoint分布"""
-        try:
-            x1, y1, x2, y2 = map(int, bbox)
-            fusion_mapping = self.fusion_mapping_data['fusion_mapping']
-            
-            # 统计bbox中每个waypoint的像素贡献
-            waypoint_pixels = {}
-            total_pixels = 0
-            mask_pixels = 0
-            
-            for y in range(y1, y2):
-                for x in range(x1, x2):
-                    if 0 <= y < mask.shape[0] and 0 <= x < mask.shape[1]:
-                        total_pixels += 1
-                        
-                        # 检查是否在mask内
-                        if mask[y, x] > 0:
-                            mask_pixels += 1
-                            
-                            # 查找像素来源
-                            mapping_info = fusion_mapping.get((x, y))
-                            if mapping_info:
-                                wp_idx = mapping_info['source_waypoint']
-                                waypoint_pixels[wp_idx] = waypoint_pixels.get(wp_idx, 0) + 1
-            
-            # 找到主要来源waypoint
-            if waypoint_pixels:
-                dominant_waypoint = max(waypoint_pixels.items(), key=lambda x: x[1])
-                dominant_wp_idx = dominant_waypoint[0]
-                dominant_pixel_count = dominant_waypoint[1]
-                coverage_ratio = dominant_pixel_count / mask_pixels if mask_pixels > 0 else 0
-            else:
-                dominant_wp_idx = None
-                coverage_ratio = 0
-            
-            return {
-                'dominant_waypoint': dominant_wp_idx,
-                'coverage_ratio': coverage_ratio,
-                'waypoint_distribution': waypoint_pixels,
-                'total_mask_pixels': mask_pixels,
-                'coverage_threshold_met': coverage_ratio >= 0.7  # 70%阈值
-            }
-            
-        except Exception as e:
-            self.get_logger().error(f'分析对象来源失败: {e}')
-            return {'dominant_waypoint': None, 'coverage_ratio': 0}
-        
-
-    def _load_fusion_mapping(self):
-        """加载融合映射信息"""
-        try:
-            import pickle
-            
-            mapping_file = os.path.join(self.current_scan_output_dir, "fusion_mapping.pkl")
-            if not os.path.exists(mapping_file):
-                self.get_logger().warn('未找到融合映射文件，将使用简化深度处理')
-                return None
-            
-            with open(mapping_file, 'rb') as f:
-                mapping_data = pickle.load(f)
-            
-            # 检查是否是单点扫描
-            fusion_params = mapping_data.get('fusion_params', {})
-            is_single_point = fusion_params.get('single_point', False)
-            
-            if is_single_point:
-                self.get_logger().info(f'✅ 单点扫描映射信息加载成功:')
-                self.get_logger().info(f'  - 扫描类型: 单点扫描')
-                waypoint_idx = fusion_params.get('waypoint_index', 0)
-                canvas_size = fusion_params.get('canvas_size', (0, 0))
-                self.get_logger().info(f'  - 主waypoint: {waypoint_idx}')
-                self.get_logger().info(f'  - 画布尺寸: {canvas_size}')
-            else:
-                # 多点扫描的处理逻辑（保持原有代码）
-                fusion_mapping = mapping_data.get('fusion_mapping', {})
-                self.get_logger().info(f'✅ 多点扫描映射信息加载成功:')
-                self.get_logger().info(f'  - 映射像素数: {len(fusion_mapping)}')
-            
-            waypoint_contributions = mapping_data.get('waypoint_contributions', {})
-            self.get_logger().info(f'  - 涉及waypoint数: {len(waypoint_contributions)}')
-            
-            # 验证每个waypoint的文件路径（保持原有代码）
-            for wp_idx, contrib in waypoint_contributions.items():
-                wp_data = contrib.get('waypoint_data', {})
-                color_file = wp_data.get('color_filename', 'N/A')
-                depth_file = wp_data.get('depth_raw_filename', 'N/A')
-                
-                self.get_logger().info(f'  - Waypoint {wp_idx}:')
-                self.get_logger().info(f'    * 贡献像素: {contrib.get("pixel_count", 0)}')
-                self.get_logger().info(f'    * 彩色文件: {color_file}')
-                self.get_logger().info(f'    * 深度文件: {depth_file}')
-                
-                # 验证深度文件是否真实存在
-                if depth_file and depth_file != 'N/A':
+                if depth_file and os.path.exists(os.path.join(self.current_scan_output_dir, os.path.basename(depth_file))):
                     depth_full_path = os.path.join(self.current_scan_output_dir, os.path.basename(depth_file))
-                    depth_exists = os.path.exists(depth_full_path)
-                    self.get_logger().info(f'    * 深度文件存在: {depth_exists}')
-                    
-                    if depth_exists:
-                        try:
-                            depth_data = np.load(depth_full_path)
-                            self.get_logger().info(f'    * 深度数据形状: {depth_data.shape}')
-                            self.get_logger().info(f'    * 深度范围: {depth_data.min():.3f} - {depth_data.max():.3f}')
-                        except Exception as e:
-                            self.get_logger().error(f'    * 深度数据读取失败: {e}')
+                    depth_data = np.load(depth_full_path)
+                else:
+                    depth_data = np.ones((480, 640), dtype=np.uint16) * 1000
+                
+            else:
+                # 多点扫描：使用第一个waypoint的数据
+                waypoint_contributions = self.fusion_mapping_data['waypoint_contributions']
+                first_waypoint_idx = list(waypoint_contributions.keys())[0]
+                waypoint_data = waypoint_contributions[first_waypoint_idx]['waypoint_data']
+                
+                depth_file = waypoint_data.get('depth_raw_filename')
+                if depth_file and os.path.exists(os.path.join(self.current_scan_output_dir, os.path.basename(depth_file))):
+                    depth_full_path = os.path.join(self.current_scan_output_dir, os.path.basename(depth_file))
+                    depth_data = np.load(depth_full_path)
+                else:
+                    depth_data = np.ones((480, 640), dtype=np.uint16) * 1000
             
-            return mapping_data
+            return depth_data, waypoint_data
             
         except Exception as e:
-            self.get_logger().error(f'加载融合映射失败: {e}')
-            import traceback
-            traceback.print_exc()
-            return None
+            self.get_logger().error(f'深度和waypoint数据提取失败: {e}')
+            # 返回占位符数据
+            placeholder_depth = np.ones((480, 640), dtype=np.uint16) * 1000
+            placeholder_waypoint = {
+                'world_pos': [0, 0, 350],
+                'roll': 179, 'pitch': 0, 'yaw': 0
+            }
+            return placeholder_depth, placeholder_waypoint
     
-    def _test_mapping_queries(self, fusion_mapping):
-        """测试映射查询功能"""
+    def _process_with_enhanced_pipeline(self, image_rgb, depth_data, waypoint_data):
+        """使用增强管道处理"""
         try:
-            if not fusion_mapping:
-                return
-            
-            # 获取一些样本像素进行测试
-            sample_pixels = list(fusion_mapping.keys())[:10]  # 取前10个像素
-            
-            self.get_logger().info(f'🧪 测试映射查询 (样本: {len(sample_pixels)} 个像素):')
-            
-            for pixel_pos in sample_pixels:
-                mapping_info = fusion_mapping[pixel_pos]
-                source_wp = mapping_info.get('source_waypoint', 'N/A')
-                source_pixel = mapping_info.get('source_pixel', (0, 0))
-                
-                self.get_logger().info(f'  - 融合像素{pixel_pos} → Waypoint {source_wp}, 原像素{source_pixel}')
-            
-            # 统计waypoint分布
-            waypoint_counts = {}
-            for mapping_info in fusion_mapping.values():
-                wp_idx = mapping_info.get('source_waypoint')
-                waypoint_counts[wp_idx] = waypoint_counts.get(wp_idx, 0) + 1
-            
-            self.get_logger().info(f'🔍 映射分布统计:')
-            for wp_idx, count in waypoint_counts.items():
-                percentage = count / len(fusion_mapping) * 100
-                self.get_logger().info(f'  - Waypoint {wp_idx}: {count} 像素 ({percentage:.1f}%)')
-                
-        except Exception as e:
-            self.get_logger().error(f'映射查询测试失败: {e}')
-
-    def _process_detection_directly(self, image_rgb, depth_data):
-        """直接处理检测，绕过ROS消息转换"""
-        try:
-            if not self.detection_pipeline:
-                self.get_logger().error('检测管道未初始化')
-                return
-            
             self.processing_active = True
-            self.get_logger().info('🚀 开始直接检测处理...')
+            self.get_logger().info('🚀 开始增强管道处理...')
             
-            # 更新检测管道的输出目录
-            detection_output_dir = os.path.join(self.current_scan_output_dir, "detection_results")
+            # 设置增强管道的输出目录
+            detection_output_dir = os.path.join(self.current_scan_output_dir, "enhanced_detection_results")
             os.makedirs(detection_output_dir, exist_ok=True)
-            self.detection_pipeline.output_dir = detection_output_dir
+            self.enhanced_pipeline.output_dir = detection_output_dir
             
-            self.get_logger().info(f'检测输出目录: {detection_output_dir}')
-            self.get_logger().info(f'处理图像尺寸: RGB{image_rgb.shape}, 深度{depth_data.shape}')
+            # 🆕 传递相机内参给管道（用于3D中心点计算）
+            camera_config = self.config_manager.get_camera_config()
+            intrinsics = camera_config.get('intrinsics', {})
+            self.enhanced_pipeline.camera_fx = intrinsics.get('fx', 912.7)
+            self.enhanced_pipeline.camera_fy = intrinsics.get('fy', 910.3)
+            self.enhanced_pipeline.camera_cx = intrinsics.get('cx', 624.0)
+            self.enhanced_pipeline.camera_cy = intrinsics.get('cy', 320.7)
             
-            # 执行检测
-            result = self.detection_pipeline.process_reference_image(
-                image_rgb, 
-                depth_data,
-                generate_visualization=True,
-                auto_display=True
+            # 使用增强管道构建参考特征库
+            result = self.enhanced_pipeline.build_reference_library(
+                image_rgb=image_rgb,
+                depth_image=depth_data,
+                waypoint_data=waypoint_data,
+                generate_visualization=True
             )
             
             if result['success']:
-                self.get_logger().info(f'✅ 检测完成，发现 {result["detection_count"]} 个目标')
+                self.get_logger().info(f'✅ 增强检测完成，构建了 {result["detection_count"]} 个参考特征')
                 
-                # 发布检测结果
-                self._publish_detection_result_json(result)
+                # 转换为与原系统兼容的格式
+                compatible_result = self._convert_to_compatible_format(result)
                 
-                # 发布可视化（直接从文件）
-                self._publish_visualization_from_file(detection_output_dir)
+                # 发布结果
+                self._publish_enhanced_detection_result(compatible_result)
                 
-                # 显示检测结果
-                self._display_detection_results(result)
+                # 🆕 改进的可视化发布（现在包含弹窗显示）
+                self._publish_visualization_from_enhanced_pipeline(detection_output_dir)
                 
-                # 启动目标选择流程
-                self._start_target_selection(result)
+                self._display_enhanced_detection_results(compatible_result)
+                self._start_enhanced_target_selection(compatible_result)
                 
             else:
-                self.get_logger().error(f'❌ 检测失败: {result.get("message", "未知错误")}')
+                self.get_logger().error(f'❌ 增强检测失败: {result.get("message", "未知错误")}')
             
         except Exception as e:
-            self.get_logger().error(f'直接检测处理失败: {e}')
+            self.get_logger().error(f'增强管道处理失败: {e}')
             import traceback
             traceback.print_exc()
         finally:
             self.processing_active = False
-        
-    def _publish_detection_result_json(self, result):
-        """发布检测结果 - 保存mask和3D坐标用于静态抓取"""
+    
+    def _convert_to_compatible_format(self, enhanced_result):
+        """将增强结果转换为与原系统兼容的格式"""
         try:
+            reference_library = enhanced_result.get('reference_library', {})
+            compatible_objects = []
+            
+            for obj_id, entry in reference_library.items():
+                metadata = entry['metadata']
+                features = entry['features']
+                
+                # 🆕 构建兼容的对象信息
+                compatible_obj = {
+                    'object_id': metadata['object_id'],
+                    'class_id': metadata['class_id'],
+                    'class_name': metadata['class_name'], 
+                    'confidence': metadata['confidence'],
+                    'bounding_box': metadata['bounding_box'],
+                    'description': metadata['description'],
+                    'features': features,
+                    'quality_score': entry['quality_score']
+                }
+                
+                # 🆕 添加增强的深度和抓夹信息
+                if 'spatial' in features:
+                    spatial_features = features['spatial']
+                    
+                    # 深度信息
+                    compatible_obj['features']['depth_info'] = {
+                        'height_mm': spatial_features.get('height_mm', 30.0),
+                        'background_world_z': spatial_features.get('background_world_z', 300.0),
+                        'background_depth_m': spatial_features.get('background_depth_m', 0.3),
+                        'depth_confidence': spatial_features.get('confidence', 0.8)
+                    }
+                    
+                    # 抓夹信息
+                    if 'gripper_width_info' in spatial_features:
+                        gripper_info = spatial_features['gripper_width_info']
+                        compatible_obj['features']['grasp_info'] = {
+                            'recommended_width': gripper_info['recommended_gripper_width'],
+                            'real_width_mm': gripper_info['real_width_mm'],
+                            'grasp_angle': gripper_info.get('angle', 0),
+                            'pixel_width': gripper_info['pixel_width'],
+                            'depth_used': gripper_info['depth_used']
+                        }
+                
+                compatible_objects.append(compatible_obj)
+            
+            # 构建兼容的结果格式
+            compatible_result = {
+                'success': True,
+                'objects': compatible_objects,
+                'detection_count': len(compatible_objects),
+                'processing_time': enhanced_result.get('processing_time', 0),
+                'message': f'增强检测成功，构建了 {len(compatible_objects)} 个参考特征'
+            }
+            
+            return compatible_result
+            
+        except Exception as e:
+            self.get_logger().error(f'格式转换失败: {e}')
+            return {'success': False, 'objects': [], 'detection_count': 0}
+    
+    def _publish_enhanced_detection_result(self, result):
+        """发布增强检测结果"""
+        try:
+            # 🆕 使用原有的发布逻辑，但添加了质量分数信息
             result_data = {
                 'detection_count': result['detection_count'],
                 'processing_time': result.get('processing_time', 0.0),
-                'output_directory': self.detection_pipeline.output_dir,
+                'output_directory': self.enhanced_pipeline.output_dir,
                 'timestamp': datetime.now().isoformat(),
+                'enhanced_features': True,  # 🆕 标记使用了增强特征
                 'objects': []
             }
             
             for obj in result.get('objects', []):
-                # 🆕 保存mask用于yaw计算
-                mask_data = None
-                if 'mask' in obj and obj['mask'] is not None:
-                    mask = obj['mask']
-                    if isinstance(mask, np.ndarray):
-                        # 保存mask的轮廓点，用于重建和yaw计算
-                        try:
-                            contours, _ = cv2.findContours(mask.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-                            if contours:
-                                largest_contour = max(contours, key=cv2.contourArea)
-                                # 简化轮廓，减少数据量
-                                epsilon = 0.02 * cv2.arcLength(largest_contour, True)
-                                simplified_contour = cv2.approxPolyDP(largest_contour, epsilon, True)
-                                contour_points = simplified_contour.reshape(-1, 2).tolist()
-                                
-                                # 保存mask信息
-                                mask_data = {
-                                    'contour_points': contour_points,
-                                    'mask_shape': mask.shape,
-                                    'mask_area': int(np.sum(mask > 0)),
-                                    # 🆕 保存最小外接矩形信息，用于yaw计算
-                                    'min_area_rect': {
-                                        'center': cv2.minAreaRect(largest_contour)[0],
-                                        'size': cv2.minAreaRect(largest_contour)[1], 
-                                        'angle': cv2.minAreaRect(largest_contour)[2]
-                                    }
-                                }
-                        except Exception as e:
-                            self.get_logger().warn(f'处理mask失败: {e}')
-                            mask_data = None
-                
-                # 确保3D坐标被正确保存
-                spatial_features = obj.get('features', {}).get('spatial', {})
-                world_coordinates = spatial_features.get('world_coordinates', [0, 0, 0])
-                scan_detail = spatial_features.get('scan_detail', [0,0,0,0, 0, 0])
-                # 构建对象数据
+                # 构建对象数据（保持原有格式，添加质量信息）
                 obj_data = {
                     'object_id': obj['object_id'],
-                    'class_id': int(obj['class_id']),
+                    'class_id': obj['class_id'],
                     'class_name': obj['class_name'],
-                    'confidence': float(obj['confidence']),
+                    'confidence': obj['confidence'],
                     'description': obj['description'],
-                    'bounding_box': obj.get('bounding_box', [0, 0, 0, 0]),
-                    
-                    # 🆕 保存mask信息用于yaw计算
-                    'mask_info': mask_data,
-                    
-                    # 确保特征格式正确
-                    'features': {
-                        'color': {
-                            'color_name': obj.get('features', {}).get('color', {}).get('color_name', 'unknown'),
-                            'histogram': obj.get('features', {}).get('color', {}).get('histogram', []),
-                            **obj.get('features', {}).get('color', {})
-                        },
-                        'shape': {
-                            'hu_moments': obj.get('features', {}).get('shape', {}).get('hu_moments', []),
-                            'contours': obj.get('features', {}).get('shape', {}).get('contours', []),
-                            'area': obj.get('features', {}).get('shape', {}).get('area', 0),
-                            'orientation': obj.get('features', {}).get('shape', {}).get('orientation', 0),
-                            **obj.get('features', {}).get('shape', {})
-                        },
-                        'spatial': {
-                            'centroid_2d': obj.get('features', {}).get('spatial', {}).get('centroid_2d', [0, 0]),
-                            'region_position': obj.get('features', {}).get('spatial', {}).get('region_position', 'unknown'),
-                            'scan_info':scan_detail,
-                            # 🆕 确保3D坐标被保存
-                            'world_coordinates': world_coordinates,
-                            'centroid_3d_camera': obj.get('features', {}).get('spatial', {}).get('centroid_3d_camera', [0, 0, 0]),
-                            **obj.get('features', {}).get('spatial', {})
-                        },
-                        'depth_info': obj.get('features', {}).get('depth_info', {})
-                    }
+                    'bounding_box': obj['bounding_box'],
+                    'quality_score': obj.get('quality_score', 0.0),  # 🆕 特征质量分数
+                    'features': obj['features']
                 }
                 
                 result_data['objects'].append(obj_data)
             
-            # 发布
+            # 🆕 保存增强的检测结果
+            self._save_enhanced_detection_results(result_data)
+            
+            # 发布ROS消息
             json_msg = String()
             json_msg.data = json.dumps(result_data, indent=2)
             self.detection_result_pub.publish(json_msg)
             
-            # 🆕 同时保存mask信息到单独文件，供静态抓取使用
-            self._save_masks_for_grasp(result_data)
-            self._save_final_detection_results(result_data)
-            self.get_logger().info('📤 Detection result published with mask and 3D coordinates')
+            self.get_logger().info('📤 增强检测结果已发布')
             
         except Exception as e:
-            self.get_logger().error(f'Failed to publish detection result: {e}')
-            import traceback
-            traceback.print_exc()
-
-    def _save_final_detection_results(self, result_data):
-        """
-        保存最终的检测结果到 detection_results.json 文件，包含深度和世界坐标信息。
-        它将覆盖 detection_pipeline 之前可能保存的同名文件。
-        """
+            self.get_logger().error(f'发布增强检测结果失败: {e}')
+    
+    def _save_enhanced_detection_results(self, result_data):
+        """保存增强检测结果"""
         try:
-            # 确保输出目录与 detection_pipeline 使用的目录一致
-            final_results_file = os.path.join(self.detection_pipeline.output_dir, "detection_results.json")
+            # 保存到增强管道的输出目录
+            results_file = os.path.join(self.enhanced_pipeline.output_dir, "enhanced_detection_results.json")
             
-            # 在保存前，确保所有 mask 都是列表，并且 world_coordinates 也是可序列化的
-            # 遍历对象，处理 mask 和 spatial features
-            processed_objects = []
-            for obj in result_data.get('objects', []):
-                # 创建一个对象的副本，以避免直接修改原始对象，影响其他使用
-                processed_obj = obj.copy()
-
-                # 处理 mask (从 numpy array 到 list)
-                if 'mask' in processed_obj and isinstance(processed_obj['mask'], np.ndarray):
-                    processed_obj['mask'] = processed_obj['mask'].tolist()
+            with open(results_file, 'w', encoding='utf-8') as f:
+                json.dump(result_data, f, indent=4, ensure_ascii=False)
+            
+            self.get_logger().info(f'💾 增强检测结果已保存: {results_file}')
+            
+        except Exception as e:
+            self.get_logger().error(f'保存增强检测结果失败: {e}')
+    
+    def _display_enhanced_detection_results(self, result):
+        """显示增强检测结果"""
+        objects = result.get('objects', [])
+        
+        self.get_logger().info(f"\n{'='*60}")
+        self.get_logger().info("🚀 增强检测结果摘要")
+        self.get_logger().info(f"{'='*60}")
+        
+        if len(objects) == 0:
+            self.get_logger().info("未检测到任何目标")
+            return
+        
+        self.get_logger().info(f"检测到 {len(objects)} 个目标（使用3D点云特征）:")
+        for i, obj in enumerate(objects, 1):
+            quality = obj.get('quality_score', 0.0)
+            description = obj['description']
+            confidence = obj['confidence']
+            
+            self.get_logger().info(
+                f"{i:2d}. {description} "
+                f"(ID: {obj['object_id']}, 置信度: {confidence:.3f}, 特征质量: {quality:.1f}%)"
+            )
+        
+        self.get_logger().info(f"{'='*60}")
+    
+    def _start_enhanced_target_selection(self, result):
+        """启动增强目标选择流程"""
+        try:
+            self.get_logger().info('🎯 启动增强目标选择流程...')
+            
+            # 🆕 使用增强管道的选择功能
+            success = self.enhanced_pipeline.select_tracking_targets()
+            
+            if success:
+                # 保存检测结果
+                self.last_detection_result = result
                 
-                # 处理 world_coordinates (确保是 list 或 tuple)
-                if 'features' in processed_obj and 'spatial' in processed_obj['features']:
-                    if 'world_coordinates' in processed_obj['features']['spatial']:
-                        wc = processed_obj['features']['spatial']['world_coordinates']
-                        if isinstance(wc, np.ndarray):
-                            processed_obj['features']['spatial']['world_coordinates'] = wc.tolist()
-                        # 如果已经是 tuple (如你的日志所示)，则无需转换
+                # 收集扫描信息
+                scan_info = self._collect_enhanced_scan_info()
                 
-                processed_objects.append(processed_obj)
-            
-            # 构建最终的 JSON 结构
-            final_json_data = {
-                'objects': processed_objects,
-                'scan_info': result_data.get('scan_info', {}) # 包含扫描信息等元数据
-                # 你可以根据需要添加其他顶级键
-            }
-
-            with open(final_results_file, 'w', encoding='utf-8') as f:
-                json.dump(final_json_data, f, indent=4, ensure_ascii=False) # 使用 indent 4 使 JSON 更可读
-            
-            self.get_logger().info(f'💾 最终检测结果已保存并覆盖: {final_results_file}')
-            
-        except TypeError as e:
-            self.get_logger().error(f"类型错误：无法将最终检测结果序列化到 JSON: {e}")
-            self.get_logger().error(f"检查数据结构，特别是mask和world_coordinates是否已正确转换。")
-        except Exception as e:
-            self.get_logger().error(f'保存最终检测结果失败: {e}', exc_info=True)
-
-
-    def _save_masks_for_grasp(self, result_data):
-        """保存masks到单独文件，供静态抓取系统使用"""
-        try:
-            masks_file = os.path.join(self.detection_pipeline.output_dir, "object_masks.json")
-            
-            masks_data = {}
-            for obj in result_data['objects']:
-                if obj.get('mask_info'):
-                    masks_data[obj['object_id']] = obj['mask_info']
-            
-            with open(masks_file, 'w') as f:
-                json.dump(masks_data, f, indent=2)
-            
-            self.get_logger().info(f'💾 Masks saved to: {masks_file}')
-            
-        except Exception as e:
-            self.get_logger().error(f'Failed to save masks: {e}')
-
-    def _publish_visualization_from_file(self, output_dir):
-        """从文件发布可视化图像"""
-        try:
-            vis_file = os.path.join(output_dir, "detection_visualization.jpg")
-            if os.path.exists(vis_file):
-                # 读取可视化图像
-                vis_image = cv2.imread(vis_file)
-                if vis_image is not None:
-                    # 转换为RGB
-                    vis_rgb = cv2.cvtColor(vis_image, cv2.COLOR_BGR2RGB)
-                    
-                    # 手动创建ROS图像消息
-                    vis_msg = Image()
-                    vis_msg.header.stamp = self.get_clock().now().to_msg()
-                    vis_msg.header.frame_id = "detection_frame"
-                    vis_msg.height = vis_rgb.shape[0]
-                    vis_msg.width = vis_rgb.shape[1]
-                    vis_msg.encoding = "rgb8"
-                    vis_msg.is_bigendian = False
-                    vis_msg.step = vis_rgb.shape[1] * 3
-                    vis_msg.data = vis_rgb.tobytes()
-                    
-                    self.visualization_pub.publish(vis_msg)
-                    self.get_logger().info('🖼️ 可视化图像已发布')
+                # 发布完成信号
+                self._publish_enhanced_detection_complete_signal(scan_info, result)
             else:
-                self.get_logger().warn(f'可视化文件不存在: {vis_file}')
+                self.get_logger().warn('目标选择失败或被跳过')
                 
         except Exception as e:
-            self.get_logger().error(f'发布可视化图像失败: {e}')
-    def _collect_scan_info(self):
-        """收集扫描信息用于tracking回退策略"""
+            self.get_logger().error(f'增强目标选择流程失败: {e}')
+    
+    def _collect_enhanced_scan_info(self):
+        """收集增强扫描信息"""
         try:
             scan_info = {
                 'center_pose': None,
                 'bounds': None,
-                'waypoint_poses': []
+                'waypoint_poses': [],
+                'enhanced_features_available': True,  # 🆕 标记有增强特征
+                'feature_quality_stats': self._get_feature_quality_stats()  # 🆕 特征质量统计
             }
             
             if self.fusion_mapping_data:
                 waypoint_contributions = self.fusion_mapping_data.get('waypoint_contributions', {})
                 
-                # 收集所有waypoint位姿
+                # 收集waypoint位姿
                 poses = []
                 for wp_data in waypoint_contributions.values():
                     waypoint_info = wp_data.get('waypoint_data', {})
@@ -1597,7 +475,7 @@ class BypassCvBridgeDetectionNode(Node):
                             'position': {'x': world_pos[0], 'y': world_pos[1], 'z': world_pos[2]},
                             'orientation': {
                                 'roll': waypoint_info.get('roll', 0),
-                                'pitch': waypoint_info.get('pitch', 0), 
+                                'pitch': waypoint_info.get('pitch', 0),
                                 'yaw': waypoint_info.get('yaw', 0)
                             }
                         })
@@ -1612,69 +490,179 @@ class BypassCvBridgeDetectionNode(Node):
                     
                     scan_info['center_pose'] = {
                         'position': {'x': center_x, 'y': center_y, 'z': center_z},
-                        'orientation': {'roll': 179, 'pitch': 0, 'yaw': waypoint_info.get('yaw', 0)}
+                        'orientation': {'roll': 179, 'pitch': 0, 'yaw': poses[0]['orientation']['yaw']}
                     }
             
             return scan_info
             
         except Exception as e:
-            self.get_logger().error(f'Failed to collect scan info: {e}')
+            self.get_logger().error(f'收集增强扫描信息失败: {e}')
             return {'center_pose': None, 'bounds': None, 'waypoint_poses': []}
     
-    def _display_detection_results(self, result):
-        """显示检测结果"""
-        objects = result.get('objects', [])
-        
-        self.get_logger().info(f"\n{'='*60}")
-        self.get_logger().info("Detection Results Summary")
-        self.get_logger().info(f"{'='*60}")
-        
-        if len(objects) == 0:
-            self.get_logger().info("No objects detected")
-            return
-        
-        self.get_logger().info(f"Detected {len(objects)} objects:")
-        for i, obj in enumerate(objects, 1):
-            self.get_logger().info(f"{i:2d}. {obj['description']} (ID: {obj['object_id']}, Conf: {obj['confidence']:.3f})")
-        
-        self.get_logger().info(f"{'='*60}")
-
-    def republish_detection_results(self):
-        """持续发布检测结果供tracking使用"""
-        if self.last_detection_result:
-            self._publish_detection_result_json(self.last_detection_result)
-
-    def _start_target_selection(self, result):
-        """启动目标选择流程"""
+    def _get_feature_quality_stats(self):
+        """获取特征质量统计"""
         try:
-            self.get_logger().info('🎯 启动目标选择流程...')
+            if not hasattr(self.enhanced_pipeline, 'reference_library'):
+                return {}
             
-            success = self.detection_pipeline.select_tracking_targets()
+            qualities = []
+            for entry in self.enhanced_pipeline.reference_library.values():
+                qualities.append(entry['quality_score'])
             
-            if success:
-                # 保存检测结果
-                self.last_detection_result = result
+            if not qualities:
+                return {}
+            
+            return {
+                'mean_quality': float(np.mean(qualities)),
+                'min_quality': float(np.min(qualities)),
+                'max_quality': float(np.max(qualities)),
+                'std_quality': float(np.std(qualities))
+            }
+            
+        except Exception:
+            return {}
+    
+    def _publish_enhanced_detection_complete_signal(self, scan_info, result):
+        """发布增强检测完成信号"""
+        try:
+            complete_data = {
+                'scan_directory': str(self.current_scan_output_dir),
+                'detection_count': len(result.get('objects', [])),
+                'status': 'completed',
+                'total_objects': len(result.get('objects', [])),
+                'timestamp': datetime.now().isoformat(),
+                'enhanced_detection': True,  # 🆕 标记使用了增强检测
                 
-                # 收集扫描信息用于tracking
-                scan_info = self._collect_scan_info()
+                # 扫描信息
+                'scan_center_pose': self._serialize_pose_data(scan_info.get('center_pose')),
+                'scan_bounds': self._serialize_bounds_data(scan_info.get('bounds')),
+                'waypoint_poses': [
+                    self._serialize_pose_data(pose) for pose in scan_info.get('waypoint_poses', [])
+                    if isinstance(pose, dict)
+                ],
                 
-                # 发布完成信号（安全版）
-                self._publish_detection_complete_signal(scan_info, result)
-            else:
-                self.get_logger().warn('目标选择失败或被跳过')
+                # 🆕 增强特征信息
+                'reference_features_path': self.enhanced_pipeline.output_dir,
+                'enhanced_detection_results_file': os.path.join(
+                    self.enhanced_pipeline.output_dir, 'enhanced_detection_results.json'
+                ),
+                'reference_library_file': os.path.join(
+                    self.enhanced_pipeline.output_dir, 'reference_library.json'
+                ),
+                'selected_targets_file': os.path.join(
+                    self.enhanced_pipeline.output_dir, 'tracking_selection.txt'
+                ),
+                
+                # 🆕 特征质量统计
+                'feature_quality_stats': scan_info.get('feature_quality_stats', {}),
+                
+                # 🆕 自适应学习状态
+                'adaptive_learning_enabled': self.adaptive_manager is not None,
+                'adaptive_learning_stats': self._get_adaptive_learning_stats()
+            }
+            
+            # 发布信号
+            try:
+                json_str = json.dumps(complete_data, indent=2, ensure_ascii=False)
+                complete_msg = String()
+                complete_msg.data = json_str
+                self.detection_complete_pub.publish(complete_msg)
+                
+                self.get_logger().info('✅ 增强检测完成信号已发布')
+                
+            except (TypeError, ValueError) as json_error:
+                self.get_logger().error(f'JSON序列化失败: {json_error}')
+                self._publish_minimal_complete_signal()
                 
         except Exception as e:
-            self.get_logger().error(f'目标选择流程失败: {e}')
-
+            self.get_logger().error(f'发布增强检测完成信号失败: {e}')
+    
+    def _get_adaptive_learning_stats(self):
+        """获取自适应学习统计"""
+        if not self.adaptive_manager:
+            return {'enabled': False}
+        
+        try:
+            report = self.adaptive_manager.get_performance_report()
+            return {
+                'enabled': True,
+                'total_matches': report.get('overall_performance', {}).get('total_matches', 0),
+                'success_rate': report.get('overall_performance', {}).get('success_rate', 0),
+                'recent_matches': report.get('recent_performance', {}).get('matches_last_7_days', 0),
+                'optimization_count': report.get('optimization_history', 0)
+            }
+        except Exception:
+            return {'enabled': True, 'error': 'stats_unavailable'}
+    
+    def _load_fusion_mapping(self):
+        """加载融合映射信息（保持原有逻辑）"""
+        try:
+            import pickle
+            
+            mapping_file = os.path.join(self.current_scan_output_dir, "fusion_mapping.pkl")
+            if not os.path.exists(mapping_file):
+                self.get_logger().warn('未找到融合映射文件，将使用简化深度处理')
+                return None
+            
+            with open(mapping_file, 'rb') as f:
+                mapping_data = pickle.load(f)
+            
+            fusion_params = mapping_data.get('fusion_params', {})
+            is_single_point = fusion_params.get('single_point', False)
+            
+            if is_single_point:
+                self.get_logger().info('✅ 单点扫描映射信息加载成功')
+                waypoint_idx = fusion_params.get('waypoint_index', 0)
+                canvas_size = fusion_params.get('canvas_size', (0, 0))
+                self.get_logger().info(f'  - 主waypoint: {waypoint_idx}')
+                self.get_logger().info(f'  - 画布尺寸: {canvas_size}')
+            else:
+                fusion_mapping = mapping_data.get('fusion_mapping', {})
+                self.get_logger().info(f'✅ 多点扫描映射信息加载成功')
+                self.get_logger().info(f'  - 映射像素数: {len(fusion_mapping)}')
+            
+            waypoint_contributions = mapping_data.get('waypoint_contributions', {})
+            self.get_logger().info(f'  - 涉及waypoint数: {len(waypoint_contributions)}')
+            
+            return mapping_data
+            
+        except Exception as e:
+            self.get_logger().error(f'加载融合映射失败: {e}')
+            return None
+    
+    def _publish_visualization_from_enhanced_pipeline(self, output_dir):
+        """发布可视化 - 单一版本"""
+        try:
+            vis_file = os.path.join(output_dir, "detection_visualization.jpg")
+            
+            if os.path.exists(vis_file):
+                vis_image_bgr = cv2.imread(vis_file)
+                if vis_image_bgr is not None:
+                    vis_rgb = cv2.cvtColor(vis_image_bgr, cv2.COLOR_BGR2RGB)
+                    
+                    # 显示弹窗
+                    self._show_detection_popup(vis_rgb)
+                    
+                    # 发布ROS消息
+                    self._publish_ros_visualization(vis_rgb)
+                    
+                    self.get_logger().info('Enhanced visualization displayed and published')
+                else:
+                    self.get_logger().error(f'Cannot read visualization: {vis_file}')
+            else:
+                self.get_logger().warn(f'Visualization file not found: {vis_file}')
+                
+        except Exception as e:
+            self.get_logger().error(f'Failed to publish visualization: {e}')
+        
     def _serialize_pose_data(self, pose_data):
-        """安全地序列化位姿数据"""
+        """安全地序列化位姿数据（保持原有逻辑）"""
         try:
             if not isinstance(pose_data, dict):
                 return None
             
             serialized = {}
             
-            # 处理位置信息
             position = pose_data.get('position', {})
             if isinstance(position, dict):
                 serialized['position'] = {
@@ -1685,7 +673,6 @@ class BypassCvBridgeDetectionNode(Node):
             else:
                 serialized['position'] = {'x': 0.0, 'y': 0.0, 'z': 0.0}
             
-            # 处理姿态信息
             orientation = pose_data.get('orientation', {})
             if isinstance(orientation, dict):
                 serialized['orientation'] = {
@@ -1701,9 +688,9 @@ class BypassCvBridgeDetectionNode(Node):
         except Exception as e:
             self.get_logger().error(f'位姿数据序列化失败: {e}')
             return None
-
+    
     def _serialize_bounds_data(self, bounds_data):
-        """安全地序列化边界数据"""
+        """安全地序列化边界数据（保持原有逻辑）"""
         try:
             if isinstance(bounds_data, dict):
                 return {
@@ -1729,54 +716,15 @@ class BypassCvBridgeDetectionNode(Node):
         except Exception as e:
             self.get_logger().error(f'边界数据序列化失败: {e}')
             return None
-
-    def _publish_detection_complete_signal(self, scan_info, result):
-        """发布检测完成信号 - 添加参考特征数据库信息"""
-        try:
-            complete_data = {
-                'scan_directory': str(self.current_scan_output_dir),
-                'detection_count': len(result.get('objects', [])),
-                'status': 'completed',
-                'total_objects': len(result.get('objects', [])),
-                'timestamp': datetime.now().isoformat(),
-                
-                # tracking 系统需要的扫描信息
-                'scan_center_pose': self._serialize_pose_data(scan_info.get('center_pose')),
-                'scan_bounds': self._serialize_bounds_data(scan_info.get('bounds')),
-                'waypoint_poses': [
-                    self._serialize_pose_data(pose) for pose in scan_info.get('waypoint_poses', [])
-                    if isinstance(pose, dict)
-                ],
-                
-                # 🆕 参考特征数据库信息
-                'reference_features_path': self.detection_pipeline.output_dir,  # detection_pipeline 的输出目录
-                'detection_results_file': os.path.join(self.detection_pipeline.output_dir, 'detection_results.json'),
-                'selected_targets_file': os.path.join(self.detection_pipeline.output_dir, 'tracking_selection.txt')
-            }
-            
-            # 发布信号
-            try:
-                json_str = json.dumps(complete_data, indent=2, ensure_ascii=False)
-                complete_msg = String()
-                complete_msg.data = json_str
-                self.detection_complete_pub.publish(complete_msg)
-                
-                self.get_logger().info('✅ Detection complete signal published')
-                
-            except (TypeError, ValueError) as json_error:
-                self.get_logger().error(f'JSON serialization failed: {json_error}')
-                self._publish_minimal_complete_signal(result)
-                
-        except Exception as e:
-            self.get_logger().error(f'Failed to publish detection complete signal: {e}')
-
+    
     def _publish_minimal_complete_signal(self):
-        """发布最小化完成信号"""
+        """发布最小化完成信号（保持原有逻辑）"""
         try:
             minimal_data = {
                 'status': 'completed',
                 'scan_directory': str(self.current_scan_output_dir),
-                'detection_count': 0
+                'detection_count': 0,
+                'enhanced_detection': False
             }
             
             complete_msg = String()
@@ -1787,19 +735,170 @@ class BypassCvBridgeDetectionNode(Node):
             
         except Exception as e:
             self.get_logger().error(f'最小化信号发布失败: {e}')
+    
+    # 🆕 添加自适应学习反馈接口
+    def update_tracking_feedback(self, object_id: str, similarity_scores: dict, 
+                                is_correct_match: bool, context: dict = None):
+        """
+        更新追踪反馈，用于自适应学习
+        
+        Args:
+            object_id: 对象ID
+            similarity_scores: 各特征的相似度分数
+            is_correct_match: 是否是正确匹配
+            context: 上下文信息
+        """
+        if not self.adaptive_manager:
+            return
+        
+        try:
+            # 获取对象的特征质量
+            feature_quality = self._get_object_feature_quality(object_id)
+            
+            # 为每个特征类型更新学习历史
+            for feature_type, similarity in similarity_scores.items():
+                if '.' in feature_type:  # 如果已经是 "type.subtype" 格式
+                    main_type, sub_type = feature_type.split('.', 1)
+                else:
+                    main_type, sub_type = feature_type, 'overall'
+                
+                self.adaptive_manager.update_learning_history(
+                    feature_type=main_type,
+                    sub_feature=sub_type,
+                    similarity=similarity,
+                    feature_quality=feature_quality,
+                    is_correct_match=is_correct_match,
+                    context=context
+                )
+            
+            self.get_logger().debug(f'📊 已更新自适应学习反馈: {object_id}')
+            
+        except Exception as e:
+            self.get_logger().error(f'更新追踪反馈失败: {e}')
+    
+    def _get_object_feature_quality(self, object_id: str) -> float:
+        """获取对象的特征质量分数"""
+        try:
+            if hasattr(self.enhanced_pipeline, 'reference_library'):
+                entry = self.enhanced_pipeline.reference_library.get(object_id)
+                if entry:
+                    return entry.get('quality_score', 75.0)
+            return 75.0  # 默认质量分数
+        except Exception:
+            return 75.0
+    
+    # 保持原有的备用回调方法
+    def reference_image_callback(self, msg):
+        """接收最终参考图像（备用方法）"""
+        self.latest_reference_image = msg
+        self.get_logger().info('📸 收到参考图像（备用）')
 
+    def reference_depth_callback(self, msg):
+        """接收深度信息（备用方法）"""
+        self.latest_depth_image = msg
+        self.get_logger().info('📏 收到深度信息（备用）')
+
+    def _publish_visualization_from_enhanced_pipeline(self, output_dir):
+        """从增强管道发布可视化图像 - 增强版本"""
+        try:
+            vis_file = os.path.join(output_dir, "detection_visualization.jpg")
+            
+            if os.path.exists(vis_file):
+                # 读取可视化图像
+                vis_image_bgr = cv2.imread(vis_file)
+                
+                if vis_image_bgr is not None:
+                    vis_rgb = cv2.cvtColor(vis_image_bgr, cv2.COLOR_BGR2RGB)
+                    
+                    # 🆕 显示弹窗
+                    self._show_detection_popup(vis_rgb)
+                    
+                    # 📡 发布ROS消息
+                    self._publish_ros_visualization(vis_rgb)
+                    
+                    self.get_logger().info('🖼️ 增强可视化图像已显示并发布')
+                else:
+                    self.get_logger().error(f'无法读取可视化图像: {vis_file}')
+            else:
+                self.get_logger().warn(f'可视化文件不存在: {vis_file}')
+                
+        except Exception as e:
+            self.get_logger().error(f'发布增强可视化图像失败: {e}')
+
+    def _show_detection_popup(self, vis_image: np.ndarray):
+        """显示单一检测弹窗"""
+        try:
+            import matplotlib
+            matplotlib.use('TkAgg')
+            import matplotlib.pyplot as plt
+            
+            plt.figure(figsize=(14, 10))
+            plt.imshow(vis_image)
+            plt.title('Enhanced Detection Results', fontsize=14, fontweight='bold')
+            plt.axis('off')
+            plt.tight_layout()
+            plt.show(block=False)
+            plt.pause(0.1)
+            
+            self.get_logger().info('Detection visualization displayed')
+            
+        except Exception as e:
+            self.get_logger().error(f'Failed to show popup: {e}')
+
+    def _show_opencv_popup(self, vis_image: np.ndarray):
+        """使用OpenCV显示弹窗（fallback方案）"""
+        try:
+            # 转换为BGR格式
+            vis_bgr = cv2.cvtColor(vis_image, cv2.COLOR_RGB2BGR)
+            
+            # 创建窗口
+            window_name = 'Enhanced Detection Results'
+            cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+            cv2.resizeWindow(window_name, 1200, 900)
+            
+            # 显示图像
+            cv2.imshow(window_name, vis_bgr)
+            cv2.waitKey(1)  # 非阻塞，让窗口响应
+            
+            self.get_logger().info('✅ OpenCV可视化窗口显示成功')
+            
+            # 设置窗口回调（可选）
+            def on_key(key):
+                if key == 27:  # ESC键
+                    cv2.destroyWindow(window_name)
+            
+        except Exception as e:
+            self.get_logger().error(f'OpenCV显示失败: {e}')
+
+    def _publish_ros_visualization(self, vis_image: np.ndarray):
+        """发布ROS可视化消息"""
+        try:
+            vis_msg = Image()
+            vis_msg.header.stamp = self.get_clock().now().to_msg()
+            vis_msg.header.frame_id = "detection_frame"
+            vis_msg.height = vis_image.shape[0]
+            vis_msg.width = vis_image.shape[1]
+            vis_msg.encoding = "rgb8"
+            vis_msg.is_bigendian = False
+            vis_msg.step = vis_image.shape[1] * 3
+            vis_msg.data = vis_image.tobytes()
+            
+            self.visualization_pub.publish(vis_msg)
+            
+        except Exception as e:
+            self.get_logger().error(f'Failed to publish ROS visualization: {e}')
 
 def main(args=None):
     rclpy.init(args=args)
     
     try:
-        node = BypassCvBridgeDetectionNode()
-        node.get_logger().info('🔍 绕过cv_bridge的检测节点运行中...')
+        node = EnhancedDetectionNode()
+        node.get_logger().info('🚀 增强检测节点运行中...')
         rclpy.spin(node)
     except KeyboardInterrupt:
-        print('🛑 检测节点被用户中断')
+        print('🛑 增强检测节点被用户中断')
     except Exception as e:
-        print(f'❌ 检测节点运行错误: {e}')
+        print(f'❌ 增强检测节点运行错误: {e}')
     finally:
         if rclpy.ok():
             rclpy.shutdown()

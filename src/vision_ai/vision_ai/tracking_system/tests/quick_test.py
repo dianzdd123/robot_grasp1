@@ -35,7 +35,7 @@ try:
     print("   ✅ Detector imported")
     
     print("   Importing ID matcher...")
-    from detection.id_matcher import IDMatcher
+    from tracking_system.detection.multi_object_tracker import IDMatcher
     print("   ✅ ID matcher imported")
     
     print("   🎉 All imports successful!")

@@ -35,6 +35,7 @@ setup(
             'smart_stitcher_node = vision_ai.smart_stitcher_node:main',
             'gui_config_node = vision_ai.gui_config_node:main',
             'detection_node = vision_ai.detection_node:main',
+            'visualization_trigger = vision_ai.visualization_trigger:main',
             # ⭐ 新增追踪系统节点 ⭐
             'tracking_node = vision_ai.tracking_system.nodes.tracking_node:main',
             'tracking_visualizer = vision_ai.tracking_system.nodes.tracking_visualizer:main',

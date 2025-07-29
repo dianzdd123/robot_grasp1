@@ -48,7 +48,7 @@ class RealSensePublisher(Node):
         self.align = rs.align(align_to)
         
         # 创建定时器，30Hz发布频率
-        self.timer = self.create_timer(1.0/30.0, self.timer_callback)
+        self.timer = self.create_timer(1.0/5.0, self.timer_callback)
         
         self.get_logger().info('RealSense Publisher Node initialized')
 
@@ -142,7 +142,7 @@ class RealSensePublisher(Node):
             else:
                 self.frame_count = 1
                 
-            if self.frame_count % 30 == 0:  # 每30帧（1秒）记录一次
+            if self.frame_count % 5 == 0:  # 每10帧（1秒）记录一次
                 self.get_logger().info(f'Published frame #{self.frame_count}')
                 
         except Exception as e:
