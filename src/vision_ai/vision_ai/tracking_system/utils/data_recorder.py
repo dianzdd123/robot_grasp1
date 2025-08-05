@@ -354,3 +354,172 @@ class DataRecorder:
         except Exception as e:
             print(f"[DATA_RECORDER] 加载会话数据失败: {e}")
             return None
+        
+    def record_tracking_failure(self, target_id: str, rgb_image: np.ndarray, 
+                            depth_image: np.ndarray, failure_reason: str = None):
+        """
+        记录追踪失败数据
+        
+        Args:
+            target_id: 目标ID
+            rgb_image: RGB图像
+            depth_image: 深度图像
+            failure_reason: 失败原因
+        """
+        try:
+            step_num = len(self.tracking_history) + 1
+            timestamp = datetime.now()
+            
+            # 保存失败时的图像
+            failure_dir = os.path.join(self.images_dir, f'failure_{step_num:02d}')
+            os.makedirs(failure_dir, exist_ok=True)
+            
+            rgb_file = os.path.join(failure_dir, 'rgb_image.jpg')
+            depth_file = os.path.join(failure_dir, 'depth_image.png')
+            depth_raw_file = os.path.join(failure_dir, 'depth_raw.npy')
+            
+            # 保存RGB图像
+            rgb_bgr = cv2.cvtColor(rgb_image, cv2.COLOR_RGB2BGR)
+            cv2.imwrite(rgb_file, rgb_bgr)
+            
+            # 保存深度图像（可视化版本）
+            depth_colormap = self._create_depth_colormap(depth_image)
+            cv2.imwrite(depth_file, depth_colormap)
+            
+            # 保存原始深度数据
+            np.save(depth_raw_file, depth_image)
+            
+            # 记录失败数据
+            failure_record = {
+                'step_number': step_num,
+                'target_id': target_id,
+                'timestamp': timestamp.isoformat(),
+                'status': 'tracking_failed',
+                'failure_reason': failure_reason or 'no_suitable_match_found',
+                'image_files': {
+                    'rgb': os.path.relpath(rgb_file, self.data_dir),
+                    'depth_colormap': os.path.relpath(depth_file, self.data_dir),
+                    'depth_raw': os.path.relpath(depth_raw_file, self.data_dir)
+                },
+                'image_shape': rgb_image.shape,
+                'human_feedback': None,  # 可能在后续更新
+                'feedback_timestamp': None,
+                
+                # 失败相关的详细信息
+                'failure_details': {
+                    'consecutive_failures': getattr(self, '_consecutive_failures', 1),
+                    'detection_attempted': True,
+                    'similarity_threshold_used': getattr(self, '_last_similarity_threshold', 0.0)
+                }
+            }
+            
+            self.tracking_history.append(failure_record)
+            
+            print(f"[DATA_RECORDER] 记录第 {step_num} 步追踪失败数据")
+            print(f"[DATA_RECORDER] 失败原因: {failure_reason}")
+            
+        except Exception as e:
+            print(f"[DATA_RECORDER] 记录追踪失败失败: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def record_detection_retry_attempt(self, target_id: str, attempt_number: int, 
+                                    rgb_image: np.ndarray = None, depth_image: np.ndarray = None):
+        """
+        记录检测重试尝试
+        
+        Args:
+            target_id: 目标ID
+            attempt_number: 尝试次数
+            rgb_image: RGB图像（可选）
+            depth_image: 深度图像（可选）
+        """
+        try:
+            timestamp = datetime.now()
+            
+            retry_record = {
+                'timestamp': timestamp.isoformat(),
+                'target_id': target_id,
+                'attempt_number': attempt_number,
+                'event_type': 'detection_retry',
+                'total_steps_so_far': len(self.tracking_history)
+            }
+            
+            # 如果提供了图像，保存图像
+            if rgb_image is not None and depth_image is not None:
+                retry_dir = os.path.join(self.images_dir, f'retry_{attempt_number}_{int(timestamp.timestamp())}')
+                os.makedirs(retry_dir, exist_ok=True)
+                
+                rgb_file = os.path.join(retry_dir, 'rgb_image.jpg')
+                depth_file = os.path.join(retry_dir, 'depth_raw.npy')
+                
+                rgb_bgr = cv2.cvtColor(rgb_image, cv2.COLOR_RGB2BGR)
+                cv2.imwrite(rgb_file, rgb_bgr)
+                np.save(depth_file, depth_image)
+                
+                retry_record['image_files'] = {
+                    'rgb': os.path.relpath(rgb_file, self.data_dir),
+                    'depth_raw': os.path.relpath(depth_file, self.data_dir)
+                }
+            
+            # 保存重试记录到单独的文件
+            retry_log_file = os.path.join(self.data_dir, 'retry_attempts.json')
+            
+            if os.path.exists(retry_log_file):
+                with open(retry_log_file, 'r', encoding='utf-8') as f:
+                    retry_log = json.load(f)
+            else:
+                retry_log = []
+            
+            retry_log.append(retry_record)
+            
+            with open(retry_log_file, 'w', encoding='utf-8') as f:
+                json.dump(retry_log, f, indent=2, ensure_ascii=False)
+            
+            print(f"[DATA_RECORDER] 记录检测重试尝试 #{attempt_number}")
+            
+        except Exception as e:
+            print(f"[DATA_RECORDER] 记录重试尝试失败: {e}")
+
+    def set_tracking_context(self, consecutive_failures: int = None, similarity_threshold: float = None):
+        """
+        设置追踪上下文信息，用于失败记录
+        
+        Args:
+            consecutive_failures: 连续失败次数
+            similarity_threshold: 当前使用的相似度阈值
+        """
+        if consecutive_failures is not None:
+            self._consecutive_failures = consecutive_failures
+        if similarity_threshold is not None:
+            self._last_similarity_threshold = similarity_threshold
+
+    def get_failure_statistics(self) -> Dict:
+        """
+        获取失败统计信息
+        
+        Returns:
+            Dict: 失败统计数据
+        """
+        try:
+            failed_steps = [r for r in self.tracking_history if r.get('status') == 'tracking_failed']
+            total_steps = len(self.tracking_history)
+            
+            failure_reasons = {}
+            for step in failed_steps:
+                reason = step.get('failure_reason', 'unknown')
+                failure_reasons[reason] = failure_reasons.get(reason, 0) + 1
+            
+            statistics = {
+                'total_failures': len(failed_steps),
+                'total_steps': total_steps,
+                'failure_rate': len(failed_steps) / total_steps if total_steps > 0 else 0,
+                'failure_reasons': failure_reasons,
+                'failure_steps': [step['step_number'] for step in failed_steps]
+            }
+            
+            return statistics
+            
+        except Exception as e:
+            print(f"[DATA_RECORDER] 获取失败统计失败: {e}")
+            return {'error': str(e)}

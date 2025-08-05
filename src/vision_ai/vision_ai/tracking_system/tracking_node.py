@@ -263,39 +263,7 @@ class TrackingNode(Node):
                     config_path = path
                     self.get_logger().info(f'✅ 找到追踪配置文件: {config_path}')
                     break
-            
-            # if config_path is None:
-            #     # 创建默认配置...（保持不变）
-            #     config_path = possible_config_paths[0]
-            #     config_dir = os.path.dirname(config_path)
-            #     os.makedirs(config_dir, exist_ok=True)
-                
-            #     default_config = {
-            #         "tracking": {
-            #             "similarity_threshold": 0.3,
-            #             "confidence_threshold": 0.5,
-            #             "max_tracking_distance": 500.0
-            #         },
-            #         "features": {
-            #             "weights": {
-            #                 "geometric": 0.4,
-            #                 "appearance": 0.2,
-            #                 "shape": 0.3,
-            #                 "spatial": 0.1
-            #             }
-            #         },
-            #         "matching": {
-            #             "use_class_filtering": True,
-            #             "single_candidate_threshold_reduction": 0.6,
-            #             "max_candidates": 10
-            #         }
-            #     }
-                
-            #     with open(config_path, 'w', encoding='utf-8') as f:
-            #         import json
-            #         json.dump(default_config, f, indent=4, ensure_ascii=False)
-                
-            #     self.get_logger().info(f'✅ 已创建默认追踪配置: {config_path}')
+
             
             # 3. 初始化追踪器
             self.tracker = EnhancedTracker(config_path)
@@ -435,58 +403,58 @@ class TrackingNode(Node):
                     self.get_logger().info(f'✅ 找到检测配置文件: {config_file}')
                     break
             
-            if config_file is None:
-                # 🔧 创建兼容的检测配置文件
-                config_file = possible_config_paths[0]
-                config_dir = os.path.dirname(config_file)
-                os.makedirs(config_dir, exist_ok=True)
+            # if config_file is None:
+            #     # 🔧 创建兼容的检测配置文件
+            #     config_file = possible_config_paths[0]
+            #     config_dir = os.path.dirname(config_file)
+            #     os.makedirs(config_dir, exist_ok=True)
                 
-                # 🔧 修复：创建不包含iou_threshold的配置
-                compatible_config = {
-                    "models": {
-                        "yolo": {
-                            "model_path": "/home/qi/下载/best2.pt",
-                            "confidence_threshold": 0.7,
-                            "device": "cuda"
-                            # 🔧 移除iou_threshold参数
-                        },
-                        "sam2": {
-                            "model_config": "sam2_hiera_l.yaml",
-                            "checkpoint_path": "/home/qi/ros2_ws/src/vision_ai/models/sam2/sam2_hiera_large.pt",
-                            "device": "cuda"
-                        }
-                    },
-                    "features": {
-                        "color": {
-                            "histogram_bins": 32
-                        },
-                        "shape": {
-                            "enable_moments": True,
-                            "enable_contour": True
-                        },
-                        "spatial": {
-                            "enable_3d": True
-                        }
-                    },
-                    "camera": {
-                        "intrinsics": {
-                            "fx": 912.694580078125,
-                            "fy": 910.309814453125,
-                            "cx": 640,
-                            "cy": 360
-                        }
-                    },
-                    "processing": {
-                        "max_objects": 50,
-                        "min_area": 100
-                    }
-                }
+            #     # 🔧 修复：创建不包含iou_threshold的配置
+            #     compatible_config = {
+            #         "models": {
+            #             "yolo": {
+            #                 "model_path": "/home/qi/下载/best2.pt",
+            #                 "confidence_threshold": 0.7,
+            #                 "device": "cuda"
+            #                 # 🔧 移除iou_threshold参数
+            #             },
+            #             "sam2": {
+            #                 "model_config": "sam2_hiera_l.yaml",
+            #                 "checkpoint_path": "/home/qi/ros2_ws/src/vision_ai/models/sam2/sam2_hiera_large.pt",
+            #                 "device": "cuda"
+            #             }
+            #         },
+            #         "features": {
+            #             "color": {
+            #                 "histogram_bins": 32
+            #             },
+            #             "shape": {
+            #                 "enable_moments": True,
+            #                 "enable_contour": True
+            #             },
+            #             "spatial": {
+            #                 "enable_3d": True
+            #             }
+            #         },
+            #         "camera": {
+            #             "intrinsics": {
+            #                 "fx": 912.694580078125,
+            #                 "fy": 910.309814453125,
+            #                 "cx": 640,
+            #                 "cy": 360
+            #             }
+            #         },
+            #         "processing": {
+            #             "max_objects": 50,
+            #             "min_area": 100
+            #         }
+            #     }
                 
-                with open(config_file, 'w', encoding='utf-8') as f:
-                    import json
-                    json.dump(compatible_config, f, indent=4, ensure_ascii=False)
+            #     with open(config_file, 'w', encoding='utf-8') as f:
+            #         import json
+            #         json.dump(compatible_config, f, indent=4, ensure_ascii=False)
                 
-                self.get_logger().info(f'✅ 已创建兼容的检测配置: {config_file}')
+            #     self.get_logger().info(f'✅ 已创建兼容的检测配置: {config_file}')
             
             # 🔧 在创建管道前，先验证并修复配置文件
             self._fix_detection_config_if_needed(config_file)
@@ -850,7 +818,7 @@ class TrackingNode(Node):
             self.get_logger().error(f'处理追踪成功失败: {e}')
     
     def _log_tracking_details(self, tracking_result: dict):
-        """记录详细追踪信息"""
+        """记录详细追踪信息 - 修复版"""
         try:
             self.get_logger().info(f'🎯 追踪详情:')
             self.get_logger().info(f'  目标ID: {tracking_result["target_id"]}')
@@ -865,15 +833,78 @@ class TrackingNode(Node):
             self.get_logger().info(f'  背景高度: {object_info["background_z"]:.1f}mm')
             self.get_logger().info(f'  推荐夹爪宽度: {object_info["recommended_gripper_width"]}')
             
-            # 显示特征相似度分解
+            # 🔧 修复：安全地显示特征相似度分解
             similarity_breakdown = tracking_result.get('similarity_breakdown', {})
             if similarity_breakdown:
-                self.get_logger().info('  特征相似度:')
-                for feature_type, similarity in similarity_breakdown.items():
-                    self.get_logger().info(f'    {feature_type}: {similarity:.3f}')
-                    
+                self.get_logger().info('  特征相似度分解:')
+                
+                for feature_type, similarity_data in similarity_breakdown.items():
+                    try:
+                        # 🆕 处理不同类型的相似度数据
+                        if isinstance(similarity_data, dict):
+                            # 如果是字典，查找关键的数值字段
+                            if 'contribution' in similarity_data:
+                                score = similarity_data['contribution']
+                                self.get_logger().info(f'    {feature_type}: {score:.3f} (贡献度)')
+                            elif 'average_score' in similarity_data:
+                                score = similarity_data['average_score']
+                                self.get_logger().info(f'    {feature_type}: {score:.3f} (平均分)')
+                            else:
+                                # 显示字典内容摘要
+                                keys = list(similarity_data.keys())[:3]  # 只显示前3个键
+                                self.get_logger().info(f'    {feature_type}: dict包含 {keys}...')
+                        
+                        elif isinstance(similarity_data, (int, float)):
+                            # 如果是数字，直接显示
+                            self.get_logger().info(f'    {feature_type}: {similarity_data:.3f}')
+                        
+                        elif isinstance(similarity_data, list):
+                            # 如果是列表，显示长度和均值
+                            if len(similarity_data) > 0 and all(isinstance(x, (int, float)) for x in similarity_data):
+                                avg_score = sum(similarity_data) / len(similarity_data)
+                                self.get_logger().info(f'    {feature_type}: {avg_score:.3f} (均值, 共{len(similarity_data)}项)')
+                            else:
+                                self.get_logger().info(f'    {feature_type}: list包含{len(similarity_data)}项')
+                        
+                        else:
+                            # 其他类型，显示类型信息
+                            self.get_logger().info(f'    {feature_type}: {type(similarity_data).__name__}')
+                            
+                    except Exception as e:
+                        self.get_logger().warn(f'    {feature_type}: 显示失败 ({e})')
+            
+            # 🆕 显示详细特征分解（如果有）
+            detailed_breakdown = tracking_result.get('detailed_similarity_breakdown', {})
+            if detailed_breakdown:
+                self.get_logger().info('  详细特征分解:')
+                
+                for feature_category, feature_details in detailed_breakdown.items():
+                    try:
+                        if isinstance(feature_details, dict) and len(feature_details) > 0:
+                            # 计算该类别的平均分数
+                            numeric_scores = []
+                            for key, value in feature_details.items():
+                                if isinstance(value, (int, float)):
+                                    numeric_scores.append(value)
+                            
+                            if numeric_scores:
+                                avg_score = sum(numeric_scores) / len(numeric_scores)
+                                self.get_logger().info(f'    {feature_category}: {avg_score:.3f} (平均, {len(numeric_scores)}个特征)')
+                            else:
+                                self.get_logger().info(f'    {feature_category}: {len(feature_details)}个特征')
+                                
+                    except Exception as e:
+                        self.get_logger().warn(f'    {feature_category}: 处理失败 ({e})')
+            
+            # 🆕 显示最小外接矩形信息（如果有）
+            bounding_rect = tracking_result.get('bounding_rect', {})
+            if bounding_rect and bounding_rect.get('width', 0) > 0:
+                self.get_logger().info(f'  最小外接矩形: {bounding_rect["width"]:.1f}x{bounding_rect["height"]:.1f}像素, 角度{bounding_rect["angle"]:.1f}°')
+                        
         except Exception as e:
             self.get_logger().error(f'记录追踪详情失败: {e}')
+            import traceback
+            traceback.print_exc()
     
     def _load_tracking_target(self) -> str:
         """从tracking_selection.txt加载用户选择的追踪目标 - 简化版"""
@@ -907,9 +938,6 @@ class TrackingNode(Node):
             if not target_id:
                 self.get_logger().error('无法从选择文件中解析目标ID')
                 return None
-            
-            # 🔧 移除：不再加载 enhanced_detection_results.json
-            # self._load_detection_results_cache()  # 删除这行
             
             return target_id
             
@@ -1144,12 +1172,12 @@ class TrackingNode(Node):
                 self._handle_tracking_failure()
                 return
             
-            if hasattr(self, 'consecutive_failures'):
-                self.consecutive_failures = 0
-            
+            # 使用增强追踪器进行匹配
             waypoint_data = self._get_current_waypoint_data()
             
-            # 🆕 使用增强追踪器（已经内置了自适应权重和位置验证）
+            # 验证waypoint数据
+            self.get_logger().info(f'📍 当前waypoint数据: {waypoint_data}')
+            
             tracking_result = self.tracker.track_target(
                 self.current_target_id,
                 self.latest_rgb_image,
@@ -1159,10 +1187,11 @@ class TrackingNode(Node):
             )
             
             if tracking_result:
+                # 🆕 修复：等待用户确认，而不是直接移动
                 self._handle_tracking_success_with_confirmation(tracking_result)
             else:
                 self._handle_tracking_failure()
-                    
+                
         except Exception as e:
             self.get_logger().error(f'追踪步骤执行失败: {e}')
             import traceback
@@ -1249,13 +1278,21 @@ class TrackingNode(Node):
             return None
         
     def _extract_tracking_parameters(self, tracking_result: dict) -> dict:
-        """提取并记录追踪参数 - 增强版"""
+        """提取并记录追踪参数 - 修复版，确保特征数据传递"""
         try:
             grasp_coord = tracking_result['grasp_coordinate']
             object_info = tracking_result['object_info']
             
-            # 🆕 如果有细粒度特征数据，一并记录
+            # 🆕 正确提取细粒度特征数据
             detailed_features = tracking_result.get('detailed_similarity_breakdown', {})
+            similarity_breakdown = tracking_result.get('similarity_breakdown', {})
+            feature_weights = tracking_result.get('feature_weights_used', {})
+            
+            # 🆕 调试输出
+            print(f"[TRACKING_PARAMS] 提取特征数据:")
+            print(f"  detailed_features keys: {list(detailed_features.keys())}")
+            print(f"  similarity_breakdown keys: {list(similarity_breakdown.keys())}")
+            print(f"  feature_weights keys: {list(feature_weights.keys())}")
             
             # 计算最小外接矩形
             bbox_info = tracking_result.get('bounding_rect', {})
@@ -1281,36 +1318,22 @@ class TrackingNode(Node):
                 'tracking_confidence': tracking_result['tracking_confidence'],
                 'detection_confidence': tracking_result['detection_confidence'],
                 
-                # 🆕 细粒度特征记录
+                # 🆕 确保特征数据正确传递
                 'detailed_features': detailed_features,
-                
-                # 🆕 相似度分解
-                'similarity_breakdown': tracking_result.get('similarity_breakdown', {}),
-                
-                # 🆕 特征权重记录
-                'feature_weights_used': getattr(self.tracker.similarity_calculator, 'feature_weights', {})
+                'similarity_breakdown': similarity_breakdown,
+                'feature_weights_used': feature_weights
             }
+            
+            print(f"[TRACKING_PARAMS] 最终参数包含 detailed_features: {len(tracking_params['detailed_features'])} 项")
+            print(f"[TRACKING_PARAMS] 最终参数包含 similarity_breakdown: {len(tracking_params['similarity_breakdown'])} 项")
             
             return tracking_params
             
         except Exception as e:
             self.get_logger().error(f'提取追踪参数失败: {e}')
+            import traceback
+            traceback.print_exc()
             return {}
-
-    def _calculate_minimum_bounding_rect(self) -> dict:
-        """计算物体的最小外接矩形"""
-        try:
-            # 这里应该从当前检测结果中获取mask
-            # 暂时返回默认值，后续可以完善
-            return {
-                'width': 0,
-                'height': 0,
-                'angle': 0,
-                'center': [0, 0]
-            }
-        except Exception as e:
-            self.get_logger().error(f'计算最小外接矩形失败: {e}')
-            return {'width': 0, 'height': 0, 'angle': 0, 'center': [0, 0]}
 
     def _display_tracking_parameters(self, params: dict):
         """显示追踪参数"""
@@ -1474,31 +1497,36 @@ class TrackingNode(Node):
             return True  # 异常时允许移动
 
     def _save_tracking_step_data(self, tracking_result: dict, success: bool):
-        """保存追踪步骤数据 - 修复版"""
+        """保存追踪步骤数据 - 修复版，传递详细特征"""
         try:
             if not self.data_recorder:
                 self.get_logger().warn('数据记录器未初始化，无法保存数据')
                 return
+            
+            # 🔧 提取详细特征数据
+            detailed_features = tracking_result.get('detailed_similarity_breakdown', {})
             
             # 🔧 将user_feedback信息合并到tracking_result中
             enhanced_tracking_result = tracking_result.copy()
             enhanced_tracking_result['user_feedback'] = 'success' if success else 'failure'
             enhanced_tracking_result['feedback_timestamp'] = datetime.now().isoformat()
             
-            # 🔧 修复：不传递user_feedback作为单独参数
+            # 🆕 调用修改后的记录方法，传递详细特征
             self.data_recorder.record_tracking_step(
                 self.current_target_id,
-                enhanced_tracking_result,  # 包含user_feedback的增强结果
+                enhanced_tracking_result,
                 self.latest_rgb_image,
-                self.latest_depth_image
-                # 🔧 移除user_feedback参数
+                self.latest_depth_image,
+                detailed_features  # 🆕 传递详细特征
             )
             
-            # 🆕 保存追踪参数历史到文件
+            # 保存追踪参数历史到文件
             self._save_parameters_history()
             
         except Exception as e:
             self.get_logger().error(f'保存追踪步骤数据失败: {e}')
+            import traceback
+            traceback.print_exc()
 
     def _save_parameters_history(self):
         """保存追踪参数历史到文件"""
@@ -1908,20 +1936,19 @@ class TrackingNode(Node):
                 (target_coord['x'] - current_pos['x'])**2 + 
                 (target_coord['y'] - current_pos['y'])**2
             )
-            
+            z_compensation = 260
             # 距离自适应策略
             if distance_3d > 200:
                 xy_ratio = 0.30
-                z_compensation = 250
+
             elif distance_3d > 100:
                 xy_ratio = 0.50
-                z_compensation = 220
             elif distance_3d > 50:
-                xy_ratio = 0.70
-                z_compensation = 200
+                xy_ratio = 0.8
+                z_compensation = 250
             else:
-                xy_ratio = 0.80
-                z_compensation = 100
+                xy_ratio = 1
+                z_compensation = 230
             
             # 🆕 安全移动高度计算
             background_z = object_info.get('background_z', 300)
@@ -1934,7 +1961,7 @@ class TrackingNode(Node):
             self.get_logger().info(f'   背景高度: {background_z:.1f}mm')
             self.get_logger().info(f'   物体高度: {object_height:.1f}mm') 
             self.get_logger().info(f'   Z补偿: {z_compensation}mm')
-            self.get_logger().info(f'   安全移动高度: max(300, {background_z:.1f} + {object_height:.1f} + {z_compensation}) = {safe_movement_z:.1f}mm')
+            self.get_logger().info(f'   安全移动高度: max(320, {background_z:.1f} + {object_height:.1f} + {z_compensation}) = {safe_movement_z:.1f}mm')
             
             return {
                 'distance_3d': distance_3d,
@@ -1972,9 +1999,9 @@ class TrackingNode(Node):
             # 精确的抓取条件
             conditions = {
                 'camera_min_height': current_pos['z'] >= 300,
-                'z_close_enough': 0 < target_distance_z < 10.0,  # Z距离小于10mm
+                'z_close_enough': 0.0 < target_distance_z < 10.0,  # Z距离小于10mm
                 'xy_aligned': xy_distance < 50.0,  # XY距离小于50mm
-                'confidence_check': tracking_result['tracking_confidence'] > 0.6,
+                'confidence_check': tracking_result['tracking_confidence'] > 0.65,
                 'stability_check': self._check_tracking_stability()
             }
             
@@ -1983,8 +2010,8 @@ class TrackingNode(Node):
             
             self.get_logger().info(f'🎯 抓取条件评估:')
             self.get_logger().info(f'   Z距离: {target_distance_z:.1f}mm (< 10mm: {conditions["z_close_enough"]})')
-            self.get_logger().info(f'   XY距离: {xy_distance:.1f}mm (< 50mm: {conditions["xy_aligned"]})')
-            self.get_logger().info(f'   置信度: {tracking_result["tracking_confidence"]:.3f} (> 0.85: {conditions["confidence_check"]})')
+            self.get_logger().info(f'   XY距离: {xy_distance:.1f}mm (< 60mm: {conditions["xy_aligned"]})')
+            self.get_logger().info(f'   置信度: {tracking_result["tracking_confidence"]:.3f} (> 0.65: {conditions["confidence_check"]})')
             self.get_logger().info(f'   稳定性: {conditions["stability_check"]}')
             self.get_logger().info(f'   🎯 准备抓取: {grasp_ready}')
             
@@ -2004,10 +2031,10 @@ class TrackingNode(Node):
 
     def _check_tracking_stability(self) -> bool:
         """检查追踪稳定性（最近3步位置变化）"""
-        if len(self.tracking_parameters_history) < 3:
+        if len(self.tracking_parameters_history) < 2:
             return False
         
-        recent_positions = [step['target_coordinate'] for step in self.tracking_parameters_history[-3:]]
+        recent_positions = [step['target_coordinate'] for step in self.tracking_parameters_history[-2:]]
         max_deviation = 0
         for i in range(1, len(recent_positions)):
             deviation = math.sqrt(
@@ -2016,7 +2043,7 @@ class TrackingNode(Node):
             )
             max_deviation = max(max_deviation, deviation)
         
-        return max_deviation < 50  # 15mm以内认为稳定
+        return max_deviation < 30  # 15mm以内认为稳定
     def _handle_detection_failure_with_retry(self):
         """处理检测失败 - 增强提示信息"""
         try:
