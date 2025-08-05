@@ -5,7 +5,8 @@ import numpy as np
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime
 import time
-
+import cv2
+import math
 # 导入增强组件
 from ..detection.features.similarity_calculator import FeatureSimilarityCalculator
 from ..detection.utils.coordinate_calculator import CoordinateCalculator, ObjectAnalyzer
@@ -15,29 +16,54 @@ from ..detection.utils.enhanced_config_manager import EnhancedConfigManager
 class EnhancedTracker:
     """增强Track模块 - 独立的特征匹配追踪器"""
     
-    def __init__(self, config_file: Optional[str] = None):
-        """
-        初始化增强追踪器
-        
-        Args:
-            config_file: 配置文件路径
-        """
-        # 配置管理
-        self.config_manager = EnhancedConfigManager(config_file)
-        
-        # 初始化核心组件
-        self._initialize_components()
-        
-        # 数据存储
-        self.reference_library = {}
-        self.current_targets = {}
-        self.tracking_history = []
-        
-        # 追踪状态
-        self.tracking_active = False
-        self.current_frame_count = 0
-        
-        print("[ENHANCED_TRACKER] 增强追踪器初始化完成")
+    def __init__(self, config_path: str):
+        """初始化增强追踪器 - 修复版"""
+        try:
+            # 加载配置
+            with open(config_path, 'r', encoding='utf-8') as f:
+                self.config = json.load(f)
+            
+            tracking_config = self.config.get('tracking', {})
+            
+            # 🔧 确保设置相似度阈值
+            self.similarity_threshold = tracking_config.get('similarity_threshold', 0.6)  # 降低默认阈值
+            self.confidence_threshold = tracking_config.get('confidence_threshold', 0.6)
+            self.max_tracking_distance = tracking_config.get('max_tracking_distance', 600.0)
+            
+            print(f"[ENHANCED_TRACKER] 配置加载完成:")
+            print(f"  - 相似度阈值: {self.similarity_threshold}")
+            print(f"  - 置信度阈值: {self.confidence_threshold}")
+            print(f"  - 最大追踪距离: {self.max_tracking_distance}mm")
+            
+            # 初始化组件
+            self.similarity_calculator = FeatureSimilarityCalculator()
+            self.coordinate_calculator = None  # 将在需要时初始化
+            
+            # 数据存储
+            self.reference_library = {}
+            self.current_target_id = None
+            self.current_target_class = None
+            self.config_manager = EnhancedConfigManager(config_path)
+            # 🆕 添加ID映射缓存
+            self.id_to_class_mapping = {}
+            self.class_to_ids_mapping = {}
+            self.position_history = []
+            self.confidence_history = []
+            print("[ENHANCED_TRACKER] 增强追踪器初始化完成")
+            self._initialize_components()
+
+        except Exception as e:
+            print(f"[ENHANCED_TRACKER] 初始化失败: {e}")
+            # 设置默认值
+            self.similarity_threshold = 0.3
+            self.confidence_threshold = 0.5
+            self.max_tracking_distance = 500.0
+            self.similarity_calculator = FeatureSimilarityCalculator()
+            self.reference_library = {}
+            self.current_target_id = None
+            self.current_target_class = None
+            self.id_to_class_mapping = {}
+            self.class_to_ids_mapping = {}
     
     def _initialize_components(self):
         """初始化核心组件"""
@@ -72,31 +98,32 @@ class EnhancedTracker:
             print(f"[ENHANCED_TRACKER] 组件初始化失败: {e}")
             raise
     
-    def load_reference_features(self, reference_library_path: str) -> bool:
-        """
-        从Detect结果加载参考特征库
-        
-        Args:
-            reference_library_path: 参考特征库文件路径
-            
-        Returns:
-            success: 是否加载成功
-        """
+    def load_reference_features(self, library_file: str) -> bool:
+        """加载参考特征库 - 优化版，构建ID映射"""
         try:
-            if not os.path.exists(reference_library_path):
-                print(f"[ENHANCED_TRACKER] 参考特征库文件不存在: {reference_library_path}")
-                return False
+            with open(library_file, 'r', encoding='utf-8') as f:
+                library_data = json.load(f)
             
-            with open(reference_library_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
+            self.reference_library = {}
             
-            # 加载参考特征库
-            self.reference_library = data
+            # 🆕 构建ID映射
+            for obj_id, entry in library_data.items():
+                self.reference_library[obj_id] = entry
+                
+                # 提取类别信息
+                class_name = obj_id.split('_')[0]
+                self.id_to_class_mapping[obj_id] = class_name
+                
+                # 构建类别到ID的映射
+                if class_name not in self.class_to_ids_mapping:
+                    self.class_to_ids_mapping[class_name] = []
+                self.class_to_ids_mapping[class_name].append(obj_id)
             
-            print(f"[ENHANCED_TRACKER] 成功加载 {len(self.reference_library)} 个参考特征")
-            
-            # 显示加载的特征摘要
-            self._display_reference_library_summary()
+            print(f"[ENHANCED_TRACKER] 参考特征库加载完成")
+            print(f"[ENHANCED_TRACKER] 总对象数: {len(self.reference_library)}")
+            print(f"[ENHANCED_TRACKER] 类别统计:")
+            for class_name, ids in self.class_to_ids_mapping.items():
+                print(f"  - {class_name}: {len(ids)} 个对象 {ids}")
             
             return True
             
@@ -142,37 +169,19 @@ class EnhancedTracker:
             print(f"[ENHANCED_TRACKER] 显示摘要失败: {e}")
     
     def select_tracking_target(self, target_id: str) -> bool:
-        """
-        选择要追踪的目标
-        
-        Args:
-            target_id: 目标对象ID
-            
-        Returns:
-            success: 是否选择成功
-        """
+        """选择追踪目标 - 添加验证"""
         try:
             if target_id not in self.reference_library:
-                print(f"[ENHANCED_TRACKER] 目标ID不存在: {target_id}")
+                print(f"[ENHANCED_TRACKER] 错误: 目标 {target_id} 不存在于参考库中")
+                print(f"[ENHANCED_TRACKER] 可用目标: {list(self.reference_library.keys())}")
                 return False
             
-            # 获取目标的参考特征
-            target_entry = self.reference_library[target_id]
-            
-            # 设置当前追踪目标
-            self.current_targets[target_id] = {
-                'reference_features': target_entry['features'],
-                'metadata': target_entry['metadata'],
-                'quality_score': target_entry.get('quality_score', 0),
-                'tracking_state': 'initialized',
-                'last_detection': None,
-                'confidence_history': [],
-                'position_history': []
-            }
+            self.current_target_id = target_id
+            self.current_target_class = self.id_to_class_mapping[target_id]
             
             print(f"[ENHANCED_TRACKER] 已选择追踪目标: {target_id}")
-            print(f"  - 类别: {target_entry['metadata'].get('class_name', 'unknown')}")
-            print(f"  - 特征质量: {target_entry.get('quality_score', 0):.1f}%")
+            print(f"[ENHANCED_TRACKER] 目标类别: {self.current_target_class}")
+            print(f"[ENHANCED_TRACKER] 同类别其他对象: {[id for id in self.class_to_ids_mapping[self.current_target_class] if id != target_id]}")
             
             return True
             
@@ -180,128 +189,622 @@ class EnhancedTracker:
             print(f"[ENHANCED_TRACKER] 选择追踪目标失败: {e}")
             return False
     
-    def track_target(self, target_id: str, current_image: np.ndarray, 
-                    current_depth: np.ndarray, waypoint_data: Dict,
+    def track_target(self, target_id: str, image_rgb: np.ndarray, 
+                    depth_image: np.ndarray, waypoint_data: Dict,
                     candidate_detections: List[Dict]) -> Optional[Dict]:
-        """
-        追踪指定目标
-        
-        Args:
-            target_id: 目标ID
-            current_image: 当前RGB图像
-            current_depth: 当前深度图像
-            waypoint_data: 当前waypoint数据
-            candidate_detections: 候选检测结果列表
-            
-        Returns:
-            tracking_result: 追踪结果，包含最佳匹配和抓取信息
-        """
+        """追踪目标 - 增强版，加入自适应权重和位置验证"""
         try:
-            if target_id not in self.current_targets:
-                print(f"[ENHANCED_TRACKER] 目标未被选择用于追踪: {target_id}")
+            print(f"[ENHANCED_TRACKER] 开始增强追踪: {target_id}")
+            
+            # ... 现有的候选过滤代码 ...
+            target_class = target_id.split('_')[0]
+            same_class_candidates = [d for d in candidate_detections if d['class_name'] == target_class]
+            
+            if len(same_class_candidates) == 0:
+                print(f"[ENHANCED_TRACKER] 未发现同类别候选")
                 return None
             
-            target_info = self.current_targets[target_id]
-            reference_features = target_info['reference_features']
+            reference_features = self.reference_library[target_id]['features']
             
-            print(f"[ENHANCED_TRACKER] 开始追踪目标: {target_id}")
-            print(f"  - 候选检测数量: {len(candidate_detections)}")
+            # 🆕 构建追踪上下文
+            tracking_context = self._build_tracking_context(waypoint_data)
             
-            # Step 1: 为每个候选提取特征
-            enhanced_candidates = []
-            for i, candidate in enumerate(candidate_detections):
+            best_match = None
+            best_detailed_similarity = None
+            best_similarity = 0.0
+            
+            for i, detection in enumerate(same_class_candidates):
                 try:
-                    # 提取当前帧特征
-                    candidate_features = self._extract_candidate_features(
-                        candidate, current_image, current_depth, waypoint_data
-                    )
+                    # 🆕 计算候选位置
+                    candidate_coord = self._extract_candidate_position(detection, waypoint_data, depth_image)
                     
-                    enhanced_candidates.append({
-                        'index': i,
-                        'original_data': candidate,
-                        'features': candidate_features
+                    # 🆕 位置连续性验证
+                    continuity_score = self._validate_position_continuity(candidate_coord)
+                    
+                    # 🆕 遮挡检测
+                    current_confidence = detection.get('confidence', 0.0)
+                    occlusion_score = self._detect_occlusion(current_confidence, detection.get('features', {}))
+                    
+                    # 更新追踪上下文
+                    tracking_context.update({
+                        'continuity_score': continuity_score,
+                        'occlusion_score': occlusion_score,
+                        'candidate_position': candidate_coord
                     })
                     
+                    # 🆕 使用自适应相似度计算
+                    detailed_similarity = self.similarity_calculator.calculate_detailed_similarity_breakdown_adaptive(
+                        reference_features, 
+                        detection.get('features', {}), 
+                        waypoint_data,
+                        tracking_context
+                    )
+                    
+                    # 🆕 综合分数：相似度 × 位置连续性 × (1 - 遮挡分数)
+                    raw_similarity = detailed_similarity['final_score']
+                    adjusted_similarity = raw_similarity * continuity_score * (1.0 - occlusion_score * 0.5)
+                    
+                    print(f"[ENHANCED_TRACKER] 候选 {i+1}: 原始={raw_similarity:.3f}, 连续性={continuity_score:.3f}, 遮挡={occlusion_score:.3f} → 调整后={adjusted_similarity:.3f}")
+                    
+                    if adjusted_similarity > best_similarity:
+                        best_similarity = adjusted_similarity
+                        best_match = detection
+                        best_detailed_similarity = detailed_similarity
+                        best_detailed_similarity['adjusted_similarity'] = adjusted_similarity
+                        best_detailed_similarity['continuity_score'] = continuity_score
+                        best_detailed_similarity['occlusion_score'] = occlusion_score
+                        
                 except Exception as e:
-                    print(f"[ENHANCED_TRACKER] 候选 {i} 特征提取失败: {e}")
+                    print(f"[ENHANCED_TRACKER] 处理候选 {i} 失败: {e}")
                     continue
             
-            if not enhanced_candidates:
-                print("[ENHANCED_TRACKER] 没有有效的候选特征")
+            if best_match and best_similarity >= self.similarity_threshold:
+                print(f"[ENHANCED_TRACKER] 增强匹配成功: {best_similarity:.3f}")
+                
+                # 🆕 更新历史记录
+                self._update_tracking_history(best_detailed_similarity.get('candidate_position', {}), best_similarity)
+                
+                return self._build_tracking_result_with_detailed_features(
+                    target_id, best_match, best_detailed_similarity, waypoint_data, image_rgb, depth_image
+                )
+            else:
+                print(f"[ENHANCED_TRACKER] 增强匹配失败")
                 return None
+                
+        except Exception as e:
+            print(f"[ENHANCED_TRACKER] 增强追踪失败: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
+    def _build_tracking_context(self, waypoint_data: Dict) -> Dict:
+        """构建追踪上下文"""
+        try:
+            # 计算与当前位置的距离
+            current_pos = waypoint_data.get('world_pos', [0, 0, 350])
+            distance_3d = 100.0  # 默认值
             
-            # Step 2: 计算相似度并找到最佳匹配
-            best_match = self.similarity_calculator.find_best_match(
-                reference_features, enhanced_candidates
-            )
+            if self.position_history:
+                last_pos = self.position_history[-1]
+                distance_3d = math.sqrt(
+                    (current_pos[0] - last_pos['x'])**2 +
+                    (current_pos[1] - last_pos['y'])**2 +
+                    (current_pos[2] - last_pos['z'])**2
+                )
             
-            if not best_match:
-                print("[ENHANCED_TRACKER] 未找到合适的匹配")
-                return self._handle_tracking_failure(target_id)
+            context = {
+                'distance_3d': distance_3d,
+                'confidence_history': self.confidence_history.copy(),
+                'current_position': {
+                    'x': current_pos[0], 
+                    'y': current_pos[1], 
+                    'z': current_pos[2]
+                },
+                'lighting_change': 0.0  # 后续可以通过图像分析得到
+            }
             
-            # Step 3: 应用自适应阈值
-            overall_similarity = best_match['similarity_result']['overall_similarity']
-            confidence = best_match['similarity_result']['confidence']
+            return context
             
-            # 获取动态阈值
-            threshold = self._get_adaptive_threshold(target_info, confidence)
+        except Exception as e:
+            print(f"[TRACKING_CONTEXT] 构建上下文失败: {e}")
+            return {'distance_3d': 100.0, 'confidence_history': []}
+
+    def _extract_candidate_position(self, detection: Dict, waypoint_data: Dict, depth_image: np.ndarray) -> Dict:
+        """提取候选位置坐标"""
+        try:
+            # 使用现有的坐标计算方法
+            grasp_coord = self._calculate_grasp_coordinate(detection, waypoint_data, depth_image)
+            return grasp_coord
+        except Exception as e:
+            print(f"[POSITION_EXTRACT] 提取候选位置失败: {e}")
+            return {'x': 0.0, 'y': 0.0, 'z': 350.0}
+
+    def _update_tracking_history(self, position: Dict, confidence: float):
+        """更新追踪历史"""
+        try:
+            self.position_history.append(position)
+            self.confidence_history.append(confidence)
             
-            print(f"[ENHANCED_TRACKER] 最佳匹配相似度: {overall_similarity:.3f} (阈值: {threshold:.3f})")
+            # 保持历史长度
+            max_history = 10
+            if len(self.position_history) > max_history:
+                self.position_history = self.position_history[-max_history:]
+            if len(self.confidence_history) > max_history:
+                self.confidence_history = self.confidence_history[-max_history:]
+                
+        except Exception as e:
+            print(f"[TRACKING_HISTORY] 更新历史失败: {e}")
             
-            if overall_similarity < threshold:
-                print("[ENHANCED_TRACKER] 相似度低于阈值，匹配失败")
-                return self._handle_tracking_failure(target_id)
+    def _build_tracking_result_with_detailed_features(self, target_id: str, detection: Dict, 
+                                                    detailed_similarity: Dict, waypoint_data: Dict,
+                                                    image_rgb: np.ndarray, depth_image: np.ndarray) -> Dict:
+        """构建包含详细特征的追踪结果"""
+        try:
+            print("[ENHANCED_TRACKER] 构建详细追踪结果...")
             
-            # Step 4: 时序一致性检查
-            if not self._temporal_consistency_check(target_id, best_match):
-                print("[ENHANCED_TRACKER] 时序一致性检查失败")
-                return self._handle_tracking_failure(target_id)
+            # 🆕 计算最小外接矩形
+            bounding_rect = self._calculate_minimum_bounding_rect(detection)
             
-            # Step 5: 生成追踪结果
-            tracking_result = self._generate_tracking_result(
-                target_id, best_match, waypoint_data
-            )
+            # 计算3D抓取坐标
+            grasp_coord = self._calculate_grasp_coordinate(detection, waypoint_data, depth_image)
             
-            # Step 6: 更新追踪状态
-            self._update_tracking_state(target_id, tracking_result)
+            # 分析物体信息
+            features = detection.get('features', {})
+            object_info = self._analyze_object_for_grasping_fixed(detection, waypoint_data, features, depth_image)
             
-            # Step 7: 自适应学习反馈（标记为成功匹配）
-            if self.adaptive_manager:
-                self._update_adaptive_learning(target_id, best_match, True)
+            # 构建追踪结果
+            tracking_result = {
+                'target_id': target_id,
+                'detection_confidence': float(detection.get('confidence', 0.0)),
+                'tracking_confidence': float(detailed_similarity['final_score']),
+                
+                # 抓取坐标
+                'grasp_coordinate': grasp_coord,
+                
+                # 物体信息
+                'object_info': object_info,
+                
+                # 🆕 最小外接矩形信息
+                'bounding_rect': bounding_rect,
+                
+                # 🆕 详细相似度分解 - 确保传递
+                'detailed_similarity_breakdown': detailed_similarity.get('detailed_breakdown', {}),
+                'similarity_breakdown': detailed_similarity.get('feature_contributions', {}),
+                'feature_weights_used': detailed_similarity.get('feature_weights_used', {}),
+                
+                # 元数据
+                'timestamp': datetime.now().isoformat(),
+                'waypoint_info': waypoint_data
+            }
             
-            print(f"[ENHANCED_TRACKER] 追踪成功: {target_id}")
+            print(f"[ENHANCED_TRACKER] 详细追踪结果构建完成:")
+            print(f"  抓取坐标: {grasp_coord}")
+            print(f"  详细特征数量: {len(detailed_similarity.get('detailed_breakdown', {}))}")
+            print(f"  相似度分解数量: {len(detailed_similarity.get('feature_contributions', {}))}")
+            
             return tracking_result
             
         except Exception as e:
-            print(f"[ENHANCED_TRACKER] 追踪失败: {e}")
+            print(f"[ENHANCED_TRACKER] 构建详细追踪结果失败: {e}")
+            import traceback
+            traceback.print_exc()
             return None
+            
+    def _build_tracking_result_from_detection(self, target_id: str, detection: Dict, 
+                                            similarity_score: float, waypoint_data: Dict,
+                                            image_rgb: np.ndarray, depth_image: np.ndarray) -> Dict:
+        """从检测结果构建追踪结果 - 使用参考库数据"""
+        try:
+            print("[ENHANCED_TRACKER] 构建追踪结果...")
+            print(f"[ENHANCED_TRACKER] 目标ID: {target_id}")
+
+            bounding_rect = self._calculate_minimum_bounding_rect(detection)
+            
+            # 🔧 验证参考库数据
+            if hasattr(self, 'reference_library') and target_id in self.reference_library:
+                ref_entry = self.reference_library[target_id]
+                spatial_ref = ref_entry.get('features', {}).get('spatial', {})
+                
+                print(f"[ENHANCED_TRACKER] 参考库验证:")
+                print(f"  height_mm: {spatial_ref.get('height_mm')}")
+                print(f"  background_world_z: {spatial_ref.get('background_world_z')}")
+            
+            features = detection.get('features', {})
+            if not features:
+                features = {
+                    'geometric': detection.get('geometric_features', {}),
+                    'appearance': detection.get('appearance_features', {}),
+                    'shape': detection.get('shape_features', {}),
+                    'spatial': detection.get('spatial_features', {})
+                }
+            
+            # 计算3D抓取坐标
+            grasp_coord = self._calculate_grasp_coordinate(detection, waypoint_data, depth_image)
+            
+            # 分析物体信息
+            object_info = self._analyze_object_for_grasping_fixed(detection, waypoint_data, features, depth_image)
+            
+            # 构建追踪结果
+            tracking_result = {
+                'target_id': target_id,
+                'detection_confidence': float(detection.get('confidence', 0.0)),
+                'tracking_confidence': float(similarity_score),
+                
+                # 抓取坐标
+                'grasp_coordinate': grasp_coord,
+                
+                # 物体信息
+                'object_info': object_info,
+                
+                # 🆕 添加最小外接矩形信息
+                'bounding_rect': bounding_rect,
+                
+                # 相似度分解
+                'similarity_breakdown': {},
+                
+                # 元数据
+                'timestamp': datetime.now().isoformat(),
+                'waypoint_info': waypoint_data
+            }
+            
+            print(f"[ENHANCED_TRACKER] 追踪结果构建完成:")
+            print(f"  抓取坐标: {grasp_coord}")
+            print(f"  物体高度: {object_info['estimated_height']:.1f}mm")
+            print(f"  背景高度: {object_info['background_z']:.1f}mm")
+            print(f"  最小外接矩形: {bounding_rect['width']:.1f}x{bounding_rect['height']:.1f}, 角度{bounding_rect['angle']:.1f}°")
+            
+            return tracking_result
+            
+        except Exception as e:
+            print(f"[ENHANCED_TRACKER] 构建追踪结果失败: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
+        
+    def _calculate_minimum_bounding_rect(self, detection: Dict) -> Dict:
+        """基于mask计算最小外接矩形"""
+        try:
+            import cv2
+            import numpy as np
+            
+            mask = detection.get('mask')
+            if mask is None or not isinstance(mask, np.ndarray):
+                print("[ENHANCED_TRACKER] 无效的mask数据")
+                return {'width': 0, 'height': 0, 'angle': 0, 'center': [0, 0]}
+            
+            # 确保mask是正确的格式
+            if mask.dtype != np.uint8:
+                if mask.dtype == bool:
+                    mask = mask.astype(np.uint8) * 255
+                else:
+                    mask = mask.astype(np.uint8)
+            
+            # 找到轮廓
+            contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            if not contours:
+                print("[ENHANCED_TRACKER] 未找到有效轮廓")
+                return {'width': 0, 'height': 0, 'angle': 0, 'center': [0, 0]}
+            
+            # 获取最大轮廓的最小外接矩形
+            largest_contour = max(contours, key=cv2.contourArea)
+            rect = cv2.minAreaRect(largest_contour)
+            center, (width, height), angle = rect
+            if width < height:
+                yaw_angle = -angle + 90 
+            else:
+                yaw_angle = -angle
+            print(f"[ENHANCED_TRACKER] 最小外接矩形: 中心{center}, 尺寸({width:.1f}x{height:.1f}), 角度{yaw_angle:.1f}°")
+            
+            return {
+                'width': float(width),
+                'height': float(height), 
+                'angle': float(yaw_angle),
+                'center': [float(center[0]), float(center[1])]
+            }
+            
+        except Exception as e:
+            print(f"[ENHANCED_TRACKER] 最小外接矩形计算失败: {e}")
+            return {'width': 0, 'height': 0, 'angle': 0, 'center': [0, 0]}        
     
+    def _calculate_grasp_coordinate(self, detection: Dict, waypoint_data: Dict, depth_image: np.ndarray) -> Dict:
+        """通过ObjectAnalyzer计算3D抓取坐标"""
+        try:
+            mask = detection.get('mask')
+            bbox = detection.get('bounding_box', [0, 0, 100, 100])
+            
+            if mask is None or depth_image is None:
+                raise ValueError("缺少mask或depth图")
+
+            spatial_features = self.object_analyzer.calculate_3d_spatial_features(
+                mask, depth_image, waypoint_data, bbox
+            )
+
+            coords = spatial_features.get('world_coordinates', [0, 0, 350])
+            return {
+                'x': float(coords[0]),
+                'y': float(coords[1]),
+                'z': float(coords[2])
+            }
+        except Exception as e:
+            print(f"[ENHANCED_TRACKER] 统一坐标转换失败: {e}")
+            return {'x': 0.0, 'y': 0.0, 'z': 350.0}
+
+    def _analyze_object_for_grasping_fixed(self, detection: Dict, waypoint_data, features: Dict, 
+                                        depth_image: np.ndarray) -> Dict:
+        """分析物体抓取信息 - 最终修复版"""
+        try:
+            print(f"[ENHANCED_TRACKER] 开始物体分析，目标ID: {self.current_target_id}")
+            
+            # 🔧 直接从参考库获取数据，不依赖任何缓存
+            if (hasattr(self, 'current_target_id') and 
+                self.current_target_id and 
+                hasattr(self, 'reference_library') and
+                self.current_target_id in self.reference_library):
+                
+                ref_entry = self.reference_library[self.current_target_id]
+                spatial_features = ref_entry.get('features', {}).get('spatial', {})
+                metadata = ref_entry.get('metadata', {})
+                
+                # 🔧 直接从参考库读取
+                height_mm = spatial_features.get('height_mm')
+                background_world_z = spatial_features.get('background_world_z')
+                class_name = metadata.get('class_name', 'unknown')
+                
+                print(f"[ENHANCED_TRACKER] 参考库原始数据:")
+                print(f"  height_mm: {height_mm}")
+                print(f"  background_world_z: {background_world_z}")
+                print(f"  class_name: {class_name}")
+                
+                if height_mm is not None and background_world_z is not None:
+                    object_info = {
+                        'object_id': self.current_target_id,
+                        'class_name': class_name,
+                        'estimated_height': float(height_mm),
+                        'background_z': float(background_world_z),
+                        'recommended_gripper_width': 500,
+                        'grasp_angle': waypoint_data.get('yaw', 0.0)
+                    }
+                    
+                    print(f"[ENHANCED_TRACKER] ✅ 使用参考库固定数据:")
+                    print(f"  高度: {object_info['estimated_height']:.1f}mm (来源: reference_library)")
+                    print(f"  背景: {object_info['background_z']:.1f}mm (来源: reference_library)")
+                    print(f"  类别: {object_info['class_name']}")
+                    
+                    return object_info
+                else:
+                    print(f"[ENHANCED_TRACKER] ⚠️ 参考库中数据为空:")
+                    print(f"  height_mm 为空: {height_mm is None}")
+                    print(f"  background_world_z 为空: {background_world_z is None}")
+            else:
+                print(f"[ENHANCED_TRACKER] ⚠️ 参考库访问检查:")
+                print(f"  has_current_target_id: {hasattr(self, 'current_target_id')}")
+                print(f"  current_target_id: {getattr(self, 'current_target_id', None)}")
+                print(f"  has_reference_library: {hasattr(self, 'reference_library')}")
+                if hasattr(self, 'reference_library'):
+                    print(f"  reference_library_size: {len(self.reference_library)}")
+                    print(f"  reference_library_keys: {list(self.reference_library.keys())}")
+                    if self.current_target_id:
+                        print(f"  target_in_library: {self.current_target_id in self.reference_library}")
+            
+            # 如果参考库数据不可用，使用默认值
+            print(f"[ENHANCED_TRACKER] ⚠️ 使用默认值")
+            return {
+                'object_id': 'unknown',
+                'class_name': 'unknown',
+                'estimated_height': 30.0,
+                'background_z': 300.0,
+                'recommended_gripper_width': 500,
+                'grasp_angle': 0.0
+            }
+            
+        except Exception as e:
+            print(f"[ENHANCED_TRACKER] 物体分析失败: {e}")
+            import traceback
+            traceback.print_exc()
+            return {
+                'object_id': 'unknown',
+                'class_name': 'unknown',
+                'estimated_height': 30.0,
+                'background_z': 300.0,
+                'recommended_gripper_width': 500,
+                'grasp_angle': 0.0
+            }
+
+    def _get_fixed_object_info_with_cache(self, detection: Dict) -> Dict:
+        """从固定检测结果获取物体信息 - 优先使用参考库数据"""
+        try:
+            object_id = detection.get('object_id')
+            class_name = detection.get('class_name', 'unknown')
+            
+            # 默认值
+            default_info = {
+                'object_id': object_id or 'unknown',
+                'class_name': class_name,
+                'estimated_height': 30.0,
+                'background_z': 300.0,
+                'recommended_gripper_width': 500,
+            }
+            
+            print(f"[ENHANCED_TRACKER] 获取物体信息: 目标ID={self.current_target_id}")
+            
+            # 🔧 关键修复：优先使用参考库数据
+            if hasattr(self, 'current_target_id') and self.current_target_id:
+                if self.current_target_id in self.reference_library:
+                    ref_entry = self.reference_library[self.current_target_id]
+                    if 'features' in ref_entry and 'spatial' in ref_entry['features']:
+                        spatial_ref = ref_entry['features']['spatial']
+                        depth_info = spatial_ref.get('depth_info', {})
+                        
+                        if 'height_mm' in depth_info:
+                            default_info['estimated_height'] = float(depth_info['height_mm'])
+                            print(f"[ENHANCED_TRACKER] 📚 使用参考库高度: {default_info['estimated_height']:.1f}mm")
+                        if 'background_world_z' in depth_info:
+                            default_info['background_z'] = float(depth_info['background_world_z'])
+                            print(f"[ENHANCED_TRACKER] 📚 使用参考库背景: {default_info['background_z']:.1f}mm")
+                        
+                        # 如果参考库中有完整数据，直接返回
+                        if 'height_mm' in depth_info and 'background_world_z' in depth_info:
+                            print(f"[ENHANCED_TRACKER] ✅ 使用参考库完整数据 (优先级1)")
+                            return default_info
+            
+            # 🔧 备用方案：使用检测结果缓存
+            if hasattr(self, 'detection_results_cache') and self.current_target_id:
+                print(f"[ENHANCED_TRACKER] 检查缓存，缓存大小: {len(getattr(self, 'detection_results_cache', {}))}")
+                
+                if self.current_target_id in self.detection_results_cache:
+                    cache_data = self.detection_results_cache[self.current_target_id]
+                    
+                    # 🆕 只在参考库数据不完整时使用缓存数据
+                    if default_info['estimated_height'] == 30.0:  # 参考库没有高度数据
+                        default_info['estimated_height'] = cache_data['height_mm']
+                        print(f"[ENHANCED_TRACKER] 💾 补充缓存高度: {default_info['estimated_height']:.1f}mm")
+                    
+                    if default_info['background_z'] == 300.0:  # 参考库没有背景数据
+                        default_info['background_z'] = cache_data['background_world_z']
+                        print(f"[ENHANCED_TRACKER] 💾 补充缓存背景: {default_info['background_z']:.1f}mm")
+                    
+                    if default_info['class_name'] == 'unknown':  # 补充类别信息
+                        default_info['class_name'] = cache_data['class_name']
+                    
+                    print(f"[ENHANCED_TRACKER] ✅ 使用参考库+缓存组合数据 (优先级2)")
+                    return default_info
+                else:
+                    print(f"[ENHANCED_TRACKER] ⚠️ 目标 {self.current_target_id} 不在缓存中")
+                    print(f"[ENHANCED_TRACKER] 可用缓存键: {list(self.detection_results_cache.keys())}")
+            else:
+                print(f"[ENHANCED_TRACKER] ⚠️ 缓存不可用: hasattr={hasattr(self, 'detection_results_cache')}, target_id={self.current_target_id}")
+            
+            print(f"[ENHANCED_TRACKER] ⚠️ 使用默认值 (优先级3): 高度={default_info['estimated_height']:.1f}mm, 背景={default_info['background_z']:.1f}mm")
+            return default_info
+            
+        except Exception as e:
+            print(f"[ENHANCED_TRACKER] 获取固定物体信息失败: {e}")
+            import traceback
+            traceback.print_exc()
+            return {
+                'object_id': 'unknown',
+                'class_name': 'unknown', 
+                'estimated_height': 30.0,
+                'background_z': 300.0,
+                'recommended_gripper_width': 500,
+                'grasp_angle': 0.0
+            }
+        
+    def set_detection_results_cache(self, cache: Dict):
+        """设置检测结果缓存"""
+        self.detection_results_cache = cache
+        print(f"[ENHANCED_TRACKER] 检测结果缓存已设置: {len(cache)} 个目标")
+
+    def _calculate_similarity(self, reference_features: Dict, 
+                            candidate_detection: Dict, 
+                            waypoint_data: Dict) -> float:
+        """计算相似度 - 修复版本"""
+        try:
+            # 🔧 提取候选特征（适配不同的特征格式）
+            candidate_features = {}
+            
+            # 尝试多种特征提取方式
+            if 'geometric_features' in candidate_detection:
+                candidate_features['geometric'] = candidate_detection['geometric_features']
+            if 'appearance_features' in candidate_detection:
+                candidate_features['appearance'] = candidate_detection['appearance_features']
+            if 'shape_features' in candidate_detection:
+                candidate_features['shape'] = candidate_detection['shape_features']
+            if 'spatial_features' in candidate_detection:
+                candidate_features['spatial'] = candidate_detection['spatial_features']
+            
+            # 如果上面没有找到，尝试从features字段提取
+            if not candidate_features and 'features' in candidate_detection:
+                features = candidate_detection['features']
+                candidate_features['geometric'] = features.get('geometric', {})
+                candidate_features['appearance'] = features.get('appearance', features.get('color', {}))
+                candidate_features['shape'] = features.get('shape', {})
+                candidate_features['spatial'] = features.get('spatial', {})
+            
+            print(f"[SIMILARITY] 参考特征类型: {list(reference_features.keys())}")
+            print(f"[SIMILARITY] 候选特征类型: {list(candidate_features.keys())}")
+            
+            # 🔧 使用修复后的相似度计算方法
+            similarity_result = self.similarity_calculator.calculate_comprehensive_similarity(
+                reference_features, 
+                candidate_features, 
+                waypoint_data
+            )
+            
+            final_score = similarity_result.get('final_score', 0.0)
+            breakdown = similarity_result.get('breakdown', {})
+            
+            print(f"[SIMILARITY] 相似度分解:")
+            for feature_type, score in breakdown.items():
+                print(f"  - {feature_type}: {score:.3f}")
+            print(f"[SIMILARITY] 最终得分: {final_score:.3f}")
+            
+            return final_score
+            
+        except Exception as e:
+            print(f"[SIMILARITY] 相似度计算失败: {e}")
+            import traceback
+            traceback.print_exc()
+            return 0.0
+        
     def _extract_candidate_features(self, candidate: Dict, image: np.ndarray,
                                    depth: np.ndarray, waypoint_data: Dict) -> Dict:
-        """为候选检测提取特征"""
-        # 这里应该使用与Detect模块相同的特征提取逻辑
-        # 为了简化，我们假设candidate已经包含了基本特征
-        # 在实际实现中，需要调用enhanced_detection_pipeline的特征提取方法
-        
-        # 获取基本信息
-        bbox = candidate.get('bounding_box', [0, 0, 100, 100])
-        mask = candidate.get('mask', np.zeros((image.shape[0], image.shape[1]), dtype=bool))
-        
-        # 提取空间特征
-        spatial_features = self.object_analyzer.calculate_3d_spatial_features(
-            mask, depth, waypoint_data, bbox
-        )
-        
-        # 这里应该调用完整的特征提取器
-        # 为了演示，返回简化的特征结构
-        features = {
-            'geometric': candidate.get('geometric_features', {}),
-            'appearance': candidate.get('appearance_features', {}),
-            'shape': candidate.get('shape_features', {}),
-            'spatial': spatial_features
-        }
-        
-        return features
+        """为候选检测提取特征 - 优化版本"""
+        try:
+            # 🆕 如果candidate已经包含detection_pipeline提取的特征，直接使用
+            if 'geometric_features' in candidate:
+                features = {
+                    'geometric': candidate.get('geometric_features', {}),
+                    'appearance': candidate.get('appearance_features', {}),
+                    'shape': candidate.get('shape_features', {}),
+                    'spatial': candidate.get('spatial_features', {})
+                }
+                
+                # 验证空间特征是否完整，如果不完整则重新计算
+                if not features['spatial'].get('world_coordinates'):
+                    bbox = candidate.get('bounding_box', [0, 0, 100, 100])
+                    mask = candidate.get('mask', np.zeros((image.shape[0], image.shape[1]), dtype=bool))
+                    
+                    spatial_features = self.object_analyzer.calculate_3d_spatial_features(
+                        mask, depth, waypoint_data, bbox
+                    )
+                    features['spatial'] = spatial_features
+                
+                print(f"[ENHANCED_TRACKER] 使用detection_pipeline提取的特征")
+                return features
+            
+            # 🆕 如果没有预提取特征，执行完整特征提取（备用方案）
+            else:
+                bbox = candidate.get('bounding_box', [0, 0, 100, 100])
+                mask = candidate.get('mask', np.zeros((image.shape[0], image.shape[1]), dtype=bool))
+                
+                # 调用完整的特征提取管道
+                spatial_features = self.object_analyzer.calculate_3d_spatial_features(
+                    mask, depth, waypoint_data, bbox
+                )
+                
+                # 这里可以调用其他特征提取器
+                # geometric_features = self.extract_geometric_features(mask, depth)
+                # appearance_features = self.extract_appearance_features(image, mask)
+                # shape_features = self.extract_shape_features(mask)
+                
+                features = {
+                    'geometric': {},  # 暂时为空，可以后续添加
+                    'appearance': {},
+                    'shape': {},
+                    'spatial': spatial_features
+                }
+                
+                print(f"[ENHANCED_TRACKER] 执行完整特征提取")
+                return features
+                
+        except Exception as e:
+            print(f"[ENHANCED_TRACKER] 特征提取失败: {e}")
+            return {
+                'geometric': {},
+                'appearance': {},
+                'shape': {},
+                'spatial': {}
+            }
     
     def _get_adaptive_threshold(self, target_info: Dict, confidence: float) -> float:
         """获取自适应阈值"""
@@ -362,7 +865,7 @@ class EnhancedTracker:
             spatial_features = candidate_data['features'].get('spatial', {})
             world_coordinates = spatial_features.get('world_coordinates', [0, 0, 0])
             gripper_info = spatial_features.get('gripper_width_info', {})
-            
+            angle = gripper_info.get('angle', 0.0)
             # 构建追踪结果
             tracking_result = {
                 'target_id': target_id,
@@ -376,7 +879,8 @@ class EnhancedTracker:
                     'y': float(world_coordinates[1]),
                     'z': float(world_coordinates[2])
                 },
-                
+               
+
                 # 物体抓取信息
                 'object_info': {
                     'object_id': target_id,
@@ -661,3 +1165,78 @@ class EnhancedTracker:
         except Exception as e:
             print(f"[ENHANCED_TRACKER] 获取性能报告失败: {e}")
             return {'error': str(e)}
+    
+    def _validate_position_continuity(self, candidate_coord: Dict, max_jump: float = 150.0) -> float:
+        """验证位置连续性，返回位置合理性分数"""
+        try:
+            if not self.position_history:
+                return 1.0  # 没有历史位置，认为合理
+            
+            last_known_coord = self.position_history[-1]
+            
+            distance = math.sqrt(
+                (candidate_coord['x'] - last_known_coord['x'])**2 +
+                (candidate_coord['y'] - last_known_coord['y'])**2 +
+                (candidate_coord['z'] - last_known_coord['z'])**2
+            )
+            
+            print(f"[POSITION_CONTINUITY] 位置跳跃检查: {distance:.1f}mm (阈值: {max_jump}mm)")
+            
+            # 距离越大，合理性越低
+            if distance > max_jump:
+                continuity_score = max(0.1, 1.0 - (distance - max_jump) / max_jump)
+                print(f"[POSITION_CONTINUITY] 位置跳跃过大，合理性分数: {continuity_score:.3f}")
+                return continuity_score
+            else:
+                print(f"[POSITION_CONTINUITY] 位置变化合理")
+                return 1.0
+                
+        except Exception as e:
+            print(f"[POSITION_CONTINUITY] 位置连续性验证失败: {e}")
+            return 1.0  # 异常时认为合理
+
+    def _detect_occlusion(self, current_confidence: float, candidate_features: Dict) -> float:
+        """检测遮挡情况，返回遮挡分数 (0-1, 1表示严重遮挡)"""
+        try:
+            occlusion_score = 0.0
+            
+            # 1. 置信度突然下降
+            if len(self.confidence_history) >= 2:
+                confidence_drop = self.confidence_history[-1] - current_confidence
+                if confidence_drop > 0.2:  # 置信度下降超过0.2
+                    occlusion_score += 0.4
+                    print(f"[OCCLUSION] 检测到置信度突然下降: {confidence_drop:.3f}")
+            
+            # 2. 外观特征异常
+            appearance_features = candidate_features.get('appearance', {})
+            if appearance_features:
+                # 检查亮度变化
+                mean_brightness = (appearance_features.get('mean_r', 128) + 
+                                 appearance_features.get('mean_g', 128) + 
+                                 appearance_features.get('mean_b', 128)) / 3
+                
+                if mean_brightness < 80:  # 亮度过低，可能被遮挡
+                    occlusion_score += 0.3
+                    print(f"[OCCLUSION] 检测到亮度异常: {mean_brightness:.1f}")
+            
+            # 3. 形状特征异常（如果有的话）
+            shape_features = candidate_features.get('shape', {})
+            if shape_features and hasattr(self, 'last_shape_features'):
+                # 简单的形状变化检测
+                shape_change = abs(shape_features.get('circularity', 0.5) - 
+                                 self.last_shape_features.get('circularity', 0.5))
+                if shape_change > 0.3:
+                    occlusion_score += 0.2
+                    print(f"[OCCLUSION] 检测到形状异常变化: {shape_change:.3f}")
+            
+            self.last_shape_features = shape_features.copy() if shape_features else {}
+            
+            occlusion_score = min(1.0, occlusion_score)
+            if occlusion_score > 0.3:
+                print(f"[OCCLUSION] 遮挡分数: {occlusion_score:.3f}")
+            
+            return occlusion_score
+            
+        except Exception as e:
+            print(f"[OCCLUSION] 遮挡检测失败: {e}")
+            return 0.0

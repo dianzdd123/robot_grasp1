@@ -143,11 +143,22 @@ class ConfigManager:
                     print(f"[CONFIG] 缺少必要配置段: {section}")
                     return False
             
-            # 检查模型文件是否存在
-            model_paths = self.get_model_paths()
-            for name, path in model_paths.items():
+            # 检查关键模型文件是否存在
+            detector_config = self.get_detector_config()
+            yolo_path = detector_config.get('model_path', '')
+            
+            segmentor_config = self.get_segmentor_config()
+            sam2_checkpoint = segmentor_config.get('checkpoint', '')
+            
+            # 只检查重要的文件路径
+            critical_files = {
+                'yolo_model': yolo_path,
+                'sam2_checkpoint': sam2_checkpoint
+            }
+            
+            for name, path in critical_files.items():
                 if path and not os.path.exists(path):
-                    print(f"[CONFIG] 模型文件不存在: {name} = {path}")
+                    print(f"[CONFIG] 关键模型文件不存在: {name} = {path}")
                     return False
             
             print(f"[CONFIG] 配置验证通过")

@@ -9,7 +9,7 @@ import json
 from .utils.config_manager import ConfigManager
 from .utils.model_factory import ModelFactory
 from .features.color_features import ColorFeatureExtractor
-from .features.shape_features import ShapeFeatureExtractor
+from .features.shape_features import EnhancedShapeFeatureExtractor
 from .features.spatial_features import SpatialFeatureExtractor
 
 class DetectionPipeline:
@@ -73,7 +73,7 @@ class DetectionPipeline:
         )
         
         # 形状特征提取器
-        self.shape_extractor = ShapeFeatureExtractor()
+        self.shape_extractor = EnhancedShapeFeatureExtractor()
         
         # 空间特征提取器
         camera_intrinsics = camera_config.get('intrinsics', {})

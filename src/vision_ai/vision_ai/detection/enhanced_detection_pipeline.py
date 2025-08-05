@@ -309,22 +309,42 @@ class EnhancedDetectionPipeline:
             print(f"[POST_PROCESSING_SUMMARY] Logging failed: {e}")
 
     def _generate_enhanced_visualization(self, image_rgb: np.ndarray, objects: List[Dict]) -> np.ndarray:
-        """生成增强可视化 - 包含后处理信息"""
+        """生成增强可视化 - 添加详细调试信息"""
         try:
-            print(f"[VISUALIZATION] Generating enhanced visualization for {len(objects)} objects")
+            print(f"[VISUALIZATION_DEBUG] 开始生成可视化，对象数量: {len(objects)}")
             
-            # 亮度增强
+            # 检查输入对象数据
+            for i, obj in enumerate(objects):
+                print(f"[VISUALIZATION_DEBUG] 对象 {i+1} 数据检查:")
+                print(f"  - class_name: {obj.get('class_name', 'MISSING')}")
+                print(f"  - confidence: {obj.get('confidence', 'MISSING')}")
+                print(f"  - features keys: {list(obj.get('features', {}).keys())}")
+                
+                # 检查特征数据
+                features = obj.get('features', {})
+                if 'appearance' in features:
+                    color_name = features['appearance'].get('color_name', 'MISSING')
+                    print(f"  - color_name: {color_name}")
+                else:
+                    print(f"  - appearance features: MISSING")
+                
+                if 'spatial' in features:
+                    height_mm = features['spatial'].get('height_mm', 'MISSING')
+                    print(f"  - height_mm: {height_mm}")
+                else:
+                    print(f"  - spatial features: MISSING")
+            
+            # ... 原有的亮度增强代码 ...
             vis_image = image_rgb.copy().astype(np.float32)
             mean_brightness = np.mean(vis_image)
             if mean_brightness < 120:
                 vis_image = np.clip(vis_image * 1.2, 0, 255)
             vis_image = vis_image.astype(np.uint8)
             
-            # 创建统一的mask覆盖层
+            # ... 原有的mask处理代码 ...
             mask_overlay = np.zeros_like(vis_image, dtype=np.float32)
             combined_mask = np.zeros((vis_image.shape[0], vis_image.shape[1]), dtype=bool)
             
-            # 颜色调色板
             colors = [
                 (255, 120, 120), (120, 255, 120), (120, 180, 255), (255, 255, 120),
                 (255, 120, 255), (120, 255, 255), (255, 180, 120), (200, 255, 180)
@@ -336,10 +356,8 @@ class EnhancedDetectionPipeline:
                 if mask is not None and isinstance(mask, np.ndarray):
                     mask_bool = mask > 0.5 if mask.dtype != bool else mask
                     if mask_bool.shape[:2] == vis_image.shape[:2]:
-                        #  为合并的检测使用特殊颜色
                         post_info = obj.get('post_processing_info', {})
                         if post_info.get('was_merged', False):
-                            # 合并的检测使用更亮的颜色
                             color = tuple(min(255, c + 30) for c in colors[i % len(colors)])
                         else:
                             color = colors[i % len(colors)]
@@ -348,7 +366,7 @@ class EnhancedDetectionPipeline:
                         combined_mask = combined_mask | mask_bool
                         valid_objects.append((i, obj, mask_bool, color))
             
-            # 应用浅色mask覆盖
+            # 应用mask覆盖
             if len(valid_objects) > 0:
                 alpha = 0.3
                 vis_image_float = vis_image.astype(np.float32)
@@ -356,67 +374,175 @@ class EnhancedDetectionPipeline:
                                                 mask_overlay[combined_mask] * alpha)
                 vis_image = np.clip(vis_image_float, 0, 255).astype(np.uint8)
             
-            # 绘制对象
+            # 绘制对象 - 增强调试版本
             font = cv2.FONT_HERSHEY_SIMPLEX
-            for i, obj, mask_bool, color in valid_objects:
+            for obj_idx, (i, obj, mask_bool, color) in enumerate(valid_objects):
+                print(f"[VISUALIZATION_DEBUG] 开始绘制对象 {obj_idx+1}")
+                
                 # 计算mask中心点
                 center_x, center_y = self._calculate_mask_center(mask_bool)
                 bbox = obj['bounding_box']
                 x1, y1, x2, y2 = map(int, bbox)
                 
-                #  为合并的检测绘制特殊边框
+                print(f"  - 中心点: ({center_x}, {center_y})")
+                print(f"  - 边界框: ({x1}, {y1}, {x2}, {y2})")
+                
+                # 绘制边框和中心点
                 post_info = obj.get('post_processing_info', {})
                 if post_info.get('was_merged', False):
-                    # 双重边框表示合并的检测
                     cv2.rectangle(vis_image, (x1-2, y1-2), (x2+2, y2+2), (255, 255, 255), 2)
                     cv2.rectangle(vis_image, (x1, y1), (x2, y2), color, 3)
                 else:
-                    cv2.rectangle(vis_image, (x1, y1), (x2, y2), color, 3)
+                    cv2.rectangle(vis_image, (x1, y1), (x2, y2), color, 2)
                 
                 # 绘制中心点
                 cv2.circle(vis_image, (center_x, center_y), 12, color, -1)
                 cv2.circle(vis_image, (center_x, center_y), 15, (255, 255, 255), 2)
                 
                 # 绘制编号
-                number_text = str(i + 1)
+                number_text = str(obj_idx + 1)
                 text_size = cv2.getTextSize(number_text, font, 0.8, 2)[0]
                 text_x = center_x - text_size[0] // 2
                 text_y = center_y + text_size[1] // 2
-                cv2.putText(vis_image, number_text, (text_x, text_y), font, 0.8, (0, 0, 0), 3)
-                cv2.putText(vis_image, number_text, (text_x, text_y), font, 0.8, (255, 255, 255), 2)
                 
-                # 生成英文描述
-                description = self._generate_english_description(obj)
+                # 白色背景 + 黑色文字
+                cv2.circle(vis_image, (center_x, center_y), 18, (255, 255, 255), -1)
+                cv2.circle(vis_image, (center_x, center_y), 18, color, 3)
+                cv2.putText(vis_image, number_text, (text_x, text_y), font, 0.8, (0, 0, 0), 2)
                 
-                #  为合并的检测添加标记
+                # 生成英文描述 - 添加调试
+                print(f"  - 开始生成英文描述...")
+                try:
+                    description = self._generate_english_description(obj)
+                    print(f"  - 生成的描述: '{description}'")
+                except Exception as desc_error:
+                    print(f"  - 描述生成失败: {desc_error}")
+                    description = f"Object {obj_idx+1} (conf:{obj.get('confidence', 0):.2f})"
+                
+                # 为合并的检测添加标记
                 if post_info.get('was_merged', False):
                     description += f" [M{post_info['merged_from_count']}]"
+                    print(f"  - 添加合并标记后: '{description}'")
                 
                 # 智能标签位置
-                label_positions = [(x1, y1 - 10), (x1, y2 + 25), (x2 + 10, y1 + 20)]
+                label_positions = [(x1, y1 + 5), (x1, y2 - 25), (x2 - 10, y1 - 20)]
                 label_x, label_y = label_positions[0]
                 for pos_x, pos_y in label_positions:
-                    if pos_x >= 0 and pos_y >= 20 and pos_x + 300 < vis_image.shape[1]:
+                    if pos_x >= 0 and pos_y >= 20 and pos_x + 400 < vis_image.shape[1]:
                         label_x, label_y = pos_x, pos_y
                         break
                 
-                # 绘制标签
-                label_width = len(description) * 8
-                cv2.rectangle(vis_image, (label_x - 3, label_y - 18), 
-                            (label_x + label_width, label_y + 8), color, -1)
-                cv2.putText(vis_image, description, (label_x, label_y), 
-                        font, 0.5, (255, 255, 255), 1)
+                print(f"  - 标签位置: ({label_x}, {label_y})")
+                
+                # 绘制标签 - 改进版本（白底黑字）
+                label_width = max(200, len(description) * 8)  # 确保最小宽度
+                label_height = 25
+                
+                # 确保标签在图像范围内
+                if label_x + label_width > vis_image.shape[1]:
+                    label_x = vis_image.shape[1] - label_width - 10
+                if label_y < 25:
+                    label_y = 25
+                
+                try:
+                    # 绘制白色背景
+                    cv2.rectangle(vis_image, (label_x - 5, label_y - 20), 
+                                (label_x + label_width, label_y + 5), (255, 255, 255), -1)
+                    
+                    # 绘制彩色边框
+                    cv2.rectangle(vis_image, (label_x - 5, label_y - 20), 
+                                (label_x + label_width, label_y + 5), color, 2)
+                    
+                    # 绘制黑色文字
+                    cv2.putText(vis_image, description, (label_x, label_y), 
+                                font, 0.6, (0, 0, 0), 2)  # 加粗黑色文字
+                    
+                    print(f"  - 标签绘制成功")
+                    
+                except Exception as draw_error:
+                    print(f"  - 标签绘制失败: {draw_error}")
+                    # 备用简化绘制
+                    cv2.putText(vis_image, f"Obj{obj_idx+1}", (label_x, label_y), 
+                                font, 0.6, (0, 0, 0), 2)
             
-            #  添加后处理信息到图像底部
+            # 添加信息面板
             self._add_post_processing_info_panel(vis_image, objects)
             
+            print(f"[VISUALIZATION_DEBUG] 可视化生成完成")
+            description_lines = []
+            for obj_idx, (i, obj, mask_bool, color) in enumerate(valid_objects):
+                # 生成详细描述
+                features = obj.get('features', {})
+                class_name = obj['class_name']
+                confidence = obj['confidence']
+                object_id = obj.get('object_id', f"{class_name}_{obj_idx}")
+                
+                # 获取颜色和高度信息
+                color_name = features.get('appearance', {}).get('color_name', '')
+                height_mm = features.get('spatial', {}).get('height_mm', 0)
+                distance = features.get('spatial', {}).get('distance_to_camera')
+                
+                # 构建描述
+                desc_parts = []
+                if color_name and color_name != 'unknown':
+                    desc_parts.append(color_name.capitalize())
+                desc_parts.append(class_name)
+                
+                # 高度描述
+                if height_mm > 0:
+                    if height_mm < 20:
+                        desc_parts.append("(flat)")
+                    elif height_mm < 80:
+                        desc_parts.append("(low)")
+                    elif height_mm < 120:
+                        desc_parts.append("(medium height)")
+                    else:
+                        desc_parts.append("(tall)")
+                
+                # 距离描述
+                if distance is not None:
+                    if distance < 0.3:
+                        desc_parts.append("nearby")
+                    elif distance < 0.6:
+                        desc_parts.append("at medium distance")
+                    else:
+                        desc_parts.append("far")
+                
+                full_description = f"{obj_idx + 1}. {' '.join(desc_parts)} (ID: {object_id}, confidence: {confidence:.3f})"
+                description_lines.append(full_description)
+
+            # 扩展画布以容纳描述
+            if description_lines:
+                line_height = 25
+                padding = 20
+                bottom_space = len(description_lines) * line_height + padding * 2
+                
+                # 创建新的扩展画布
+                extended_height = vis_image.shape[0] + bottom_space
+                extended_image = np.ones((extended_height, vis_image.shape[1], 3), dtype=np.uint8) * 240  # 浅灰背景
+                
+                # 复制原图到新画布
+                extended_image[:vis_image.shape[0], :] = vis_image
+                
+                # 绘制描述文本
+                font = cv2.FONT_HERSHEY_SIMPLEX
+                font_scale = 0.6
+                font_thickness = 1
+                
+                for i, desc in enumerate(description_lines):
+                    y_pos = vis_image.shape[0] + padding + (i + 1) * line_height
+                    cv2.putText(extended_image, desc, (10, y_pos), 
+                            font, font_scale, (0, 0, 0), font_thickness)
+                
+                vis_image = extended_image
             return vis_image
             
         except Exception as e:
-            print(f"[VISUALIZATION] Generation failed: {e}")
+            print(f"[VISUALIZATION_DEBUG] 可视化生成失败: {e}")
             import traceback
             traceback.print_exc()
             return None
+        
     def _add_post_processing_info_panel(self, vis_image: np.ndarray, objects: List[Dict]):
         """添加后处理信息面板"""
         try:
@@ -496,7 +622,6 @@ class EnhancedDetectionPipeline:
         try:
             features = obj.get('features', {})
             class_name = obj['class_name']
-            confidence = obj['confidence']
             
             # 颜色信息
             color_name = features.get('appearance', {}).get('color_name', '')
@@ -505,138 +630,16 @@ class EnhancedDetectionPipeline:
             else:
                 color_desc = ''
             
-            # 高度信息
-            height_mm = features.get('spatial', {}).get('height_mm', 0)
-            if height_mm > 0:
-                height_desc = f"{height_mm:.0f}mm"
-            else:
-                height_desc = ''
-            
             # 组合描述
             parts = []
             if color_desc:
                 parts.append(color_desc)
             parts.append(class_name)
-            if height_desc:
-                parts.append(f"h:{height_desc}")
-            parts.append(f"conf:{confidence:.2f}")
             
             return ' '.join(parts)
             
         except Exception:
             return f"{obj.get('class_name', 'object')} conf:{obj.get('confidence', 0):.2f}"
-
-
-    def _add_info_panel(self, vis_image: np.ndarray, objects: List[Dict]):
-        """在图像上添加信息面板"""
-        try:
-            # 在图像底部添加信息条
-            panel_height = 60
-            panel_y = vis_image.shape[0] - panel_height
-            
-            # 创建半透明背景
-            overlay = vis_image.copy()
-            cv2.rectangle(overlay, (0, panel_y), (vis_image.shape[1], vis_image.shape[0]), 
-                        (0, 0, 0), -1)
-            cv2.addWeighted(overlay, 0.7, vis_image, 0.3, 0, vis_image)
-            
-            # 添加文字信息
-            font = cv2.FONT_HERSHEY_SIMPLEX
-            info_text = f"Enhanced Detection: {len(objects)} objects detected"
-            avg_quality = np.mean([obj.get('quality_score', 0) for obj in objects])
-            quality_text = f"Avg Feature Quality: {avg_quality:.1f}%"
-            
-            cv2.putText(vis_image, info_text, (10, panel_y + 20), 
-                    font, 0.6, (255, 255, 255), 2)
-            cv2.putText(vis_image, quality_text, (10, panel_y + 40), 
-                    font, 0.6, (255, 255, 255), 2)
-            
-            # 在右侧添加时间戳
-            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            cv2.putText(vis_image, timestamp, (vis_image.shape[1] - 200, panel_y + 30), 
-                    font, 0.5, (200, 200, 200), 1)
-            
-        except Exception as e:
-            print(f"[INFO_PANEL] 添加信息面板失败: {e}")
-
-
-    # def _calculate_3d_center_point(self, mask: np.ndarray, features: Dict) -> Tuple[int, int]:
-    #     """
-    #     计算物体的3D中心点在2D图像中的投影位置
-        
-    #     Args:
-    #         mask: 物体mask
-    #         features: 物体特征（包含3D信息）
-            
-    #     Returns:
-    #         center_x, center_y: 3D中心点的2D投影坐标
-    #     """
-    #     try:
-    #         # 方法1: 如果有3D空间信息，优先使用
-    #         spatial_features = features.get('spatial', {})
-            
-    #         # 检查是否有3D质心信息
-    #         centroid_3d_camera = spatial_features.get('centroid_3d_camera')
-    #         if centroid_3d_camera and len(centroid_3d_camera) == 3:
-    #             # 如果有相机坐标系的3D质心，投影到2D
-    #             cam_x, cam_y, cam_z = centroid_3d_camera
-                
-    #             # 使用相机内参投影到2D（需要相机内参）
-    #             fx = getattr(self, 'camera_fx', 912.7)  # 默认焦距
-    #             fy = getattr(self, 'camera_fy', 910.3)
-    #             cx = getattr(self, 'camera_cx', 624.0)
-    #             cy = getattr(self, 'camera_cy', 320.7)
-                
-    #             if cam_z > 0.01:  # 有效深度
-    #                 pixel_x = int(cam_x * fx / cam_z + cx)
-    #                 pixel_y = int(cam_y * fy / cam_z + cy)
-                    
-    #                 # 检查投影点是否在图像范围内
-    #                 if (0 <= pixel_x < mask.shape[1] and 0 <= pixel_y < mask.shape[0]):
-    #                     print(f"[3D_CENTER] 使用3D质心投影: ({pixel_x}, {pixel_y})")
-    #                     return pixel_x, pixel_y
-            
-    #         # 方法2: 使用2D质心但考虑高度信息调整
-    #         mask_indices = np.where(mask > 0)
-    #         if len(mask_indices[0]) > 0:
-    #             # 基础2D质心
-    #             centroid_2d_y = np.mean(mask_indices[0])
-    #             centroid_2d_x = np.mean(mask_indices[1])
-                
-    #             # 获取物体高度信息
-    #             height_mm = spatial_features.get('height_mm', 0)
-                
-    #             # 根据高度调整Y坐标（高物体中心点稍微上移）
-    #             if height_mm > 50:  # 高物体（>50mm）
-    #                 # 向上偏移，偏移量与高度成正比
-    #                 height_offset = min(0, height_mm / 5)  # 最多上移20像素
-    #                 centroid_2d_y -= height_offset
-    #                 print(f"[3D_CENTER] 高物体调整: 高度{height_mm}mm, 上移{height_offset}像素")
-                
-    #             center_x = int(centroid_2d_x)
-    #             center_y = int(centroid_2d_y)
-                
-    #             print(f"[3D_CENTER] 使用2D质心+高度调整: ({center_x}, {center_y})")
-    #             return center_x, center_y
-            
-    #         # 方法3: fallback到bbox中心
-    #         bbox = features.get('bbox', [0, 0, 100, 100])
-    #         if len(bbox) >= 4:
-    #             center_x = int((bbox[0] + bbox[2]) / 2)
-    #             center_y = int((bbox[1] + bbox[3]) / 2)
-    #             print(f"[3D_CENTER] 使用bbox中心: ({center_x}, {center_y})")
-    #             return center_x, center_y
-            
-    #         # 默认返回
-    #         return 100, 100
-            
-    #     except Exception as e:
-    #         print(f"[3D_CENTER] 计算3D中心点失败: {e}")
-    #         # fallback到mask质心
-    #         mask_indices = np.where(mask > 0)
-    #         if len(mask_indices[0]) > 0:
-    #             return int(np.mean(mask_indices[1])), int(np.mean(mask_indices[0]))
-    #         return 100, 100
     
     def _extract_enhanced_features(self, image_rgb: np.ndarray, mask: np.ndarray,
                                 depth_image: np.ndarray, waypoint_data: Dict,
@@ -1143,3 +1146,99 @@ class EnhancedDetectionPipeline:
             
         except Exception as e:
             print(f"[PUBLISH] 发布可视化消息失败: {e}")
+    def process_single_image(self, image_rgb: np.ndarray, 
+                        depth_image: Optional[np.ndarray] = None,
+                        camera_pose: Optional[Dict] = None) -> Dict:
+        """
+        处理单张图像 - 用于追踪系统的实时检测
+        
+        Args:
+            image_rgb: RGB图像 (H, W, 3)
+            depth_image: 深度图像 (H, W)，可选
+            camera_pose: 相机位姿，可选
+            
+        Returns:
+            result: 检测结果字典，包含objects列表
+        """
+        try:
+            print(f"[ENHANCED_PIPELINE] 开始处理单张图像...")
+            
+            # 🔧 确保RGB和深度图像分辨率匹配
+            if image_rgb.shape[:2] != depth_image.shape:
+                print(f'[ENHANCED_PIPELINE] 调整深度图像分辨率: {depth_image.shape} -> {image_rgb.shape[:2]}')
+                depth_image = cv2.resize(
+                    depth_image, 
+                    (image_rgb.shape[1], image_rgb.shape[0]), 
+                    interpolation=cv2.INTER_LINEAR
+                )
+            
+            # 1. YOLO检测
+            boxes, class_ids, confidences = self.detector.detect(image_rgb)
+            
+            if len(boxes) == 0:
+                print("[ENHANCED_PIPELINE] 未检测到任何目标")
+                return {'objects': []}
+            
+            print(f"[ENHANCED_PIPELINE] YOLO检测到 {len(boxes)} 个目标")
+            
+            # 2. SAM2分割
+            masks = self.segmentor.segment(image_rgb, boxes)
+            print("[ENHANCED_PIPELINE] SAM2分割完成")
+            
+            # 3. 处理检测结果（不使用3D后处理，避免合并）
+            objects = []
+            class_names = self.detector.get_class_names()
+            
+            for i, (box, class_id, confidence, mask) in enumerate(zip(boxes, class_ids, confidences, masks)):
+                try:
+                    class_name = class_names.get(class_id, f'class_{class_id}')
+                    
+                    # 🔧 安全的特征提取，确保mask和图像尺寸匹配
+                    if mask.shape != image_rgb.shape[:2]:
+                        print(f'[ENHANCED_PIPELINE] 调整mask尺寸: {mask.shape} -> {image_rgb.shape[:2]}')
+                        mask = cv2.resize(
+                            mask.astype(np.uint8), 
+                            (image_rgb.shape[1], image_rgb.shape[0]), 
+                            interpolation=cv2.INTER_NEAREST
+                        ).astype(bool)
+                    
+                    # 🔧 构建waypoint数据（如果没有提供camera_pose）
+                    if camera_pose is None:
+                        camera_pose = {
+                            'world_pos': [0, 0, 350],
+                            'roll': 179, 'pitch': 0, 'yaw': 0
+                        }
+                    
+                    # 提取增强特征
+                    features = self._extract_enhanced_features(
+                        image_rgb, mask, depth_image, camera_pose, box.tolist()
+                    )
+                    
+                    obj = {
+                        'bounding_box': box.tolist(),
+                        'confidence': float(confidence),
+                        'class_id': int(class_id),
+                        'class_name': class_name,
+                        'mask': mask,
+                        'features': features
+                    }
+                    
+                    objects.append(obj)
+                    
+                except Exception as e:
+                    print(f'[ENHANCED_PIPELINE] 处理对象 {i} 时出错: {e}')
+                    continue
+            
+            print(f"[ENHANCED_PIPELINE] 单张图像处理完成，检测到 {len(objects)} 个有效目标")
+            
+            return {
+                'objects': objects,
+                'image_shape': image_rgb.shape,
+                'depth_shape': depth_image.shape if depth_image is not None else None
+            }
+            
+        except Exception as e:
+            print(f"[ENHANCED_PIPELINE] 单张图像处理失败: {e}")
+            import traceback
+            traceback.print_exc()
+            return {'objects': []}

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-
+import json
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Pose, Point, Quaternion, PoseStamped
@@ -86,7 +86,9 @@ class XArmControllerNode(Node):
         self.arm_state_pub = self.create_publisher(String, '/xarm/state', 10)
         self.gripper_state_pub = self.create_publisher(Float64, '/xarm/gripper_position', 10)
         self.gripper_status_pub = self.create_publisher(String, '/xarm/gripper_status', 10)
-        
+        self.movement_complete_pub = self.create_publisher(
+        String, '/xarm/movement_complete', 10
+        )
         # 创建订阅者
         self.target_pose_sub = self.create_subscription(
             PoseStamped, '/xarm/target_pose', self.target_pose_callback, 10)
@@ -244,7 +246,7 @@ class XArmControllerNode(Node):
             self.get_logger().error(f'初始化移动异常: {e}')
 
     def publish_status(self):
-        """发布机械臂状态信息"""
+        """发布机械臂状态信息 - 修复角度转换"""
         try:
             current_time = self.get_clock().now().to_msg()
             
@@ -269,12 +271,26 @@ class XArmControllerNode(Node):
                 pose_msg.pose.position.y = position[1] 
                 pose_msg.pose.position.z = position[2]
                 
-                # 姿态转换
-                roll, pitch, yaw = position[3], position[4], position[5]
+                # 🔧 关键修复：角度转换
+                roll_deg, pitch_deg, yaw_deg = position[3], position[4], position[5]
+                
+                # 🆕 添加调试信息
+                self.get_logger().debug(f'xArm原始角度(度): roll={roll_deg:.2f}, pitch={pitch_deg:.2f}, yaw={yaw_deg:.2f}')
+                
+                # 🔧 修复：转换为弧度后再计算四元数
+                roll = math.radians(roll_deg)
+                pitch = math.radians(pitch_deg) 
+                yaw = math.radians(yaw_deg)
+                
+                # 四元数计算（使用弧度）
                 qx = math.sin(roll/2) * math.cos(pitch/2) * math.cos(yaw/2) - math.cos(roll/2) * math.sin(pitch/2) * math.sin(yaw/2)
                 qy = math.cos(roll/2) * math.sin(pitch/2) * math.cos(yaw/2) + math.sin(roll/2) * math.cos(pitch/2) * math.sin(yaw/2)
                 qz = math.cos(roll/2) * math.cos(pitch/2) * math.sin(yaw/2) - math.sin(roll/2) * math.sin(pitch/2) * math.cos(yaw/2)
                 qw = math.cos(roll/2) * math.cos(pitch/2) * math.cos(yaw/2) + math.sin(roll/2) * math.sin(pitch/2) * math.sin(yaw/2)
+                
+                # 🆕 验证转换：将四元数转回欧拉角进行验证
+                verify_roll, verify_pitch, verify_yaw = self.quat_to_euler(qx, qy, qz, qw)
+                self.get_logger().debug(f'四元数验证角度(度): roll={verify_roll:.2f}, pitch={verify_pitch:.2f}, yaw={verify_yaw:.2f}')
                 
                 pose_msg.pose.orientation.x = qx
                 pose_msg.pose.orientation.y = qy
@@ -664,6 +680,19 @@ class XArmControllerNode(Node):
             else:
                 self.get_logger().error(f'❌ Failed at waypoint {i+1}, error: {code}')
                 return False
+        
+        # 🆕 路径执行完成后发布移动完成信号
+        try:
+            movement_complete_msg = String()
+            movement_complete_msg.data = json.dumps({
+                'status': 'movement_completed',
+                'final_position': path[-1] if path else [0, 0, 0],
+                'timestamp': time.time()
+            })
+            self.movement_complete_pub.publish(movement_complete_msg)
+            self.get_logger().info('📡 移动完成信号已发布')
+        except Exception as e:
+            self.get_logger().error(f'发布移动完成信号失败: {e}')
         
         return True
 

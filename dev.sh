@@ -33,32 +33,32 @@ if [ "$1" = "full_system" ]; then
     tmux send-keys -t vision_ai:3.1 'echo "ros2 topic echo /detection_result"' Enter
     tmux send-keys -t vision_ai:3.1 'echo "ros2 topic echo /stitching_complete"' Enter
     tmux send-keys -t vision_ai:3.1 'echo "ros2 node list"' Enter
-    # 🆕 窗口5：追踪系统主控制台
-    tmux new-window -t vision_ai:5
-    tmux send-keys -t vision_ai:5 'echo "🎯 追踪系统主控制台"' Enter
-    tmux send-keys -t vision_ai:5 'echo "═══════════════════════════════════════"' Enter
-    tmux send-keys -t vision_ai:5 'echo "正在启动追踪节点..."' Enter
-    tmux send-keys -t vision_ai:5 'cd ~/ros2_ws && source install/setup.bash' Enter
-    tmux send-keys -t vision_ai:5 'echo ""' Enter
-    tmux send-keys -t vision_ai:5 'echo "🚀 启动追踪节点..."' Enter
-    tmux send-keys -t vision_ai:5 'sleep 2' Enter
-    tmux send-keys -t vision_ai:5 'ros2 run vision_ai tracking_node' Enter
+    # 🆕 窗口4：追踪系统主控制台
+    tmux new-window -t vision_ai:4
+    tmux send-keys -t vision_ai:4 'echo "🎯 追踪系统主控制台"' Enter
+    tmux send-keys -t vision_ai:4 'echo "═══════════════════════════════════════"' Enter
+    tmux send-keys -t vision_ai:4 'echo "正在启动追踪节点..."' Enter
+    tmux send-keys -t vision_ai:4 'cd ~/ros2_ws && source install/setup.bash' Enter
+    tmux send-keys -t vision_ai:4 'echo ""' Enter
+    tmux send-keys -t vision_ai:4 'echo "🚀 启动追踪节点..."' Enter
+    tmux send-keys -t vision_ai:4 'sleep 2' Enter
+    tmux send-keys -t vision_ai:4 'ros2 run vision_ai tracking_node' Enter
 
     # 右侧分屏：追踪状态监控和控制
-    tmux split-window -h -t vision_ai:5
-    tmux send-keys -t vision_ai:5.1 'echo "📊 追踪状态监控与控制"' Enter
-    tmux send-keys -t vision_ai:5.1 'echo "═══════════════════════════════════════"' Enter
-    tmux send-keys -t vision_ai:5.1 'cd ~/ros2_ws && source install/setup.bash' Enter
-    tmux send-keys -t vision_ai:5.1 'echo ""' Enter
-    tmux send-keys -t vision_ai:5.1 'echo "📋 快捷命令："' Enter
-    tmux send-keys -t vision_ai:5.1 'echo "  📊 追踪状态: ros2 topic echo /tracking/status --once"' Enter
-    tmux send-keys -t vision_ai:5.1 'echo "  🎮 目标位姿: ros2 topic echo /xarm/target_pose --once"' Enter
-    tmux send-keys -t vision_ai:5.1 'echo "  🤏 夹爪控制: ros2 topic echo /xarm/gripper_target --once"' Enter
-    tmux send-keys -t vision_ai:5.1 'echo "  🖼️ 可视化流: ros2 topic echo /tracking/visualization --once"' Enter
-    tmux send-keys -t vision_ai:5.1 'echo "  🚨 紧急停止: ros2 topic pub /tracking/emergency_stop std_msgs/Empty"' Enter
-    tmux send-keys -t vision_ai:5.1 'echo ""' Enter
-    tmux send-keys -t vision_ai:5.1 'echo "等待追踪节点启动..."' Enter
-    tmux send-keys -t vision_ai:5.1 'sleep 3' Enter
+    tmux split-window -h -t vision_ai:4
+    tmux send-keys -t vision_ai:4.1 'echo "📊 追踪状态监控与控制"' Enter
+    tmux send-keys -t vision_ai:4.1 'echo "═══════════════════════════════════════"' Enter
+    tmux send-keys -t vision_ai:4.1 'cd ~/ros2_ws && source install/setup.bash' Enter
+    tmux send-keys -t vision_ai:4.1 'echo ""' Enter
+    tmux send-keys -t vision_ai:4.1 'echo "📋 快捷命令："' Enter
+    tmux send-keys -t vision_ai:4.1 'echo "  📊 追踪状态: ros2 topic echo /tracking/status --once"' Enter
+    tmux send-keys -t vision_ai:4.1 'echo "  🎮 目标位姿: ros2 topic echo /xarm/target_pose --once"' Enter
+    tmux send-keys -t vision_ai:4.1 'echo "  🤏 夹爪控制: ros2 topic echo /xarm/gripper_target --once"' Enter
+    tmux send-keys -t vision_ai:4.1 'echo "  🖼️ 可视化流: ros2 topic echo /tracking/visualization --once"' Enter
+    tmux send-keys -t vision_ai:4.1 'echo "  🚨 紧急停止: ros2 topic pub /tracking/emergency_stop std_msgs/Empty"' Enter
+    tmux send-keys -t vision_ai:4.1 'echo ""' Enter
+    tmux send-keys -t vision_ai:4.1 'echo "等待追踪节点启动..."' Enter
+    tmux send-keys -t vision_ai:4.1 'sleep 3' Enter
     # 连接到会话，默认显示第1个窗口（规划+执行）
     tmux select-window -t vision_ai:1
     tmux attach-session -t vision_ai

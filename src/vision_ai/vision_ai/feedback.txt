@@ -1,164 +1,352 @@
-cd ~/ros2_ws && source install/setup.bash
-ros2 run vision_ai smart_stitcher_node
-qi@wpq:~/ros2_ws$ cd ~/ros2_ws && source install/setup.bash
-qi@wpq:~/ros2_ws$ ros2 run vision_ai smart_stitcher_node
-[INFO] [1752774757.357325996] [smart_stitcher_node]: ✅ 深度对齐映射表创建完成
-[INFO] [1752774757.359081103] [smart_stitcher_node]: 智能拼接节点已启动 (修复内参+深度对齐)
-[INFO] [1752774757.359656597] [smart_stitcher_node]: 彩色相机FOV: 70.1° × 43.2°
-[INFO] [1752774757.360178239] [smart_stitcher_node]: 彩色相机主点: (624.1, 320.7)
-[INFO] [1752774757.360696587] [smart_stitcher_node]: 深度相机主点: (638.8, 351.8)
-[INFO] [1752774800.645340815] [smart_stitcher_node]: 收到拼接请求: 1 张图像
-[INFO] [1752774800.645605595] [smart_stitcher_node]: 🎨 处理Waypoint 0 图像转换...
-[INFO] [1752774800.753862085] [smart_stitcher_node]: 🔍 Waypoint 0 完整信息:
-[INFO] [1752774800.754540318] [smart_stitcher_node]:   - 位置: (-7.5, -245.0, 416.7)
-[INFO] [1752774800.755042382] [smart_stitcher_node]:   - 姿态: Roll=180.0°, Pitch=0.0°, Yaw=-90.0°
-[INFO] [1752774800.755432796] [smart_stitcher_node]:   - 深度对齐: ❌
-[INFO] [1752774800.755840154] [smart_stitcher_node]: 处理单点扫描 (含深度对齐)
-[INFO] [1752774800.778087766] [smart_stitcher_node]: 🆕 创建单点映射信息: Waypoint 0, 尺寸 578×1026
-[INFO] [1752774800.779056177] [smart_stitcher_node]: ✅ 单点映射信息已保存: waypoint_0 -> 578×1026 像素, 深度对齐: ❌
-[INFO] [1752774800.787535070] [smart_stitcher_node]: 单点处理完成: scan_output_20250717_185252/single_point_result_20250717_185320.jpg
-[INFO] [1752774800.789695099] [smart_stitcher_node]: 📢 发布拼接完成信号: scan_output_20250717_185252
-[INFO] [1752774800.949671405] [smart_stitcher_node]: 📸 发布参考图像 (含深度对齐信息)
-[INFO] [1752774800.949986916] [smart_stitcher_node]: 📏 深度数据不可用，跳过深度发布
+[ENHANCED_PIPELINE] SAM2分割完成
+[FEATURES] 开始提取特征，输入: image(720, 1280, 3), mask(720, 1280), depth(720, 1280)
+[FEATURES] 几何特征提取完成: ['hu_moments', 'area', 'perimeter', 'circularity', 'solidity', 'aspect_ratio', 'extent', 'fpfh', 'bbox_dimensions', 'bbox_volume', 'pca_features', 'point_spread', 'shape_context_3d', 'mean_density', 'std_density', 'density_variation', 'centroid_3d', 'surface_normal_stats', 'density_stats', 'density_uniformity']
+[FEATURES] 开始提取特征，输入: image(720, 1280, 3), mask(720, 1280), depth(720, 1280)
+[FEATURES] 几何特征提取完成: ['hu_moments', 'area', 'perimeter', 'circularity', 'solidity', 'aspect_ratio', 'extent', 'fpfh', 'bbox_dimensions', 'bbox_volume', 'pca_features', 'point_spread', 'shape_context_3d', 'mean_density', 'std_density', 'density_variation', 'centroid_3d', 'surface_normal_stats', 'density_stats', 'density_uniformity']
+[ENHANCED_PIPELINE] 单张图像处理完成，检测到 2 个有效目标
+[INFO] [1754339510.423314670] [tracking_node]: 实时检测完成，发现 2 个候选目标
+[INFO] [1754339510.423957047] [tracking_node]: 当前位姿状态 :roll:178.999979,pitch: 0.0, yaw:-89.999981
+[INFO] [1754339510.424510537] [tracking_node]: 📍 当前waypoint数据: {'world_pos': [81.988823, -303.354614, 320.0], 'roll': 178.999979, 'pitch': 0.0, 'yaw': -89.999981, 'timestamp': builtin_interfaces.msg.Time(sec=1754339509, nanosec=341187555)}
+[ENHANCED_TRACKER] 开始追踪目标: lemon_0
+  - 候选检测数量: 2
+[ENHANCED_TRACKER] 同类别候选数量: 2 / 2
+[SIMILARITY] 参考特征类型: ['geometric', 'shape', 'appearance', 'spatial']
+[SIMILARITY] 候选特征类型: ['geometric', 'appearance', 'shape', 'spatial']
+[SIMILARITY_CALC] 开始综合相似度计算
+[SIMILARITY_CALC] 几何相似度: 0.461
+[SIMILARITY_CALC] 形状相似度: 0.955
+[SIMILARITY_CALC] 外观相似度: 0.800
+[SIMILARITY_CALC] 空间相似度: 0.500
+[SIMILARITY_CALC] 综合相似度计算完成: 0.681
+[SIMILARITY] 相似度分解:
+  - geometric: 0.461
+  - shape: 0.955
+  - appearance: 0.800
+  - spatial: 0.500
+[SIMILARITY] 最终得分: 0.681
+[ENHANCED_TRACKER] 候选 1 相似度: 0.681
+[SIMILARITY] 参考特征类型: ['geometric', 'shape', 'appearance', 'spatial']
+[SIMILARITY] 候选特征类型: ['geometric', 'appearance', 'shape', 'spatial']
+[SIMILARITY_CALC] 开始综合相似度计算
+[SIMILARITY_CALC] 几何相似度: 0.368
+[SIMILARITY_CALC] 形状相似度: 0.936
+[SIMILARITY_CALC] 外观相似度: 0.800
+[SIMILARITY_CALC] 空间相似度: 0.500
+[SIMILARITY_CALC] 综合相似度计算完成: 0.638
+[SIMILARITY] 相似度分解:
+  - geometric: 0.368
+  - shape: 0.936
+  - appearance: 0.800
+  - spatial: 0.500
+[SIMILARITY] 最终得分: 0.638
+[ENHANCED_TRACKER] 候选 2 相似度: 0.638
+[ENHANCED_TRACKER] 最佳匹配相似度: 0.681 (阈值: 0.600)
+[ENHANCED_TRACKER] 匹配成功！
+[ENHANCED_TRACKER] 构建追踪结果...
+[ENHANCED_TRACKER] 目标ID: lemon_0
+[ENHANCED_TRACKER] 最小外接矩形: 中心(1175.5, 279.0), 尺寸(196.0x207.0), 角度0.0°
+[ENHANCED_TRACKER] 参考库验证:
+  height_mm: 41.99999999999998
+  background_world_z: 48.119378611800826
+[ENHANCED_TRACKER] 开始物体分析，目标ID: lemon_0
+[ENHANCED_TRACKER] 参考库原始数据:
+  height_mm: 41.99999999999998
+  background_world_z: 48.119378611800826
+  class_name: lemon
+[ENHANCED_TRACKER] ✅ 使用参考库固定数据:
+  高度: 42.0mm (来源: reference_library)
+  背景: 48.1mm (来源: reference_library)
+  类别: lemon
+[ENHANCED_TRACKER] 追踪结果构建完成:
+  抓取坐标: {'x': -79.15836920425009, 'y': -381.894994369163, 'z': 8.108854571636348}
+  物体高度: 42.0mm
+  背景高度: 48.1mm
+  最小外接矩形: 196.0x207.0, 角度0.0°
+[INFO] [1754339510.452070349] [tracking_node]: ✅ 追踪成功，分析抓取条件
+[INFO] [1754339510.452565689] [tracking_node]: 🎯 追踪详情:
+[INFO] [1754339510.453009406] [tracking_node]:   目标ID: lemon_0
+[INFO] [1754339510.453448046] [tracking_node]:   追踪置信度: 0.681
+[INFO] [1754339510.453890425] [tracking_node]:   检测置信度: 0.944
+[INFO] [1754339510.454324163] [tracking_node]:   目标坐标: (-79.2, -381.9, 8.1mm)
+[INFO] [1754339510.454776622] [tracking_node]:   物体高度: 42.0mm
+[INFO] [1754339510.455243477] [tracking_node]:   背景高度: 48.1mm
+[INFO] [1754339510.455720237] [tracking_node]:   推荐夹爪宽度: 500
+[INFO] [1754339510.456178091] [tracking_node]: 📐 移动策略计算:
+[INFO] [1754339510.456622001] [tracking_node]:    3D距离: 179.3mm
+[INFO] [1754339510.457052540] [tracking_node]:    XY移动比例: 0.5
+[INFO] [1754339510.457509791] [tracking_node]:    背景高度: 48.1mm
+[INFO] [1754339510.458005264] [tracking_node]:    物体高度: 42.0mm
+[INFO] [1754339510.458433939] [tracking_node]:    Z补偿: 220mm
+[INFO] [1754339510.458859015] [tracking_node]:    安全移动高度: max(300, 48.1 + 42.0 + 220) = 320.0mm
+[INFO] [1754339510.459304276] [tracking_node]: 🎯 抓取条件评估:
+[INFO] [1754339510.459716791] [tracking_node]:    Z距离: 8.1mm (< 10mm: True)
+[INFO] [1754339510.460123085] [tracking_node]:    XY距离: 179.3mm (< 50mm: False)
+[INFO] [1754339510.460490021] [tracking_node]:    置信度: 0.681 (> 0.85: False)
+[INFO] [1754339510.460899920] [tracking_node]:    稳定性: True
+[INFO] [1754339510.461299002] [tracking_node]:    🎯 准备抓取: False
+[INFO] [1754339510.461728530] [tracking_node]: ⏳ 未满足抓取条件，继续追踪
 
-
-
-cd ~/ros2_ws && source install/setup.bash
-ros2 run vision_ai detection_node
-qi@wpq:~/ros2_ws$ cd ~/ros2_ws && source install/setup.bash
-qi@wpq:~/ros2_ws$ ros2 run vision_ai detection_node
-[YOLO] 模型加载成功: /home/qi/下载/best2.pt
-[YOLO] 置信度阈值: 0.7
-[FACTORY] YOLO检测器创建成功
-[SAM2] 模型加载成功
-[SAM2] 设备: cuda
-[SAM2] 配置: sam2_hiera_l.yaml
-[SAM2] 检查点: /home/qi/ros2_ws/src/vision_ai/models/sam2/sam2_hiera_large.pt
-[FACTORY] SAM2分割器创建成功
-[PIPELINE] 模型初始化成功
-[PIPELINE] 特征提取器初始化完成
-[PIPELINE] 检测管道初始化完成
-[PIPELINE] 输出目录: detection_output_20250717_185239
-[INFO] [1752774763.231954778] [detection_node]: ✅ 检测管道初始化成功
-[INFO] [1752774763.248060128] [detection_node]: ✅ Detection node 深度对齐映射表创建完成
-[INFO] [1752774763.248342768] [detection_node]: 🔍 Detection node (bypass cv_bridge) started, waiting for stitching complete signal...
-[INFO] [1752774763.248563434] [detection_node]: 🔍 绕过cv_bridge的检测节点运行中...
-[INFO] [1752774800.790180759] [detection_node]: 🎯 Received stitching complete signal: scan_output_20250717_185252
-[INFO] [1752774800.790611247] [detection_node]: 🔄 开始加载融合映射信息...
-[INFO] [1752774800.791053216] [detection_node]: ✅ 单点扫描映射信息加载成功:
-[INFO] [1752774800.791404659] [detection_node]:   - 扫描类型: 单点扫描
-[INFO] [1752774800.791750384] [detection_node]:   - 主waypoint: 0
-[INFO] [1752774800.792097838] [detection_node]:   - 画布尺寸: (578, 1026)
-[INFO] [1752774800.792431421] [detection_node]:   - 涉及waypoint数: 1
-[INFO] [1752774800.792776236] [detection_node]:   - Waypoint 0:
-[INFO] [1752774800.793107381] [detection_node]:     * 贡献像素: 593028
-[INFO] [1752774800.793456603] [detection_node]:     * 彩色文件: scan_output_20250717_185252/color_waypoint_001.jpg
-[INFO] [1752774800.793820746] [detection_node]:     * 深度文件: scan_output_20250717_185252/depth_raw_waypoint_001.npy
-[INFO] [1752774800.794184085] [detection_node]:     * 深度文件存在: True
-[INFO] [1752774800.795747000] [detection_node]:     * 深度数据形状: (720, 1280)
-[INFO] [1752774800.796848448] [detection_node]:     * 深度范围: 0.000 - 381.000
-[INFO] [1752774800.797233254] [detection_node]: ✅ 映射信息加载和验证完成
-[INFO] [1752774800.805031460] [detection_node]: 融合图像加载成功: (720, 1280, 3)
-[INFO] [1752774800.805449727] [detection_node]: 🧪 开始模拟检测映射测试...
-[INFO] [1752774800.805784561] [detection_node]: 📦 测试检测框: [320, 180, 960, 540]
-[INFO] [1752774800.806982550] [detection_node]: ✅ 模拟映射分析成功:
-[INFO] [1752774800.807297914] [detection_node]:   - 主要来源: Waypoint None
-[INFO] [1752774800.807629742] [detection_node]:   - 覆盖率: 0.0%
-[INFO] [1752774800.807942231] [detection_node]:   - 阈值达成: False
-[INFO] [1752774800.808924347] [detection_node]: 🚀 开始基于映射的检测处理...
-[PIPELINE] 开始处理参考图像...
-
-0: 384x640 1 banana, 1 corn, 1 potato, 1 redpepper, 52.0ms
-Speed: 2.1ms preprocess, 52.0ms inference, 104.6ms postprocess per image at shape (1, 3, 384, 640)
-[YOLO] 检测到 4 个目标 (置信度 >= 0.7)
-[PIPELINE] YOLO检测到 4 个目标
-[SAM2] 完成 4 个目标的分割
-[PIPELINE] SAM2分割完成
-[PIPELINE] 可视化图像已保存: scan_output_20250717_185252/detection_results/detection_visualization.jpg
-[PIPELINE] matplotlib图像已保存: scan_output_20250717_185252/detection_results/detection_plot.png
-[PIPELINE] ✅ matplotlib显示成功
-[PIPELINE] ✅ 可视化处理完成
-[PIPELINE] 可视化图像已保存: scan_output_20250717_185252/detection_results/detection_visualization.jpg
-[PIPELINE] 检测结果已保存到: scan_output_20250717_185252/detection_results/detection_results.json
-[PIPELINE] 检测摘要已保存到: scan_output_20250717_185252/detection_results/detection_summary.txt
-[PIPELINE] 参考图像处理完成，检测到 4 个有效目标
-[INFO] [1752774803.473351546] [detection_node]: 🧬 开始增强对象 1/4: redpepper_0
-[INFO] [1752774803.473902823] [detection_node]: 🔍 单点扫描，使用Waypoint 0
-[INFO] [1752774803.487457203] [detection_node]: 深度对齐完成: 质量=51.02%
-[INFO] [1752774803.487785670] [detection_node]: ✅ 使用实时对齐深度数据
-[INFO] [1752774803.488050551] [detection_node]: 🔍 计算高度 (对齐深度): bbox=[596,21,853,266], center=[724,143]
-[INFO] [1752774803.806047800] [detection_node]: 📊 高度计算结果 (对齐深度): 2 个有效值
-[INFO] [1752774803.806430488] [detection_node]:   - bbox内对比: 60.0mm
-[INFO] [1752774803.806704300] [detection_node]:   - 扩展背景: 63.0mm
-[INFO] [1752774803.806998529] [detection_node]: ✅ 使用平均值: 61.5mm
-[ERROR] [1752774803.935372855] [detection_node]: 3D空间特征计算失败 (对齐深度): only integers, slices (`:`), ellipsis (`...`), numpy.newaxis (`None`) and integer or boolean arrays are valid indices
-[INFO] [1752774803.935741004] [detection_node]: ✅ 对象 redpepper_0 深度增强完成: 高度=61.49999999999997mm
-[INFO] [1752774803.936013729] [detection_node]: 🧬 开始增强对象 2/4: potato_0
-[INFO] [1752774803.936279204] [detection_node]: 🔍 单点扫描，使用Waypoint 0
-[INFO] [1752774803.939189567] [detection_node]: 深度对齐完成: 质量=51.02%
-[INFO] [1752774803.939487386] [detection_node]: ✅ 使用实时对齐深度数据
-[INFO] [1752774803.939752808] [detection_node]: 🔍 计算高度 (对齐深度): bbox=[255,181,536,392], center=[395,286]
-[INFO] [1752774804.287031034] [detection_node]: 📊 高度计算结果 (对齐深度): 0 个有效值
-[WARN] [1752774804.287407515] [detection_node]: 所有高度计算方法都失败，使用默认值
-[ERROR] [1752774804.454261262] [detection_node]: 3D空间特征计算失败 (对齐深度): only integers, slices (`:`), ellipsis (`...`), numpy.newaxis (`None`) and integer or boolean arrays are valid indices
-[INFO] [1752774804.454639871] [detection_node]: ✅ 对象 potato_0 深度增强完成: 高度=30.0mm
-[INFO] [1752774804.454955723] [detection_node]: 🧬 开始增强对象 3/4: corn_0
-[INFO] [1752774804.455215383] [detection_node]: 🔍 单点扫描，使用Waypoint 0
-[INFO] [1752774804.458063322] [detection_node]: 深度对齐完成: 质量=51.02%
-[INFO] [1752774804.458347907] [detection_node]: ✅ 使用实时对齐深度数据
-[INFO] [1752774804.458611353] [detection_node]: 🔍 计算高度 (对齐深度): bbox=[568,326,878,647], center=[723,486]
-[INFO] [1752774804.978988890] [detection_node]: 📊 高度计算结果 (对齐深度): 2 个有效值
-[INFO] [1752774804.979336644] [detection_node]:   - bbox内对比: 30.0mm
-[INFO] [1752774804.979604401] [detection_node]:   - 扩展背景: 25.0mm
-[INFO] [1752774804.979931303] [detection_node]: ✅ 使用平均值: 27.5mm
-[ERROR] [1752774805.155406882] [detection_node]: 3D空间特征计算失败 (对齐深度): only integers, slices (`:`), ellipsis (`...`), numpy.newaxis (`None`) and integer or boolean arrays are valid indices
-[INFO] [1752774805.155748708] [detection_node]: ✅ 对象 corn_0 深度增强完成: 高度=27.49999999999997mm
-[INFO] [1752774805.156008419] [detection_node]: 🧬 开始增强对象 4/4: banana_0
-[INFO] [1752774805.156268699] [detection_node]: 🔍 单点扫描，使用Waypoint 0
-[INFO] [1752774805.159294551] [detection_node]: 深度对齐完成: 质量=51.02%
-[INFO] [1752774805.159581377] [detection_node]: ✅ 使用实时对齐深度数据
-[INFO] [1752774805.159848709] [detection_node]: 🔍 计算高度 (对齐深度): bbox=[850,63,1106,622], center=[978,342]
-[INFO] [1752774805.892875183] [detection_node]: 📊 高度计算结果 (对齐深度): 2 个有效值
-[INFO] [1752774805.893196974] [detection_node]:   - 扩展背景: 6.0mm
-[INFO] [1752774805.893447657] [detection_node]:   - 中心点对比: 32.0mm
-[INFO] [1752774805.893764660] [detection_node]: ✅ 使用中位数: 19.0mm
-[ERROR] [1752774806.137736984] [detection_node]: 3D空间特征计算失败 (对齐深度): only integers, slices (`:`), ellipsis (`...`), numpy.newaxis (`None`) and integer or boolean arrays are valid indices
-[INFO] [1752774806.138091080] [detection_node]: ✅ 对象 banana_0 深度增强完成: 高度=18.99999999999999mm
-[INFO] [1752774806.138363650] [detection_node]: ✅ 检测完成，发现 4 个目标
-[INFO] [1752774806.138645547] [detection_node]: 🧬 深度信息增强完成
-[INFO] [1752774806.155437005] [detection_node]: 💾 Masks saved to: scan_output_20250717_185252/detection_results/object_masks.json
-[INFO] [1752774806.157044766] [detection_node]: 💾 最终检测结果已保存并覆盖: scan_output_20250717_185252/detection_results/detection_results.json
-[INFO] [1752774806.157283701] [detection_node]: 📤 Detection result published with mask and 3D coordinates
-[INFO] [1752774806.380350660] [detection_node]: 🖼️ 可视化图像已发布
-[INFO] [1752774806.380683201] [detection_node]:
 ============================================================
-[INFO] [1752774806.380947345] [detection_node]: Detection Results Summary
-[INFO] [1752774806.381199324] [detection_node]: ============================================================
-[INFO] [1752774806.381458346] [detection_node]: Detected 4 objects:
-[INFO] [1752774806.381741324] [detection_node]:  1. Red redpepper (medium height) in top center [h=61.5mm] (ID: redpepper_0, Conf: 0.961)
-[INFO] [1752774806.381989981] [detection_node]:  2. Orange potato (low) in center left [h=30.0mm] (ID: potato_0, Conf: 0.961)
-[INFO] [1752774806.382238655] [detection_node]:  3. Orange corn (low) in bottom center [h=27.5mm] (ID: corn_0, Conf: 0.928)
-[INFO] [1752774806.382484741] [detection_node]:  4. Orange banana (flat) in center right [h=19.0mm] (ID: banana_0, Conf: 0.874)
-[INFO] [1752774806.382770981] [detection_node]: ============================================================
-[INFO] [1752774806.383019495] [detection_node]: 🎯 启动目标选择流程...
+🎯 追踪步骤 8 - 请确认追踪结果
+============================================================
+📋 当前追踪结果:
+  🎯 目标坐标: (-79.2, -381.9, 8.1mm)
+  🔍 追踪置信度: 0.681
 
-==================================================
-Select Tracking Targets
-==================================================
+💬 命令选项:
+  's' 或 'success' - 确认追踪成功，继续移动
+  'f' 或 'fail'    - 标记追踪失败
+  'q' 或 'quit'    - 退出追踪
+============================================================
+请输入命令 (s/f/q): f
+[INFO] [1754339514.628505904] [tracking_node]: ❌ 用户标记追踪失败
+[INFO] [1754339514.628866855] [tracking_node]: 当前位姿状态 :roll:178.999979,pitch: 0.0, yaw:-89.999981
+[DATA_RECORDER] 记录第 8 步追踪数据 (包含细粒度特征)
+[INFO] [1754339514.642680047] [tracking_node]: 💾 追踪参数历史已保存: scan_output_20250804_212836/tracking_results/tracking_parameters_history.json
+[INFO] [1754339514.758566625] [tracking_node]: 🔍 执行第 9 步追踪
+[INFO] [1754339514.759210337] [tracking_node]: 📊 图像信息:
+[INFO] [1754339514.759643720] [tracking_node]:   RGB: (720, 1280, 3), dtype: uint8
+[INFO] [1754339514.760023466] [tracking_node]:   Depth: (720, 1280), dtype: uint16
+[INFO] [1754339514.760575572] [tracking_node]:   Depth range: 0-41869
+[INFO] [1754339514.761228796] [tracking_node]: 🔍 执行实时检测...
+[INFO] [1754339514.761617062] [tracking_node]: 预处理后图像: RGB(720, 1280, 3), Depth(720, 1280)
+[INFO] [1754339514.762003927] [tracking_node]: 当前位姿状态 :roll:178.999979,pitch: 0.0, yaw:-89.999981
+[ENHANCED_PIPELINE] 开始处理单张图像...
 
-Detected objects:
- 1. Red redpepper (medium height) in top center [h=61.5mm] (ID: redpepper_0, Conf: 0.961)
- 2. Orange potato (low) in center left [h=30.0mm] (ID: potato_0, Conf: 0.961)
- 3. Orange corn (low) in bottom center [h=27.5mm] (ID: corn_0, Conf: 0.928)
- 4. Orange banana (flat) in center right [h=19.0mm] (ID: banana_0, Conf: 0.874)
+0: 384x640 2 lemons, 5.9ms
+Speed: 1.2ms preprocess, 5.9ms inference, 1.5ms postprocess per image at shape (1, 3, 384, 640)
+[YOLO] 检测到 2 个目标 (置信度 >= 0.7)
+[ENHANCED_PIPELINE] YOLO检测到 2 个目标
+[SAM2] 完成 2 个目标的分割
+[ENHANCED_PIPELINE] SAM2分割完成
+[FEATURES] 开始提取特征，输入: image(720, 1280, 3), mask(720, 1280), depth(720, 1280)
+[FEATURES] 几何特征提取完成: ['hu_moments', 'area', 'perimeter', 'circularity', 'solidity', 'aspect_ratio', 'extent', 'fpfh', 'bbox_dimensions', 'bbox_volume', 'pca_features', 'point_spread', 'shape_context_3d', 'mean_density', 'std_density', 'density_variation', 'centroid_3d', 'surface_normal_stats', 'density_stats', 'density_uniformity']
+[FEATURES] 开始提取特征，输入: image(720, 1280, 3), mask(720, 1280), depth(720, 1280)
+[FEATURES] 几何特征提取完成: ['hu_moments', 'area', 'perimeter', 'circularity', 'solidity', 'aspect_ratio', 'extent', 'fpfh', 'bbox_dimensions', 'bbox_volume', 'pca_features', 'point_spread', 'shape_context_3d', 'mean_density', 'std_density', 'density_variation', 'centroid_3d', 'surface_normal_stats', 'density_stats', 'density_uniformity']
+[ENHANCED_PIPELINE] 单张图像处理完成，检测到 2 个有效目标
+[INFO] [1754339515.822861628] [tracking_node]: 实时检测完成，发现 2 个候选目标
+[INFO] [1754339515.823429227] [tracking_node]: 当前位姿状态 :roll:178.999979,pitch: 0.0, yaw:-89.999981
+[INFO] [1754339515.824090702] [tracking_node]: 📍 当前waypoint数据: {'world_pos': [81.988823, -303.354614, 320.0], 'roll': 178.999979, 'pitch': 0.0, 'yaw': -89.999981, 'timestamp': builtin_interfaces.msg.Time(sec=1754339514, nanosec=741346653)}
+[ENHANCED_TRACKER] 开始追踪目标: lemon_0
+  - 候选检测数量: 2
+[ENHANCED_TRACKER] 同类别候选数量: 2 / 2
+[SIMILARITY] 参考特征类型: ['geometric', 'shape', 'appearance', 'spatial']
+[SIMILARITY] 候选特征类型: ['geometric', 'appearance', 'shape', 'spatial']
+[SIMILARITY_CALC] 开始综合相似度计算
+[SIMILARITY_CALC] 几何相似度: 0.461
+[SIMILARITY_CALC] 形状相似度: 0.955
+[SIMILARITY_CALC] 外观相似度: 0.800
+[SIMILARITY_CALC] 空间相似度: 0.500
+[SIMILARITY_CALC] 综合相似度计算完成: 0.681
+[SIMILARITY] 相似度分解:
+  - geometric: 0.461
+  - shape: 0.955
+  - appearance: 0.800
+  - spatial: 0.500
+[SIMILARITY] 最终得分: 0.681
+[ENHANCED_TRACKER] 候选 1 相似度: 0.681
+[SIMILARITY] 参考特征类型: ['geometric', 'shape', 'appearance', 'spatial']
+[SIMILARITY] 候选特征类型: ['geometric', 'appearance', 'shape', 'spatial']
+[SIMILARITY_CALC] 开始综合相似度计算
+[SIMILARITY_CALC] 几何相似度: 0.368
+[SIMILARITY_CALC] 形状相似度: 0.934
+[SIMILARITY_CALC] 外观相似度: 0.800
+[SIMILARITY_CALC] 空间相似度: 0.500
+[SIMILARITY_CALC] 综合相似度计算完成: 0.637
+[SIMILARITY] 相似度分解:
+  - geometric: 0.368
+  - shape: 0.934
+  - appearance: 0.800
+  - spatial: 0.500
+[SIMILARITY] 最终得分: 0.637
+[ENHANCED_TRACKER] 候选 2 相似度: 0.637
+[ENHANCED_TRACKER] 最佳匹配相似度: 0.681 (阈值: 0.600)
+[ENHANCED_TRACKER] 匹配成功！
+[ENHANCED_TRACKER] 构建追踪结果...
+[ENHANCED_TRACKER] 目标ID: lemon_0
+[ENHANCED_TRACKER] 最小外接矩形: 中心(1175.5, 279.0), 尺寸(196.0x207.0), 角度0.0°
+[ENHANCED_TRACKER] 参考库验证:
+  height_mm: 41.99999999999998
+  background_world_z: 48.119378611800826
+[ENHANCED_TRACKER] 开始物体分析，目标ID: lemon_0
+[ENHANCED_TRACKER] 参考库原始数据:
+  height_mm: 41.99999999999998
+  background_world_z: 48.119378611800826
+  class_name: lemon
+[ENHANCED_TRACKER] ✅ 使用参考库固定数据:
+  高度: 42.0mm (来源: reference_library)
+  背景: 48.1mm (来源: reference_library)
+  类别: lemon
+[ENHANCED_TRACKER] 追踪结果构建完成:
+  抓取坐标: {'x': -80.09327634985239, 'y': -380.2368046711272, 'z': 6.122722892547616}
+  物体高度: 42.0mm
+  背景高度: 48.1mm
+  最小外接矩形: 196.0x207.0, 角度0.0°
+[INFO] [1754339515.852601340] [tracking_node]: ✅ 追踪成功，分析抓取条件
+[INFO] [1754339515.853121750] [tracking_node]: 🎯 追踪详情:
+[INFO] [1754339515.853584998] [tracking_node]:   目标ID: lemon_0
+[INFO] [1754339515.853979748] [tracking_node]:   追踪置信度: 0.681
+[INFO] [1754339515.854286734] [tracking_node]:   检测置信度: 0.943
+[INFO] [1754339515.854580326] [tracking_node]:   目标坐标: (-80.1, -380.2, 6.1mm)
+[INFO] [1754339515.854879935] [tracking_node]:   物体高度: 42.0mm
+[INFO] [1754339515.855169797] [tracking_node]:   背景高度: 48.1mm
+[INFO] [1754339515.855456849] [tracking_node]:   推荐夹爪宽度: 500
+[INFO] [1754339515.855781083] [tracking_node]: 📐 移动策略计算:
+[INFO] [1754339515.856080025] [tracking_node]:    3D距离: 179.4mm
+[INFO] [1754339515.856468292] [tracking_node]:    XY移动比例: 0.5
+[INFO] [1754339515.856925860] [tracking_node]:    背景高度: 48.1mm
+[INFO] [1754339515.857366762] [tracking_node]:    物体高度: 42.0mm
+[INFO] [1754339515.857794112] [tracking_node]:    Z补偿: 220mm
+[INFO] [1754339515.858235217] [tracking_node]:    安全移动高度: max(300, 48.1 + 42.0 + 220) = 320.0mm
+[INFO] [1754339515.858694781] [tracking_node]: 🎯 抓取条件评估:
+[INFO] [1754339515.859122213] [tracking_node]:    Z距离: 6.1mm (< 10mm: True)
+[INFO] [1754339515.859553936] [tracking_node]:    XY距离: 179.4mm (< 50mm: False)
+[INFO] [1754339515.859977491] [tracking_node]:    置信度: 0.681 (> 0.85: False)
+[INFO] [1754339515.860374498] [tracking_node]:    稳定性: True
+[INFO] [1754339515.860779414] [tracking_node]:    🎯 准备抓取: False
+[INFO] [1754339515.861157083] [tracking_node]: ⏳ 未满足抓取条件，继续追踪
 
-Please select objects to track:
-Format: Enter numbers separated by commas (e.g., 1,3,5)
+============================================================
+🎯 追踪步骤 9 - 请确认追踪结果
+============================================================
+📋 当前追踪结果:
+  🎯 目标坐标: (-80.1, -380.2, 6.1mm)
+  🔍 追踪置信度: 0.681
 
-Your selection: 1
+💬 命令选项:
+  's' 或 'success' - 确认追踪成功，继续移动
+  'f' 或 'fail'    - 标记追踪失败
+  'q' 或 'quit'    - 退出追踪
+============================================================
+请输入命令 (s/f/q): f
+[INFO] [1754339518.231809432] [tracking_node]: ❌ 用户标记追踪失败
+[INFO] [1754339518.232166921] [tracking_node]: 当前位姿状态 :roll:178.999979,pitch: 0.0, yaw:-89.999981
+[DATA_RECORDER] 记录第 9 步追踪数据 (包含细粒度特征)
+[INFO] [1754339518.246456046] [tracking_node]: 💾 追踪参数历史已保存: scan_output_20250804_212836/tracking_results/tracking_parameters_history.json
+[INFO] [1754339518.412177168] [tracking_node]: 🔍 执行第 10 步追踪
+[INFO] [1754339518.413055376] [tracking_node]: 📊 图像信息:
+[INFO] [1754339518.413627904] [tracking_node]:   RGB: (720, 1280, 3), dtype: uint8
+[INFO] [1754339518.414155841] [tracking_node]:   Depth: (720, 1280), dtype: uint16
+[INFO] [1754339518.415012432] [tracking_node]:   Depth range: 0-7870
+[INFO] [1754339518.415707720] [tracking_node]: 🔍 执行实时检测...
+[INFO] [1754339518.416178033] [tracking_node]: 预处理后图像: RGB(720, 1280, 3), Depth(720, 1280)
+[INFO] [1754339518.416668574] [tracking_node]: 当前位姿状态 :roll:178.999979,pitch: 0.0, yaw:-89.999981
+[ENHANCED_PIPELINE] 开始处理单张图像...
 
-Selected tracking targets:
-  - Red redpepper (medium height) in top center [h=61.5mm] (ID: redpepper_0)
-[PIPELINE] 追踪选择已保存到: scan_output_20250717_185252/detection_results/tracking_selection.txt
-[INFO] [1752774839.779907177] [detection_node]: ✅ Detection complete signal published
-[INFO] [1752774839.782057347] [detection_node]: 📸 收到参考图像（备用）
+0: 384x640 2 lemons, 6.6ms
+Speed: 1.7ms preprocess, 6.6ms inference, 1.6ms postprocess per image at shape (1, 3, 384, 640)
+[YOLO] 检测到 2 个目标 (置信度 >= 0.7)
+[ENHANCED_PIPELINE] YOLO检测到 2 个目标
+[SAM2] 完成 2 个目标的分割
+[ENHANCED_PIPELINE] SAM2分割完成
+[FEATURES] 开始提取特征，输入: image(720, 1280, 3), mask(720, 1280), depth(720, 1280)
+[FEATURES] 几何特征提取完成: ['hu_moments', 'area', 'perimeter', 'circularity', 'solidity', 'aspect_ratio', 'extent', 'fpfh', 'bbox_dimensions', 'bbox_volume', 'pca_features', 'point_spread', 'shape_context_3d', 'mean_density', 'std_density', 'density_variation', 'centroid_3d', 'surface_normal_stats', 'density_stats', 'density_uniformity']
+[FEATURES] 开始提取特征，输入: image(720, 1280, 3), mask(720, 1280), depth(720, 1280)
+[FEATURES] 几何特征提取完成: ['hu_moments', 'area', 'perimeter', 'circularity', 'solidity', 'aspect_ratio', 'extent', 'fpfh', 'bbox_dimensions', 'bbox_volume', 'pca_features', 'point_spread', 'shape_context_3d', 'mean_density', 'std_density', 'density_variation', 'centroid_3d', 'surface_normal_stats', 'density_stats', 'density_uniformity']
+[ENHANCED_PIPELINE] 单张图像处理完成，检测到 2 个有效目标
+[INFO] [1754339519.486001396] [tracking_node]: 实时检测完成，发现 2 个候选目标
+[INFO] [1754339519.486599040] [tracking_node]: 当前位姿状态 :roll:178.999979,pitch: 0.0, yaw:-89.999981
+[INFO] [1754339519.487059325] [tracking_node]: 📍 当前waypoint数据: {'world_pos': [81.988823, -303.354614, 320.0], 'roll': 178.999979, 'pitch': 0.0, 'yaw': -89.999981, 'timestamp': builtin_interfaces.msg.Time(sec=1754339518, nanosec=341366464)}
+[ENHANCED_TRACKER] 开始追踪目标: lemon_0
+  - 候选检测数量: 2
+[ENHANCED_TRACKER] 同类别候选数量: 2 / 2
+[SIMILARITY] 参考特征类型: ['geometric', 'shape', 'appearance', 'spatial']
+[SIMILARITY] 候选特征类型: ['geometric', 'appearance', 'shape', 'spatial']
+[SIMILARITY_CALC] 开始综合相似度计算
+[SIMILARITY_CALC] 几何相似度: 0.461
+[SIMILARITY_CALC] 形状相似度: 0.956
+[SIMILARITY_CALC] 外观相似度: 0.800
+[SIMILARITY_CALC] 空间相似度: 0.500
+[SIMILARITY_CALC] 综合相似度计算完成: 0.681
+[SIMILARITY] 相似度分解:
+  - geometric: 0.461
+  - shape: 0.956
+  - appearance: 0.800
+  - spatial: 0.500
+[SIMILARITY] 最终得分: 0.681
+[ENHANCED_TRACKER] 候选 1 相似度: 0.681
+[SIMILARITY] 参考特征类型: ['geometric', 'shape', 'appearance', 'spatial']
+[SIMILARITY] 候选特征类型: ['geometric', 'appearance', 'shape', 'spatial']
+[SIMILARITY_CALC] 开始综合相似度计算
+[SIMILARITY_CALC] 几何相似度: 0.366
+[SIMILARITY_CALC] 形状相似度: 0.934
+[SIMILARITY_CALC] 外观相似度: 0.800
+[SIMILARITY_CALC] 空间相似度: 0.500
+[SIMILARITY_CALC] 综合相似度计算完成: 0.637
+[SIMILARITY] 相似度分解:
+  - geometric: 0.366
+  - shape: 0.934
+  - appearance: 0.800
+  - spatial: 0.500
+[SIMILARITY] 最终得分: 0.637
+[ENHANCED_TRACKER] 候选 2 相似度: 0.637
+[ENHANCED_TRACKER] 最佳匹配相似度: 0.681 (阈值: 0.600)
+[ENHANCED_TRACKER] 匹配成功！
+[ENHANCED_TRACKER] 构建追踪结果...
+[ENHANCED_TRACKER] 目标ID: lemon_0
+[ENHANCED_TRACKER] 最小外接矩形: 中心(1175.5, 279.0), 尺寸(196.0x207.0), 角度0.0°
+[ENHANCED_TRACKER] 参考库验证:
+  height_mm: 41.99999999999998
+  background_world_z: 48.119378611800826
+[ENHANCED_TRACKER] 开始物体分析，目标ID: lemon_0
+[ENHANCED_TRACKER] 参考库原始数据:
+  height_mm: 41.99999999999998
+  background_world_z: 48.119378611800826
+  class_name: lemon
+[ENHANCED_TRACKER] ✅ 使用参考库固定数据:
+  高度: 42.0mm (来源: reference_library)
+  背景: 48.1mm (来源: reference_library)
+  类别: lemon
+[ENHANCED_TRACKER] 追踪结果构建完成:
+  抓取坐标: {'x': -79.78425220869528, 'y': -380.28720134843894, 'z': 6.118908132595746}
+  物体高度: 42.0mm
+  背景高度: 48.1mm
+  最小外接矩形: 196.0x207.0, 角度0.0°
+[INFO] [1754339519.514084092] [tracking_node]: ✅ 追踪成功，分析抓取条件
+[INFO] [1754339519.514607041] [tracking_node]: 🎯 追踪详情:
+[INFO] [1754339519.515092429] [tracking_node]:   目标ID: lemon_0
+[INFO] [1754339519.515541273] [tracking_node]:   追踪置信度: 0.681
+[INFO] [1754339519.515986758] [tracking_node]:   检测置信度: 0.944
+[INFO] [1754339519.516432147] [tracking_node]:   目标坐标: (-79.8, -380.3, 6.1mm)
+[INFO] [1754339519.516901392] [tracking_node]:   物体高度: 42.0mm
+[INFO] [1754339519.517346227] [tracking_node]:   背景高度: 48.1mm
+[INFO] [1754339519.517835820] [tracking_node]:   推荐夹爪宽度: 500
+[INFO] [1754339519.518182401] [tracking_node]: 📐 移动策略计算:
+[INFO] [1754339519.518488759] [tracking_node]:    3D距离: 179.1mm
+[INFO] [1754339519.518783803] [tracking_node]:    XY移动比例: 0.5
+[INFO] [1754339519.519058655] [tracking_node]:    背景高度: 48.1mm
+[INFO] [1754339519.519346092] [tracking_node]:    物体高度: 42.0mm
+[INFO] [1754339519.519781133] [tracking_node]:    Z补偿: 220mm
+[INFO] [1754339519.520211671] [tracking_node]:    安全移动高度: max(300, 48.1 + 42.0 + 220) = 320.0mm
+[INFO] [1754339519.520680417] [tracking_node]: 🎯 抓取条件评估:
+[INFO] [1754339519.521124223] [tracking_node]:    Z距离: 6.1mm (< 10mm: True)
+[INFO] [1754339519.521546574] [tracking_node]:    XY距离: 179.1mm (< 50mm: False)
+[INFO] [1754339519.522007197] [tracking_node]:    置信度: 0.681 (> 0.85: False)
+[INFO] [1754339519.522468741] [tracking_node]:    稳定性: True
+[INFO] [1754339519.522876745] [tracking_node]:    🎯 准备抓取: False
+[INFO] [1754339519.523230255] [tracking_node]: ⏳ 未满足抓取条件，继续追踪
+
+============================================================
+🎯 追踪步骤 10 - 请确认追踪结果
+============================================================
+📋 当前追踪结果:
+  🎯 目标坐标: (-79.8, -380.3, 6.1mm)
+  🔍 追踪置信度: 0.681
+
+💬 命令选项:
+  's' 或 'success' - 确认追踪成功，继续移动
+  'f' 或 'fail'    - 标记追踪失败
+  'q' 或 'quit'    - 退出追踪
+============================================================
+请输入命令 (s/f/q): f
+[INFO] [1754339521.973699407] [tracking_node]: ❌ 用户标记追踪失败
+[INFO] [1754339521.974043361] [tracking_node]: 当前位姿状态 :roll:178.999979,pitch: 0.0, yaw:-89.999981
+[DATA_RECORDER] 记录第 10 步追踪数据 (包含细粒度特征)
+[INFO] [1754339521.991372944] [tracking_node]: 💾 追踪参数历史已保存: scan_output_20250804_212836/tracking_results/tracking_parameters_history.json
+[INFO] [1754339521.991744495] [tracking_node]: 🏁 追踪会话完成，开始收集反馈
+[INFO] [1754339521.992058154] [tracking_node]: ✅ 所有步骤已在实时过程中收集反馈，跳过额外反馈收集
+[ONLINE_LEARNER] 学习数据已保存: /home/qi/ros2_ws/install/vision_ai/lib/python3.10/site-packages/vision_ai/tracking_system/adaptive_learning/../../data/user_profiles/default_user/adaptive_learning/default_user_online_learning.json
+[DATA_RECORDER] 会话数据已保存: scan_output_20250804_212836/tracking_data/tracking_session.json
+[DATA_RECORDER] 会话摘要已保存: scan_output_20250804_212836/tracking_data/session_summary.txt
+[INFO] [1754339521.994140755] [tracking_node]: ✅ 反馈收集完成，学习数据已更新
+[INFO] [1754339521.994687610] [tracking_node]: 📊 追踪完成统计: 总步数=10, 目标=lemon_0

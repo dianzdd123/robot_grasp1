@@ -95,20 +95,23 @@ class CoordinateCalculator:
         tcp_point_homo = self.camera_to_tcp_transform @ camera_point_homo
         tcp_point = tcp_point_homo[:3]
         
-        # TCP位姿
-        tcp_x, tcp_y, tcp_z = tcp_pose[:3]
-        tcp_roll, tcp_pitch, tcp_yaw = tcp_pose[3:]
-        
         # TCP到世界坐标的变换
+        grasp_offset_tcp = np.array([-0.015, 0.0, 0.0])  # 单位：米
+        tcp_point += grasp_offset_tcp
+    
+        # TCP到世界坐标的变换矩阵
+        tcp_x, tcp_y, tcp_z = tcp_pose[:3]  # mm
+        tcp_roll, tcp_pitch, tcp_yaw = tcp_pose[3:]  # degree
+        
         tcp_rotation = R.from_euler('xyz', [tcp_roll, tcp_pitch, tcp_yaw], degrees=True)
         tcp_to_world_matrix = np.eye(4)
         tcp_to_world_matrix[:3, :3] = tcp_rotation.as_matrix()
-        tcp_to_world_matrix[:3, 3] = [tcp_x/1000, tcp_y/1000, tcp_z/1000]
+        tcp_to_world_matrix[:3, 3] = [tcp_x / 1000.0, tcp_y / 1000.0, tcp_z / 1000.0]  # 转为米
         
-        # 变换到世界坐标
+        # TCP坐标 → 世界坐标
         tcp_point_homo_world = np.array([tcp_point[0], tcp_point[1], tcp_point[2], 1.0])
         world_point_homo = tcp_to_world_matrix @ tcp_point_homo_world
-        world_point = world_point_homo[:3] * 1000  # 转换为mm
+        world_point = world_point_homo[:3] * 1000  # 转为 mm
         
         return world_point
 
@@ -278,7 +281,10 @@ class ObjectAnalyzer:
             largest_contour = max(contours, key=cv2.contourArea)
             rect = cv2.minAreaRect(largest_contour)
             _, (width, height), angle = rect
-            
+            if width < height:
+                yaw_angle = -angle + 90 
+            else:
+                yaw_angle = -angle
             # 选择较短的边作为抓夹宽度参考
             shorter_side_pixels = min(width, height)
             
@@ -292,8 +298,7 @@ class ObjectAnalyzer:
             real_width_mm = shorter_side_pixels * (center_depth / fx) * 1000
             
             # 添加安全余量
-            safety_margin = 1.25
-            recommended_width = real_width_mm * safety_margin
+            recommended_width = real_width_mm * 10
             recommended_width = max(100, min(800, recommended_width))
             
             return {
@@ -301,7 +306,7 @@ class ObjectAnalyzer:
                 'recommended_gripper_width': int(recommended_width),
                 'pixel_width': shorter_side_pixels,
                 'depth_used': center_depth,
-                'angle': angle
+                'angle': yaw_angle
             }
             
         except Exception as e:

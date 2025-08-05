@@ -37,14 +37,7 @@ setup(
             'detection_node = vision_ai.detection_node:main',
             'visualization_trigger = vision_ai.visualization_trigger:main',
             # ⭐ 新增追踪系统节点 ⭐
-            'tracking_node = vision_ai.tracking_system.nodes.tracking_node:main',
-            'tracking_visualizer = vision_ai.tracking_system.nodes.tracking_visualizer:main',
-            'tracking_trigger = vision_ai.tracking_system.nodes.tracking_trigger:main',
-            
-            # 独立测试入口
-            'test_tracking_detector = vision_ai.tracking_system.detection.realtime_detector:main',
-            'test_tracking_matcher = vision_ai.tracking_system.detection.id_matcher:main',
-            'test_tracking_state = vision_ai.tracking_system.core.state_machine:main',
+            'tracking_node = vision_ai.tracking_system.tracking_node:main',
         ],
     },
 )

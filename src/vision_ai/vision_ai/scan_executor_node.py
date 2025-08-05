@@ -361,7 +361,7 @@ class ScanExecutorNode(Node):
                         return
                 
                 # 验证深度数据合理性
-                if depth_raw.max() < 1000:  # 深度值应该至少有几百毫米
+                if depth_raw.max() < 50:  # 深度值应该至少有几百毫米
                     self.get_logger().warn(f'Depth values seem too small: max={depth_raw.max()}')
                 
                 # 确保有效的图像数据
