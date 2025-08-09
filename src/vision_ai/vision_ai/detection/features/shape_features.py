@@ -161,6 +161,7 @@ class EnhancedShapeFeatureExtractor:
         except Exception:
             return {'density_error': 'computation_failed'}
     
+
     def _extract_2d_shape_features(self, mask: np.ndarray) -> Dict:
         """提取2D形状特征（保留作为补充）"""
         features = {}
@@ -191,6 +192,18 @@ class EnhancedShapeFeatureExtractor:
         if contours:
             largest_contour = max(contours, key=cv2.contourArea)
             features.update(self._extract_contour_features(largest_contour))
+            
+            # 🆕 添加凸包面积计算
+            try:
+                convex_hull = cv2.convexHull(largest_contour)
+                convex_area = cv2.contourArea(convex_hull)
+                features['convex_area'] = float(convex_area)
+            except Exception as e:
+                print(f"[SHAPE_FEATURES] 凸包面积计算失败: {e}")
+                features['convex_area'] = 0.0
+        else:
+            # 🆕 如果没有找到轮廓，确保 convex_area 存在
+            features['convex_area'] = 0.0
         
         return features
     

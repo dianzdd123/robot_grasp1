@@ -185,9 +185,15 @@ class ColorFeatureExtractor:
             return {
                 'mean_color': [0, 0, 0],
                 'std_color': [0, 0, 0],
+                'mean_r': 0.0,  # 🔧 新增单独的R通道均值
+                'mean_g': 0.0,  # 🔧 新增单独的G通道均值
+                'mean_b': 0.0,  # 🔧 新增单独的B通道均值
+                'std_r': 0.0,   # 🔧 新增单独的R通道标准差
+                'std_g': 0.0,   # 🔧 新增单独的G通道标准差
+                'std_b': 0.0,   # 🔧 新增单独的B通道标准差
                 'dominant_color': [0, 0, 0],
                 'color_name': "unknown",
-                'histogram': np.zeros((self.bins * 3,))
+                'histogram': np.zeros((self.bins * 3,)).tolist()
             }
         
         # 提取mask区域的像素
@@ -206,7 +212,14 @@ class ColorFeatureExtractor:
         return {
             'mean_color': mean_color.tolist(),
             'std_color': std_color.tolist(),
+            # 🔧 新增单独的RGB通道统计
+            'mean_r': float(mean_color[0]),
+            'mean_g': float(mean_color[1]),
+            'mean_b': float(mean_color[2]),
+            'std_r': float(std_color[0]),
+            'std_g': float(std_color[1]),
+            'std_b': float(std_color[2]),
             'dominant_color': dominant_color.tolist(),
             'color_name': color_name,
-            'histogram': histogram
+            'histogram': histogram.tolist() if isinstance(histogram, np.ndarray) else histogram
         }

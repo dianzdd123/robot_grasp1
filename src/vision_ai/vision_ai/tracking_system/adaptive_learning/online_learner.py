@@ -94,11 +94,30 @@ class OnlineLearner:
         return target_id.split('_')[0] if '_' in target_id else target_id
     
     def _create_learning_record(self, target_id: str, tracking_record: Dict, is_correct: bool) -> Dict:
-        """创建学习记录"""
+        """创建学习记录 - 修复版"""
         try:
-            # 提取相似度信息
-            similarity_breakdown = tracking_record.get('tracking_result', {}).get('similarity_breakdown', {})
-            overall_similarity = tracking_record.get('tracking_result', {}).get('tracking_confidence', 0.0)
+            # 🔧 安全地提取相似度信息
+            if not tracking_record:
+                print("[ONLINE_LEARNER] tracking_record 为空")
+                return {
+                    'target_id': target_id,
+                    'class_name': self._extract_class_name(target_id),
+                    'timestamp': datetime.now().isoformat(),
+                    'is_correct': is_correct,
+                    'overall_similarity': 0.0,
+                    'feature_similarities': {},
+                    'step_number': 0,
+                    'tracking_confidence': 0.0
+                }
+            
+            # 🔧 安全地访问嵌套字典
+            tracking_result = tracking_record.get('tracking_result', {})
+            if not tracking_result:
+                # 如果没有嵌套结构，直接使用 tracking_record
+                tracking_result = tracking_record
+            
+            similarity_breakdown = tracking_result.get('similarity_breakdown', {})
+            overall_similarity = tracking_result.get('tracking_confidence', 0.0)
             
             # 创建学习记录
             record = {
@@ -106,20 +125,33 @@ class OnlineLearner:
                 'class_name': self._extract_class_name(target_id),
                 'timestamp': datetime.now().isoformat(),
                 'is_correct': is_correct,
-                'overall_similarity': overall_similarity,
+                'overall_similarity': float(overall_similarity),
                 'feature_similarities': similarity_breakdown,
                 'step_number': tracking_record.get('step_number', 0),
-                'tracking_confidence': tracking_record.get('tracking_result', {}).get('tracking_confidence', 0.0)
+                'tracking_confidence': float(overall_similarity)
             }
             
             return record
             
         except Exception as e:
             print(f"[ONLINE_LEARNER] 创建学习记录失败: {e}")
-            return {}
-    
+            import traceback
+            traceback.print_exc()
+            
+            # 返回基本记录
+            return {
+                'target_id': target_id,
+                'class_name': self._extract_class_name(target_id),
+                'timestamp': datetime.now().isoformat(),
+                'is_correct': is_correct,
+                'overall_similarity': 0.0,
+                'feature_similarities': {},
+                'step_number': 0,
+                'tracking_confidence': 0.0
+            }
+        
     def _update_class_data(self, class_name: str, learning_record: Dict):
-        """更新类别特定数据"""
+        """更新类别特定数据 - 修复版"""
         try:
             if class_name not in self.class_specific_data:
                 self.class_specific_data[class_name] = {
@@ -137,8 +169,11 @@ class OnlineLearner:
             
             class_data = self.class_specific_data[class_name]
             
+            # 🔧 安全地检查 is_correct 字段
+            is_correct = learning_record.get('is_correct', False)
+            
             # 添加记录到对应列表
-            if learning_record['is_correct']:
+            if is_correct:
                 class_data['correct_records'].append(learning_record)
                 class_data['performance_metrics']['correct_count'] += 1
             else:
@@ -148,17 +183,25 @@ class OnlineLearner:
             class_data['performance_metrics']['total_feedback'] += 1
             
             # 计算最近10次的准确率
-            recent_records = list(class_data['correct_records'])[-10:] + list(class_data['incorrect_records'])[-10:]
-            if recent_records:
-                recent_correct = sum(1 for r in recent_records if r['is_correct'])
-                class_data['performance_metrics']['recent_accuracy'] = recent_correct / len(recent_records)
+            recent_correct_records = list(class_data['correct_records'])[-10:]
+            recent_incorrect_records = list(class_data['incorrect_records'])[-10:]
+            recent_total = len(recent_correct_records) + len(recent_incorrect_records)
+            
+            if recent_total > 0:
+                recent_correct_count = len(recent_correct_records)
+                class_data['performance_metrics']['recent_accuracy'] = recent_correct_count / recent_total
                 
                 # 更新最佳准确率
-                if class_data['performance_metrics']['recent_accuracy'] > class_data['performance_metrics']['best_accuracy']:
-                    class_data['performance_metrics']['best_accuracy'] = class_data['performance_metrics']['recent_accuracy']
+                current_accuracy = class_data['performance_metrics']['recent_accuracy']
+                if current_accuracy > class_data['performance_metrics']['best_accuracy']:
+                    class_data['performance_metrics']['best_accuracy'] = current_accuracy
+            
+            print(f"[ONLINE_LEARNER] 类别数据更新完成: {class_name}")
             
         except Exception as e:
             print(f"[ONLINE_LEARNER] 更新类别数据失败: {e}")
+            import traceback
+            traceback.print_exc()
     
     def _perform_micro_update(self, class_name: str):
         """执行微调更新 - 小幅调整权重"""
@@ -249,45 +292,124 @@ class OnlineLearner:
             print(f"[ONLINE_LEARNER] 重大更新失败: {e}")
     
     def _calculate_feature_adjustments(self, correct_records: List, incorrect_records: List) -> Dict:
-        """计算特征调整量"""
+        """计算特征调整量 - 修复版，处理复杂的相似度结构"""
         try:
             adjustments = {}
             
             # 计算正确案例的特征平均表现
             correct_features = {}
             for record in correct_records:
-                for feature_type, similarity in record.get('feature_similarities', {}).items():
+                feature_similarities = record.get('feature_similarities', {})
+                
+                for feature_type, similarity_data in feature_similarities.items():
                     if feature_type not in correct_features:
                         correct_features[feature_type] = []
-                    correct_features[feature_type].append(similarity)
+                    
+                    # 🔧 修复：处理不同格式的相似度数据
+                    similarity_value = self._extract_similarity_value(similarity_data)
+                    if similarity_value is not None:
+                        correct_features[feature_type].append(similarity_value)
             
             # 计算错误案例的特征平均表现
             incorrect_features = {}
             for record in incorrect_records:
-                for feature_type, similarity in record.get('feature_similarities', {}).items():
+                feature_similarities = record.get('feature_similarities', {})
+                
+                for feature_type, similarity_data in feature_similarities.items():
                     if feature_type not in incorrect_features:
                         incorrect_features[feature_type] = []
-                    incorrect_features[feature_type].append(similarity)
+                    
+                    # 🔧 修复：处理不同格式的相似度数据
+                    similarity_value = self._extract_similarity_value(similarity_data)
+                    if similarity_value is not None:
+                        incorrect_features[feature_type].append(similarity_value)
             
             # 计算调整量
             for feature_type in set(correct_features.keys()) | set(incorrect_features.keys()):
-                correct_avg = np.mean(correct_features.get(feature_type, [0])) if correct_features.get(feature_type) else 0
-                incorrect_avg = np.mean(incorrect_features.get(feature_type, [0])) if incorrect_features.get(feature_type) else 0
+                correct_values = correct_features.get(feature_type, [])
+                incorrect_values = incorrect_features.get(feature_type, [])
                 
-                # 如果正确案例中该特征表现更好，增加权重；否则减少权重
-                if correct_avg > incorrect_avg:
+                if correct_values and incorrect_values:
+                    correct_avg = np.mean(correct_values)
+                    incorrect_avg = np.mean(incorrect_values)
+                    
+                    # 如果正确案例中该特征表现更好，增加权重；否则减少权重
                     adjustments[feature_type] = (correct_avg - incorrect_avg) * 0.5
-                else:
-                    adjustments[feature_type] = (correct_avg - incorrect_avg) * 0.5
+                elif correct_values:
+                    # 只有正确案例有数据，轻微增加权重
+                    adjustments[feature_type] = np.mean(correct_values) * 0.1
+                elif incorrect_values:
+                    # 只有错误案例有数据，轻微减少权重
+                    adjustments[feature_type] = -np.mean(incorrect_values) * 0.1
             
             return adjustments
             
         except Exception as e:
             print(f"[ONLINE_LEARNER] 计算特征调整失败: {e}")
+            import traceback
+            traceback.print_exc()
             return {}
+
+    # 2. 新增辅助方法：提取相似度值
+    def _extract_similarity_value(self, similarity_data) -> Optional[float]:
+        """
+        从相似度数据中提取数值 - 处理多种格式
+        """
+        try:
+            if similarity_data is None:
+                return None
+            
+            # 如果是数字，直接返回
+            if isinstance(similarity_data, (int, float)):
+                return float(similarity_data)
+            
+            # 如果是numpy数值类型
+            if isinstance(similarity_data, (np.integer, np.floating)):
+                return float(similarity_data)
+            
+            # 如果是字典，尝试提取常见的数值字段
+            if isinstance(similarity_data, dict):
+                # 按优先级尝试不同字段
+                value_fields = [
+                    'final_score', 'average_score', 'contribution', 
+                    'overall_score', 'score', 'value', 'similarity'
+                ]
+                
+                for field in value_fields:
+                    if field in similarity_data:
+                        value = similarity_data[field]
+                        if isinstance(value, (int, float, np.integer, np.floating)):
+                            return float(value)
+                
+                # 如果没有找到标准字段，尝试找到第一个数值
+                for key, value in similarity_data.items():
+                    if isinstance(value, (int, float, np.integer, np.floating)):
+                        return float(value)
+                
+                return None
+            
+            # 如果是列表，取平均值
+            if isinstance(similarity_data, (list, tuple)):
+                numeric_values = []
+                for item in similarity_data:
+                    if isinstance(item, (int, float, np.integer, np.floating)):
+                        numeric_values.append(float(item))
+                
+                return np.mean(numeric_values) if numeric_values else None
+            
+            # 尝试转换为float
+            try:
+                return float(similarity_data)
+            except (ValueError, TypeError):
+                return None
+                
+        except Exception as e:
+            print(f"[ONLINE_LEARNER] 提取相似度值失败: {e}")
+            return None
+
     
     def _optimize_weights_from_history(self, correct_records: List, incorrect_records: List) -> Optional[Dict]:
-        """基于历史数据优化权重"""
+        """基于历史数据优化权重 - 修复版"""
         try:
             # 收集所有特征数据
             all_features = set()
@@ -304,13 +426,18 @@ class OnlineLearner:
                 correct_similarities = []
                 incorrect_similarities = []
                 
+                # 🔧 修复：使用新的相似度值提取方法
                 for record in correct_records:
-                    sim = record.get('feature_similarities', {}).get(feature_type, 0)
-                    correct_similarities.append(sim)
+                    similarity_data = record.get('feature_similarities', {}).get(feature_type)
+                    similarity_value = self._extract_similarity_value(similarity_data)
+                    if similarity_value is not None:
+                        correct_similarities.append(similarity_value)
                 
                 for record in incorrect_records:
-                    sim = record.get('feature_similarities', {}).get(feature_type, 0)
-                    incorrect_similarities.append(sim)
+                    similarity_data = record.get('feature_similarities', {}).get(feature_type)
+                    similarity_value = self._extract_similarity_value(similarity_data)
+                    if similarity_value is not None:
+                        incorrect_similarities.append(similarity_value)
                 
                 if correct_similarities and incorrect_similarities:
                     # 计算分离度 - 正确案例均值与错误案例均值的差异
@@ -326,12 +453,19 @@ class OnlineLearner:
                     # 综合性能指标
                     performance = separation * stability
                     feature_performances[feature_type] = max(0.01, performance)
+                elif correct_similarities:
+                    # 只有正确样本，使用均值作为性能
+                    performance = np.mean(correct_similarities)
+                    feature_performances[feature_type] = max(0.01, performance)
             
             if not feature_performances:
                 return None
             
             # 将性能转换为权重（归一化）
             total_performance = sum(feature_performances.values())
+            if total_performance <= 0:
+                return None
+            
             optimized_weights = {
                 feature: performance / total_performance 
                 for feature, performance in feature_performances.items()
@@ -341,6 +475,8 @@ class OnlineLearner:
             
         except Exception as e:
             print(f"[ONLINE_LEARNER] 历史权重优化失败: {e}")
+            import traceback
+            traceback.print_exc()
             return None
     
     def get_class_performance_report(self, class_name: str) -> Dict:

@@ -346,7 +346,7 @@ class AdaptiveThresholdManager:
         return breakdown
     
     def save_learning_data(self):
-        """保存学习数据到文件"""
+        """保存学习数据到文件 - 修复日期序列化"""
         if not self.config_file:
             return
         
@@ -354,27 +354,67 @@ class AdaptiveThresholdManager:
             # 创建目录
             os.makedirs(os.path.dirname(self.config_file), exist_ok=True)
             
-            # 准备保存数据
+            # 🔧 准备保存数据，处理日期序列化
             save_data = {
                 'base_thresholds': self.base_thresholds,
                 'feature_weights': self.feature_weights,
                 'learning_history': {
-                    'successes': [(r[0], r[1], r[2], r[3].isoformat(), r[4]) for r in self.learning_history['successes']],
-                    'failures': [(r[0], r[1], r[2], r[3].isoformat(), r[4]) for r in self.learning_history['failures']],
-                    'adjustments': self.learning_history['adjustments']
+                    'successes': [],
+                    'failures': [],
+                    'adjustments': []
                 },
                 'performance_stats': {
-                    **self.performance_stats,
-                    'last_update': self.performance_stats['last_update'].isoformat()
+                    'total_matches': self.performance_stats['total_matches'],
+                    'successful_matches': self.performance_stats['successful_matches'],
+                    'false_positives': self.performance_stats.get('false_positives', 0),
+                    'false_negatives': self.performance_stats.get('false_negatives', 0),
+                    'last_update': self.performance_stats['last_update'].isoformat()  # 🔧 转换为字符串
                 }
             }
+            
+            # 🔧 处理学习历史中的日期对象
+            for record in self.learning_history['successes']:
+                if len(record) >= 4:
+                    serialized_record = (
+                        record[0],  # feature_key
+                        record[1],  # similarity
+                        record[2],  # feature_quality
+                        record[3].isoformat() if hasattr(record[3], 'isoformat') else str(record[3]),  # timestamp
+                        record[4] if len(record) > 4 else None  # context
+                    )
+                    save_data['learning_history']['successes'].append(serialized_record)
+            
+            for record in self.learning_history['failures']:
+                if len(record) >= 4:
+                    serialized_record = (
+                        record[0],  # feature_key
+                        record[1],  # similarity
+                        record[2],  # feature_quality
+                        record[3].isoformat() if hasattr(record[3], 'isoformat') else str(record[3]),  # timestamp
+                        record[4] if len(record) > 4 else None  # context
+                    )
+                    save_data['learning_history']['failures'].append(serialized_record)
+            
+            # 🔧 处理adjustments中的日期
+            for adjustment in self.learning_history['adjustments']:
+                if isinstance(adjustment, dict) and 'timestamp' in adjustment:
+                    adj_copy = adjustment.copy()
+                    if hasattr(adj_copy['timestamp'], 'isoformat'):
+                        adj_copy['timestamp'] = adj_copy['timestamp'].isoformat()
+                    save_data['learning_history']['adjustments'].append(adj_copy)
+                else:
+                    save_data['learning_history']['adjustments'].append(adjustment)
             
             # 保存到文件
             with open(self.config_file, 'w', encoding='utf-8') as f:
                 json.dump(save_data, f, indent=2, ensure_ascii=False)
                 
+            print(f"[ADAPTIVE] 学习数据保存成功: {self.config_file}")
+                
         except Exception as e:
             print(f"[ADAPTIVE] 保存学习数据失败: {e}")
+            import traceback
+            traceback.print_exc()
     
     def load_learning_data(self):
         """从文件加载学习数据"""

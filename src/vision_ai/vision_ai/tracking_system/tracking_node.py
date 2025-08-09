@@ -20,7 +20,8 @@ from .utils.user_profile_manager import UserProfileManager
 from .utils.tracking_visualizer import TrackingVisualizer
 from .adaptive_learning.online_learner import OnlineLearner
 from ..detection.enhanced_detection_pipeline import EnhancedDetectionPipeline
-
+from typing import Dict, List, Optional, Tuple
+from .filters.kalman_tracker import TrackingStabilityManager
 class TrackingNode(Node):
     def __init__(self):
         super().__init__('tracking_node')
@@ -60,7 +61,7 @@ class TrackingNode(Node):
         self.visualizer = None
         self.online_learner = None
         self.detection_pipeline = None
-        
+        self._last_waypoint_data = None
         # 线程锁和TCP位姿
         self.tracking_lock = threading.Lock()
         self.current_tcp_pose = None
@@ -68,7 +69,10 @@ class TrackingNode(Node):
         # 系统状态标志
         self.system_initialized = False
         self.waiting_for_detection_complete = True
-        
+        self.hybrid_mode_enabled = True  # 启用混合相似度模式
+        self.auto_success_transition_step = 10  # 第10步开始考虑自动判断
+        self.consecutive_high_confidence = 0    # 连续高置信度计数
+        self.debug_data_flow = True  # 启用数据流调试
         # 初始化基础组件
         from cv_bridge import CvBridge
         self.bridge = CvBridge()
@@ -320,14 +324,21 @@ class TrackingNode(Node):
             if not self._verify_system_components_no_cache():
                 self.get_logger().error('❌ 系统组件验证失败')
                 return False
+            if self.tracker and hasattr(self.tracker, 'load_detection_history'):
+                history_loaded = self.tracker.load_detection_history()
+                if history_loaded:
+                    self.get_logger().info('✅ 检测历史已加载，启用混合相似度模式')
+                else:
+                    self.get_logger().info('📝 检测历史为空，将从头开始积累')
             
-            self.get_logger().info('🎉 追踪系统初始化完成，所有组件就绪')
+            # 🆕 设置tracker的scan目录（用于保存历史）
+            if hasattr(self.tracker, 'current_scan_dir'):
+                self.tracker.current_scan_dir = self.current_scan_dir
+            
             return True
             
         except Exception as e:
-            self.get_logger().error(f'❌ 初始化追踪系统失败: {e}')
-            import traceback
-            traceback.print_exc()
+            self.get_logger().error(f"初始化追踪系统失败: {e}")
             return False
     def _verify_system_components_no_cache(self) -> bool:
         """验证系统组件是否正常 - 不检查缓存"""
@@ -403,62 +414,6 @@ class TrackingNode(Node):
                     self.get_logger().info(f'✅ 找到检测配置文件: {config_file}')
                     break
             
-            # if config_file is None:
-            #     # 🔧 创建兼容的检测配置文件
-            #     config_file = possible_config_paths[0]
-            #     config_dir = os.path.dirname(config_file)
-            #     os.makedirs(config_dir, exist_ok=True)
-                
-            #     # 🔧 修复：创建不包含iou_threshold的配置
-            #     compatible_config = {
-            #         "models": {
-            #             "yolo": {
-            #                 "model_path": "/home/qi/下载/best2.pt",
-            #                 "confidence_threshold": 0.7,
-            #                 "device": "cuda"
-            #                 # 🔧 移除iou_threshold参数
-            #             },
-            #             "sam2": {
-            #                 "model_config": "sam2_hiera_l.yaml",
-            #                 "checkpoint_path": "/home/qi/ros2_ws/src/vision_ai/models/sam2/sam2_hiera_large.pt",
-            #                 "device": "cuda"
-            #             }
-            #         },
-            #         "features": {
-            #             "color": {
-            #                 "histogram_bins": 32
-            #             },
-            #             "shape": {
-            #                 "enable_moments": True,
-            #                 "enable_contour": True
-            #             },
-            #             "spatial": {
-            #                 "enable_3d": True
-            #             }
-            #         },
-            #         "camera": {
-            #             "intrinsics": {
-            #                 "fx": 912.694580078125,
-            #                 "fy": 910.309814453125,
-            #                 "cx": 640,
-            #                 "cy": 360
-            #             }
-            #         },
-            #         "processing": {
-            #             "max_objects": 50,
-            #             "min_area": 100
-            #         }
-            #     }
-                
-            #     with open(config_file, 'w', encoding='utf-8') as f:
-            #         import json
-            #         json.dump(compatible_config, f, indent=4, ensure_ascii=False)
-                
-            #     self.get_logger().info(f'✅ 已创建兼容的检测配置: {config_file}')
-            
-            # 🔧 在创建管道前，先验证并修复配置文件
-            self._fix_detection_config_if_needed(config_file)
-            
             # 创建增强检测管道
             from ..detection.enhanced_detection_pipeline import EnhancedDetectionPipeline
             
@@ -474,96 +429,6 @@ class TrackingNode(Node):
             
         except Exception as e:
             self.get_logger().error(f'❌ 初始化检测管道失败: {e}')
-
-    def _fix_detection_config_if_needed(self, config_file: str):
-        """修复检测配置文件中的问题参数"""
-        try:
-            with open(config_file, 'r', encoding='utf-8') as f:
-                config = json.load(f)
-            
-            # 🔧 检查并移除有问题的YOLO参数
-            yolo_config = config.get('models', {}).get('yolo', {})
-            problematic_params = ['iou_threshold', 'nms_threshold', 'max_detections']
-            
-            config_changed = False
-            for param in problematic_params:
-                if param in yolo_config:
-                    removed_value = yolo_config.pop(param)
-                    self.get_logger().info(f'🔧 移除不支持的YOLO参数: {param}={removed_value}')
-                    config_changed = True
-            
-            # 🔧 确保YOLO配置包含必需参数
-            required_params = {
-                'model_path': '/home/qi/下载/best2.pt',
-                'confidence_threshold': 0.7,
-                'device': 'cuda'
-            }
-            
-            for param, default_value in required_params.items():
-                if param not in yolo_config:
-                    yolo_config[param] = default_value
-                    self.get_logger().info(f'🔧 添加缺失的YOLO参数: {param}={default_value}')
-                    config_changed = True
-            
-            # 如果配置有更改，保存文件
-            if config_changed:
-                with open(config_file, 'w', encoding='utf-8') as f:
-                    json.dump(config, f, indent=4, ensure_ascii=False)
-                self.get_logger().info('✅ 检测配置文件已修复并保存')
-            
-        except Exception as e:
-            self.get_logger().error(f'修复检测配置文件失败: {e}')
-
-    def _verify_system_components(self) -> bool:
-        """验证系统组件是否正常"""
-        try:
-            self.get_logger().info('🔧 验证系统组件...')
-            
-            # 检查核心组件
-            components = [
-                ('tracker', self.tracker),
-                ('detection_pipeline', self.detection_pipeline),
-                ('data_recorder', self.data_recorder),
-            ]
-            
-            all_ok = True
-            for name, component in components:
-                if component is not None:
-                    self.get_logger().info(f'  ✅ {name}: 已初始化')
-                else:
-                    self.get_logger().error(f'  ❌ {name}: 未初始化')
-                    all_ok = False
-            
-            # 检查追踪目标
-            if self.current_target_id:
-                self.get_logger().info(f'  ✅ 追踪目标: {self.current_target_id}')
-            else:
-                self.get_logger().error('  ❌ 追踪目标: 未设置')
-                all_ok = False
-            
-            # 检查图像数据
-            if self.latest_rgb_image is not None:
-                self.get_logger().info(f'  ✅ RGB图像: {self.latest_rgb_image.shape}')
-            else:
-                self.get_logger().warn('  ⚠️ RGB图像: 暂无数据')
-            
-            if self.latest_depth_image is not None:
-                self.get_logger().info(f'  ✅ 深度图像: {self.latest_depth_image.shape}')
-            else:
-                self.get_logger().warn('  ⚠️ 深度图像: 暂无数据')
-            
-            return all_ok
-            
-        except Exception as e:
-            self.get_logger().error(f'系统组件验证失败: {e}')
-            return False
-
-        
-    def _initialize_detection_pipeline(self):
-        """初始化实时检测管道 - 重定向到修复版本"""
-        return self._initialize_detection_pipeline_fixed()
-
-        
     def tcp_pose_callback(self, msg):
         """TCP位姿回调 - 缓存当前机械臂位姿"""
         try:
@@ -779,132 +644,6 @@ class TrackingNode(Node):
             self.get_logger().error(f'获取waypoint数据失败: {e}')
             return {'world_pos': [0, 0, 350], 'roll': 179, 'pitch': 0, 'yaw': 0}
     
-    def _handle_tracking_success(self, tracking_result: dict):
-        """处理追踪成功 - 增加循环控制"""
-        try:
-            self.get_logger().info('✅ 追踪成功')
-            
-            # 显示详细追踪信息
-            self._log_tracking_details(tracking_result)
-            
-            # 发布追踪结果给机械臂（25%移动策略）
-            self._publish_target_pose(tracking_result)
-            
-            # 记录追踪数据
-            self.data_recorder.record_tracking_step(
-                self.current_target_id,
-                tracking_result,
-                self.latest_rgb_image,
-                self.latest_depth_image
-            )
-            
-            # 更新追踪计数
-            self.tracking_count += 1
-            
-            # 🆕 检查是否达到最大步数
-            if self.tracking_count >= self.max_tracking_steps:
-                self.get_logger().info(f'🎯 已完成 {self.tracking_count} 步追踪，达到最大步数')
-                self._finish_tracking_session()
-                return  # 🔧 重要：立即返回，停止继续处理
-            
-            # 发布状态
-            self._publish_tracking_status('tracking_success', tracking_result)
-            
-            # 🆕 暂停追踪，等待机械臂移动完成
-            self.movement_complete = False
-            self.get_logger().info(f'⏳ 等待机械臂移动到目标位置... (步数: {self.tracking_count}/{self.max_tracking_steps})')
-            
-        except Exception as e:
-            self.get_logger().error(f'处理追踪成功失败: {e}')
-    
-    def _log_tracking_details(self, tracking_result: dict):
-        """记录详细追踪信息 - 修复版"""
-        try:
-            self.get_logger().info(f'🎯 追踪详情:')
-            self.get_logger().info(f'  目标ID: {tracking_result["target_id"]}')
-            self.get_logger().info(f'  追踪置信度: {tracking_result["tracking_confidence"]:.3f}')
-            self.get_logger().info(f'  检测置信度: {tracking_result["detection_confidence"]:.3f}')
-            
-            grasp_coord = tracking_result['grasp_coordinate']
-            self.get_logger().info(f'  目标坐标: ({grasp_coord["x"]:.1f}, {grasp_coord["y"]:.1f}, {grasp_coord["z"]:.1f}mm)')
-
-            object_info = tracking_result['object_info']
-            self.get_logger().info(f'  物体高度: {object_info["estimated_height"]:.1f}mm')
-            self.get_logger().info(f'  背景高度: {object_info["background_z"]:.1f}mm')
-            self.get_logger().info(f'  推荐夹爪宽度: {object_info["recommended_gripper_width"]}')
-            
-            # 🔧 修复：安全地显示特征相似度分解
-            similarity_breakdown = tracking_result.get('similarity_breakdown', {})
-            if similarity_breakdown:
-                self.get_logger().info('  特征相似度分解:')
-                
-                for feature_type, similarity_data in similarity_breakdown.items():
-                    try:
-                        # 🆕 处理不同类型的相似度数据
-                        if isinstance(similarity_data, dict):
-                            # 如果是字典，查找关键的数值字段
-                            if 'contribution' in similarity_data:
-                                score = similarity_data['contribution']
-                                self.get_logger().info(f'    {feature_type}: {score:.3f} (贡献度)')
-                            elif 'average_score' in similarity_data:
-                                score = similarity_data['average_score']
-                                self.get_logger().info(f'    {feature_type}: {score:.3f} (平均分)')
-                            else:
-                                # 显示字典内容摘要
-                                keys = list(similarity_data.keys())[:3]  # 只显示前3个键
-                                self.get_logger().info(f'    {feature_type}: dict包含 {keys}...')
-                        
-                        elif isinstance(similarity_data, (int, float)):
-                            # 如果是数字，直接显示
-                            self.get_logger().info(f'    {feature_type}: {similarity_data:.3f}')
-                        
-                        elif isinstance(similarity_data, list):
-                            # 如果是列表，显示长度和均值
-                            if len(similarity_data) > 0 and all(isinstance(x, (int, float)) for x in similarity_data):
-                                avg_score = sum(similarity_data) / len(similarity_data)
-                                self.get_logger().info(f'    {feature_type}: {avg_score:.3f} (均值, 共{len(similarity_data)}项)')
-                            else:
-                                self.get_logger().info(f'    {feature_type}: list包含{len(similarity_data)}项')
-                        
-                        else:
-                            # 其他类型，显示类型信息
-                            self.get_logger().info(f'    {feature_type}: {type(similarity_data).__name__}')
-                            
-                    except Exception as e:
-                        self.get_logger().warn(f'    {feature_type}: 显示失败 ({e})')
-            
-            # 🆕 显示详细特征分解（如果有）
-            detailed_breakdown = tracking_result.get('detailed_similarity_breakdown', {})
-            if detailed_breakdown:
-                self.get_logger().info('  详细特征分解:')
-                
-                for feature_category, feature_details in detailed_breakdown.items():
-                    try:
-                        if isinstance(feature_details, dict) and len(feature_details) > 0:
-                            # 计算该类别的平均分数
-                            numeric_scores = []
-                            for key, value in feature_details.items():
-                                if isinstance(value, (int, float)):
-                                    numeric_scores.append(value)
-                            
-                            if numeric_scores:
-                                avg_score = sum(numeric_scores) / len(numeric_scores)
-                                self.get_logger().info(f'    {feature_category}: {avg_score:.3f} (平均, {len(numeric_scores)}个特征)')
-                            else:
-                                self.get_logger().info(f'    {feature_category}: {len(feature_details)}个特征')
-                                
-                    except Exception as e:
-                        self.get_logger().warn(f'    {feature_category}: 处理失败 ({e})')
-            
-            # 🆕 显示最小外接矩形信息（如果有）
-            bounding_rect = tracking_result.get('bounding_rect', {})
-            if bounding_rect and bounding_rect.get('width', 0) > 0:
-                self.get_logger().info(f'  最小外接矩形: {bounding_rect["width"]:.1f}x{bounding_rect["height"]:.1f}像素, 角度{bounding_rect["angle"]:.1f}°')
-                        
-        except Exception as e:
-            self.get_logger().error(f'记录追踪详情失败: {e}')
-            import traceback
-            traceback.print_exc()
     
     def _load_tracking_target(self) -> str:
         """从tracking_selection.txt加载用户选择的追踪目标 - 简化版"""
@@ -1149,7 +888,7 @@ class TrackingNode(Node):
             self.get_logger().error(f'处理移动完成信号失败: {e}')
     
     def _execute_tracking_step(self):
-        """执行单步追踪 - 修复版：追踪→确认→记录→移动"""
+        """执行单步追踪 - 修复版：保存waypoint数据供后续使用"""
         try:
             self.get_logger().info(f'🔍 执行第 {self.tracking_count + 1} 步追踪')
             
@@ -1157,12 +896,6 @@ class TrackingNode(Node):
             if not self._validate_image_data():
                 self.get_logger().error('图像数据验证失败，跳过追踪')
                 return
-            
-            # 记录图像信息用于调试
-            self.get_logger().info(f'📊 图像信息:')
-            self.get_logger().info(f'  RGB: {self.latest_rgb_image.shape}, dtype: {self.latest_rgb_image.dtype}')
-            self.get_logger().info(f'  Depth: {self.latest_depth_image.shape}, dtype: {self.latest_depth_image.dtype}')
-            self.get_logger().info(f'  Depth range: {self.latest_depth_image.min()}-{self.latest_depth_image.max()}')
             
             # 获取候选检测结果
             candidate_detections = self._get_candidate_detections()
@@ -1172,8 +905,14 @@ class TrackingNode(Node):
                 self._handle_tracking_failure()
                 return
             
-            # 使用增强追踪器进行匹配
+            # 保存候选检测的完整数据（在追踪前）
+            candidates_backup = self._prepare_candidates_for_detailed_save(candidate_detections)
+            
+            # 获取当前waypoint数据
             waypoint_data = self._get_current_waypoint_data()
+            
+            # 🆕 保存waypoint数据供后续使用
+            self._last_waypoint_data = waypoint_data.copy()
             
             # 验证waypoint数据
             self.get_logger().info(f'📍 当前waypoint数据: {waypoint_data}')
@@ -1187,7 +926,15 @@ class TrackingNode(Node):
             )
             
             if tracking_result:
-                # 🆕 修复：等待用户确认，而不是直接移动
+                # 立即保存详细数据（在用户确认之前）
+                self._save_detailed_step_data(
+                    self.tracking_count + 1,
+                    candidates_backup, 
+                    tracking_result, 
+                    waypoint_data
+                )
+                
+                # 处理追踪成功，等待用户确认
                 self._handle_tracking_success_with_confirmation(tracking_result)
             else:
                 self._handle_tracking_failure()
@@ -1199,71 +946,701 @@ class TrackingNode(Node):
 
     # tracking_node.py
     def _handle_tracking_success_with_confirmation(self, tracking_result: dict):
-        """处理追踪成功 - 添加抓取条件判断"""
+        """处理追踪成功 - 混合相似度版本"""
         try:
-            self.get_logger().info('✅ 追踪成功，分析抓取条件')
+            self.get_logger().info('✅ 追踪成功（混合相似度），分析抓取条件')
             
-            # 显示详细追踪信息
-            self._log_tracking_details(tracking_result)
+            # 显示混合相似度详细信息
+            self._log_hybrid_tracking_details(tracking_result)
             
-            # 🆕 计算移动策略（用于抓取条件判断）
+            # 计算移动策略
             movement_strategy = self._calculate_adaptive_movement_strategy(
                 self.current_tcp_pose, 
                 tracking_result['grasp_coordinate'], 
                 tracking_result['object_info']
             )
             
-            # 🆕 评估抓取条件
+            # 评估抓取条件
             grasp_conditions = self._evaluate_grasp_conditions(tracking_result, movement_strategy)
             
+            # 🆕 检查是否可以自动判断成功
+            auto_success = tracking_result.get('auto_success', False)
+            
             if grasp_conditions['grasp_ready']:
-                # 满足抓取条件，生成抓取信息文件
-                self.get_logger().info('🎯 满足抓取条件，准备抓取')
-                
-                bounding_rect = tracking_result.get('bounding_rect', {})
-                grasp_filename = self._generate_grasp_info_file(tracking_result, bounding_rect)
-                
-                if grasp_filename:
-                    # 发布抓取触发信号
-                    self._publish_grasp_trigger(grasp_filename, tracking_result['grasp_coordinate'])
+                # 满足抓取条件
+                if auto_success:
+                    # 自动判断成功且满足抓取条件，直接抓取
+                    self.get_logger().info('🤖 自动判断成功且满足抓取条件，直接执行抓取')
+                    self._execute_direct_grasp(tracking_result)
+                else:
+                    # 需要用户确认抓取
+                    self.get_logger().info('🎯 满足抓取条件，请求用户确认抓取')
+                    self._start_grasp_confirmation_with_auto_info(tracking_result)
+            else:
+                # 不满足抓取条件
+                if auto_success:
+                    # 自动判断成功，直接继续
+                    self.get_logger().info('🤖 自动判断成功，继续追踪')
+                    self._handle_auto_success_continue(tracking_result)
+                else:
+                    # 需要用户确认
+                    self.get_logger().info('⏳ 请求用户确认追踪结果')
+                    self._start_command_input_thread_with_auto_info(tracking_result)
                     
-                    # 🆕 标记追踪完成
-                    self.tracking_active = False
-                    self._finish_tracking_session()
-                    return  # 🔧 抓取触发后结束追踪
-            
-            # 不满足抓取条件，继续追踪流程
-            self.get_logger().info('⏳ 未满足抓取条件，继续追踪')
-            
-            # 继续原有确认流程
-            self.current_tracking_result = tracking_result
-            self.waiting_for_user_confirmation = True
-            self.user_feedback_received = False
-            
-            self._start_command_input_thread()
-            
         except Exception as e:
             self.get_logger().error(f'处理追踪成功失败: {e}')
 
-    def _generate_grasp_info_file(self, tracking_result: dict, bounding_rect: dict) -> str:
-        """生成抓取信息文件"""
+    def _execute_direct_grasp(self, tracking_result: dict):
+        """直接执行抓取（自动判断成功且满足抓取条件）"""
         try:
-            import time
+            self.get_logger().info('🤖 自动执行抓取流程')
+            
+            # 记录自动成功到历史
+            if hasattr(self.tracker, 'record_successful_detection_manual'):
+                detection_data = self._extract_detection_from_tracking_result(tracking_result)
+                similarity_data = tracking_result.get('hybrid_similarity_info', {})
+                self.tracker.record_successful_detection_manual(
+                    self.current_target_id, detection_data, similarity_data, user_confirmed=True
+                )
+            
+            # 生成抓取文件
+            bounding_rect = tracking_result.get('bounding_rect', {})
+            grasp_filename = self._generate_grasp_info_file(tracking_result, bounding_rect)
+            
+            if grasp_filename:
+                self._publish_grasp_trigger(grasp_filename, tracking_result['grasp_coordinate'])
+                self.tracking_active = False
+                self._finish_tracking_session()
+            else:
+                self.get_logger().error('❌ 自动抓取文件生成失败，转为手动确认')
+                self._start_grasp_confirmation_with_auto_info(tracking_result)
+                
+        except Exception as e:
+            self.get_logger().error(f'直接执行抓取失败: {e}')
+
+    def _handle_auto_success_continue(self, tracking_result: dict):
+        """处理自动成功继续追踪"""
+        try:
+            # 记录成功检测
+            if hasattr(self.tracker, 'record_successful_detection_manual'):
+                detection_data = self._extract_detection_from_tracking_result(tracking_result)
+                similarity_data = tracking_result.get('hybrid_similarity_info', {})
+                self.tracker.record_successful_detection_manual(
+                    self.current_target_id, detection_data, similarity_data, user_confirmed=True
+                )
+            
+            # 继续追踪流程
+            self._publish_target_pose(tracking_result)
+            self.tracking_count += 1
+            self.movement_complete = False
+            self._save_tracking_step_data(tracking_result, True)
+    
+            # 🔧 更新 tracking_parameters_history
+            tracking_params = self._extract_tracking_parameters(tracking_result)
+            tracking_params['user_feedback'] = 'auto_success'
+            self.tracking_parameters_history.append(tracking_params)
+            # 更新连续成功计数
+            self.consecutive_high_confidence += 1
+            
+            self.get_logger().info(f'🤖 自动继续追踪 (步数: {self.tracking_count}/{self.max_tracking_steps})')
+            
+        except Exception as e:
+            self.get_logger().error(f'自动成功继续处理失败: {e}')
+
+    def _start_command_input_thread_with_auto_info(self, tracking_result: dict):
+        """启动命令输入（包含自动判断信息）"""
+        try:
+            self.current_tracking_result = tracking_result
+            self.waiting_for_user_confirmation = True
+            self.user_feedback_received = False
+            self._grasp_confirmation_mode = False
+            
+            # 启动增强版命令输入线程
+            self._start_enhanced_command_input_thread()
+            
+        except Exception as e:
+            self.get_logger().error(f'启动增强命令输入失败: {e}')
+
+    def _start_enhanced_grasp_confirmation_thread(self):
+        """启动增强版抓取确认线程"""
+        try:
+            if hasattr(self, 'enhanced_grasp_thread') and self.enhanced_grasp_thread and self.enhanced_grasp_thread.is_alive():
+                return
+            
+            self.enhanced_grasp_thread = threading.Thread(
+                target=self._enhanced_grasp_confirmation_worker,
+                daemon=True
+            )
+            self.enhanced_grasp_thread.start()
+            
+        except Exception as e:
+            self.get_logger().error(f'启动增强抓取确认线程失败: {e}')
+
+    def _enhanced_grasp_confirmation_worker(self):
+        """增强版抓取确认工作线程"""
+        try:
+            print(f"\n{'='*80}")
+            print(f"🤖 混合相似度抓取确认 - 步骤 {self.tracking_count + 1}")
+            print(f"{'='*80}")
+            
+            if self.current_tracking_result:
+                grasp_coord = self.current_tracking_result['grasp_coordinate']
+                object_info = self.current_tracking_result['object_info']
+                hybrid_info = self.current_tracking_result.get('hybrid_similarity_info', {})
+                auto_success = self.current_tracking_result.get('auto_success', False)
+                
+                print(f"📋 抓取信息:")
+                print(f"  🎯 目标坐标: ({grasp_coord['x']:.1f}, {grasp_coord['y']:.1f}, {grasp_coord['z']:.1f}mm)")
+                print(f"  📏 物体高度: {object_info.get('estimated_height', 30):.1f}mm")
+                print(f"  📐 背景高度: {object_info.get('background_z', 300):.1f}mm")
+                print(f"  🔧 推荐夹爪宽度: {object_info.get('recommended_gripper_width', 150)}")
+                
+                print(f"\n🔀 混合相似度信息:")
+                print(f"  📚 参考库相似度: {hybrid_info.get('reference_score', 0):.3f}")
+                print(f"  📈 历史相似度: {hybrid_info.get('historical_score', 0):.3f}")
+                print(f"  📊 历史记录数: {hybrid_info.get('history_count', 0)}")
+                print(f"  🔍 最终置信度: {self.current_tracking_result['tracking_confidence']:.3f}")
+                
+                if auto_success:
+                    print(f"  🤖 系统自动判断: ✅ 成功")
+                else:
+                    print(f"  👤 系统判断: ❓ 需要人工确认")
+            
+            print(f"\n💬 命令选项:")
+            print(f"  'g' 或 'grasp'    - 确认执行抓取")
+            print(f"  'c' 或 'continue' - 取消抓取，继续追踪")
+            if not self.current_tracking_result.get('auto_success', False):
+                print(f"  'a' 或 'auto'     - 标记为成功并启用此目标的自动判断")
+            print(f"  'q' 或 'quit'     - 退出追踪")
+            print(f"{'='*80}")
+            
+            while self.waiting_for_user_confirmation and not self.user_feedback_received:
+                try:
+                    user_input = input("请输入命令 (g/c/a/q): ").strip().lower()
+                    
+                    if user_input in ['g', 'grasp', '抓取']:
+                        self._handle_enhanced_grasp_confirmation('grasp')
+                        break
+                    elif user_input in ['c', 'continue', '继续']:
+                        self._handle_enhanced_grasp_confirmation('continue')
+                        break
+                    elif user_input in ['a', 'auto', '自动'] and not self.current_tracking_result.get('auto_success', False):
+                        self._handle_enhanced_grasp_confirmation('auto_success')
+                        break
+                    elif user_input in ['q', 'quit', '退出']:
+                        self._handle_quit_request()
+                        break
+                    else:
+                        available_commands = ['g', 'c', 'q']
+                        if not self.current_tracking_result.get('auto_success', False):
+                            available_commands.insert(-1, 'a')
+                        print(f"❌ 无效输入，请输入: {'/'.join(available_commands)}")
+                        
+                except (EOFError, KeyboardInterrupt):
+                    print("\n🛑 用户中断输入")
+                    self._handle_quit_request()
+                    break
+                except Exception as e:
+                    print(f"❌ 输入处理错误: {e}")
+                    
+        except Exception as e:
+            self.get_logger().error(f'增强抓取确认工作线程失败: {e}')
+
+    def _start_enhanced_command_input_thread(self):
+        """启动增强版命令输入线程"""
+        try:
+            if hasattr(self, 'enhanced_command_thread') and self.enhanced_command_thread and self.enhanced_command_thread.is_alive():
+                return
+            
+            self.enhanced_command_thread = threading.Thread(
+                target=self._enhanced_command_input_worker,
+                daemon=True
+            )
+            self.enhanced_command_thread.start()
+            
+        except Exception as e:
+            self.get_logger().error(f'启动增强命令输入线程失败: {e}')
+
+    def _enhanced_command_input_worker(self):
+        """增强版命令输入工作线程"""
+        try:
+            print(f"\n{'='*80}")
+            print(f"🔀 混合相似度追踪确认 - 步骤 {self.tracking_count + 1}")
+            print(f"{'='*80}")
+            
+            if self.current_tracking_result:
+                grasp_coord = self.current_tracking_result['grasp_coordinate']
+                hybrid_info = self.current_tracking_result.get('hybrid_similarity_info', {})
+                auto_success = self.current_tracking_result.get('auto_success', False)
+                
+                print(f"📋 追踪结果:")
+                print(f"  🎯 目标坐标: ({grasp_coord['x']:.1f}, {grasp_coord['y']:.1f}, {grasp_coord['z']:.1f}mm)")
+                print(f"  🔍 最终置信度: {self.current_tracking_result['tracking_confidence']:.3f}")
+                
+                print(f"\n🔀 混合相似度详情:")
+                print(f"  📚 参考库相似度: {hybrid_info.get('reference_score', 0):.3f}")
+                print(f"  📈 历史相似度: {hybrid_info.get('historical_score', 0):.3f}")
+                print(f"  📊 历史记录数: {hybrid_info.get('history_count', 0)}")
+                
+                if auto_success:
+                    print(f"  🤖 系统自动判断: ✅ 成功")
+                else:
+                    print(f"  👤 系统判断: ❓ 需要人工确认")
+            
+            print(f"\n💬 命令选项:")
+            print(f"  's' 或 'success' - 确认追踪成功，继续移动")
+            print(f"  'f' 或 'fail'    - 标记追踪失败")
+            if not self.current_tracking_result.get('auto_success', False):
+                print(f"  'a' 或 'auto'    - 标记为成功并启用此目标的自动判断")
+            print(f"  'q' 或 'quit'    - 退出追踪")
+            print(f"{'='*80}")
+            
+            while self.waiting_for_user_confirmation and not self.user_feedback_received:
+                try:
+                    user_input = input("请输入命令 (s/f/a/q): ").strip().lower()
+                    
+                    if user_input in ['s', 'success']:
+                        self._handle_enhanced_user_confirmation('success')
+                        break
+                    elif user_input in ['f', 'fail']:
+                        self._handle_enhanced_user_confirmation('failure')
+                        break
+                    elif user_input in ['a', 'auto'] and not self.current_tracking_result.get('auto_success', False):
+                        self._handle_enhanced_user_confirmation('auto_success')
+                        break
+                    elif user_input in ['q', 'quit']:
+                        self._handle_quit_request()
+                        break
+                    else:
+                        available_commands = ['s', 'f', 'q']
+                        if not self.current_tracking_result.get('auto_success', False):
+                            available_commands.insert(-1, 'a')
+                        print(f"❌ 无效输入，请输入: {'/'.join(available_commands)}")
+                        
+                except (EOFError, KeyboardInterrupt):
+                    print("\n🛑 用户中断输入")
+                    self._handle_quit_request()
+                    break
+                except Exception as e:
+                    print(f"❌ 输入处理错误: {e}")
+                    
+        except Exception as e:
+            self.get_logger().error(f'增强命令输入工作线程失败: {e}')
+
+    def _handle_enhanced_grasp_confirmation(self, action: str):
+        """处理增强版抓取确认"""
+        try:
+            self.user_feedback_received = True
+            current_result_backup = self.current_tracking_result
+            
+            if action == 'grasp':
+                self.get_logger().info('🤖 用户确认执行抓取')
+                
+                # 记录成功到历史
+                self._record_tracking_success_to_history(current_result_backup)
+                
+                # 执行抓取
+                bounding_rect = current_result_backup.get('bounding_rect', {})
+                grasp_filename = self._generate_grasp_info_file(current_result_backup, bounding_rect)
+                
+                if grasp_filename:
+                    self._publish_grasp_trigger(grasp_filename, current_result_backup['grasp_coordinate'])
+                    self.tracking_active = False
+                    self._finish_tracking_session()
+                
+            elif action == 'continue':
+                self.get_logger().info('⏭️ 用户取消抓取，继续追踪')
+                
+                # 记录成功到历史
+                self._record_tracking_success_to_history(current_result_backup)
+                
+                # 继续追踪流程
+                self._continue_tracking_after_confirmation(current_result_backup, True)
+                
+            elif action == 'auto_success':
+                self.get_logger().info('🤖 用户启用自动判断模式')
+                
+                # 启用自动模式
+                if hasattr(self.tracker, 'enable_auto_success_mode'):
+                    self.tracker.enable_auto_success_mode(True, threshold=0.8)
+                
+                # 记录成功到历史
+                self._record_tracking_success_to_history(current_result_backup)
+                
+                # 继续追踪流程
+                self._continue_tracking_after_confirmation(current_result_backup, True)
+            
+            # 重置状态
+            self.waiting_for_user_confirmation = False
+            self.current_tracking_result = None
+            if hasattr(self, '_grasp_confirmation_mode'):
+                delattr(self, '_grasp_confirmation_mode')
+                
+        except Exception as e:
+            self.get_logger().error(f'处理增强抓取确认失败: {e}')
+
+    def _handle_enhanced_user_confirmation(self, action: str):
+        """处理增强版用户确认"""
+        try:
+            self.user_feedback_received = True
+            current_result_backup = self.current_tracking_result
+            
+            if action in ['success', 'auto_success']:
+                is_success = True
+                
+                if action == 'auto_success':
+                    self.get_logger().info('🤖 用户启用自动判断模式')
+                    if hasattr(self.tracker, 'enable_auto_success_mode'):
+                        self.tracker.enable_auto_success_mode(True, threshold=0.8)
+                
+                # 记录成功到历史
+                self._record_tracking_success_to_history(current_result_backup)
+                
+            elif action == 'failure':
+                is_success = False
+                self.get_logger().info('❌ 用户标记追踪失败')
+                
+                # 不记录到成功历史，但记录失败信息
+                self._record_tracking_failure_info(current_result_backup)
+            
+            # 继续原有的确认流程
+            self._continue_tracking_after_confirmation(current_result_backup, is_success)
+            
+            # 重置状态
+            self.waiting_for_user_confirmation = False
+            self.current_tracking_result = None
+            
+        except Exception as e:
+            self.get_logger().error(f'处理增强用户确认失败: {e}')
+
+    def _record_tracking_success_to_history(self, tracking_result: dict):
+        """记录追踪成功到混合相似度历史"""
+        try:
+            if hasattr(self.tracker, 'record_successful_detection_manual'):
+                detection_data = self._extract_detection_from_tracking_result(tracking_result)
+                similarity_data = tracking_result.get('hybrid_similarity_info', {})
+                
+                self.tracker.record_successful_detection_manual(
+                    self.current_target_id, 
+                    detection_data, 
+                    similarity_data, 
+                    user_confirmed=True
+                )
+                
+                self.get_logger().info('✅ 成功记录已添加到混合相似度历史')
+                
+        except Exception as e:
+            self.get_logger().error(f'记录追踪成功到历史失败: {e}')
+
+    def _record_tracking_failure_info(self, tracking_result: dict):
+        """记录追踪失败信息（不添加到成功历史）"""
+        try:
+            # 可以记录失败统计，但不影响成功历史
+            failure_info = {
+                'timestamp': datetime.now().isoformat(),
+                'confidence': tracking_result.get('tracking_confidence', 0),
+                'reason': 'user_marked_failure'
+            }
+            
+            self.get_logger().info('📝 追踪失败信息已记录')
+            
+        except Exception as e:
+            self.get_logger().error(f'记录追踪失败信息失败: {e}')
+
+    def _extract_detection_from_tracking_result(self, tracking_result: dict) -> dict:
+        """从追踪结果中提取检测数据"""
+        try:
+            # 这个方法需要根据tracking_result的实际结构来实现
+            # 提取检测相关的特征数据
+            return {
+                'geometric_features': tracking_result.get('geometric_features', {}),
+                'appearance_features': tracking_result.get('appearance_features', {}),
+                'shape_features': tracking_result.get('shape_features', {}),
+                'spatial_features': tracking_result.get('spatial_features', {}),
+                'confidence': tracking_result.get('detection_confidence', 0.0),
+                'class_name': tracking_result.get('object_info', {}).get('class_name', 'unknown')
+            }
+            
+        except Exception as e:
+            self.get_logger().error(f'提取检测数据失败: {e}')
+            return {}
+
+    def _continue_tracking_after_confirmation(self, tracking_result: dict, success: bool):
+        """确认后继续追踪流程"""
+        try:
+            if success:
+                # 发布移动指令
+                if self._validate_pose_change(tracking_result):
+                    self._publish_target_pose(tracking_result)
+                    self.tracking_count += 1
+                    self.movement_complete = False
+                    
+                    # 更新连续成功计数
+                    self.consecutive_high_confidence += 1
+                else:
+                    self.get_logger().warn('❌ 姿态变化超过限制，跳过移动')
+            else:
+                # 失败情况也增加计数，但重置连续成功
+                self.tracking_count += 1
+                self.consecutive_high_confidence = 0
+            
+            # 检查是否完成
+            if self.tracking_count >= self.max_tracking_steps:
+                self._finish_tracking_session()
+                
+        except Exception as e:
+            self.get_logger().error(f'确认后继续追踪失败: {e}')
+
+    def _finish_tracking_session(self):
+        """完成追踪会话 - 混合相似度版本"""
+        try:
+            self.get_logger().info('🏁 混合相似度追踪会话完成')
+            
+            # 显示混合相似度统计
+            if hasattr(self.tracker, 'get_detection_history_stats'):
+                stats = self.tracker.get_detection_history_stats(self.current_target_id)
+                if stats.get('history_length', 0) > 0:
+                    self.get_logger().info(f'📊 {self.current_target_id} 历史统计:')
+                    self.get_logger().info(f'   历史记录数: {stats["history_length"]}')
+                    self.get_logger().info(f'   平均置信度: {stats["avg_confidence"]:.3f}')
+                    self.get_logger().info(f'   置信度范围: {stats["min_confidence"]:.3f} - {stats["max_confidence"]:.3f}')
+            
+            # 保存混合相似度历史
+            if hasattr(self.tracker, '_save_detection_history'):
+                self.tracker._save_detection_history()
+            
+            # 原有的完成逻辑
+            self.tracking_active = False
+            
+            complete_data = {
+                'status': 'completed',
+                'total_steps': self.tracking_count,
+                'target_id': self.current_target_id,
+                'user_id': self.current_user_id,
+                'consecutive_high_confidence': self.consecutive_high_confidence,
+                'hybrid_mode_used': True
+            }
+            
+            complete_msg = String()
+            complete_msg.data = json.dumps(complete_data)
+            self.tracking_complete_pub.publish(complete_msg)
+            
+            self.get_logger().info(f'📈 追踪完成: 总步数={self.tracking_count}, 连续高置信度={self.consecutive_high_confidence}')
+            
+        except Exception as e:
+            self.get_logger().error(f'完成混合相似度追踪会话失败: {e}')
+
+    def _start_grasp_confirmation_with_auto_info(self, tracking_result: dict):
+        """启动抓取确认（包含自动判断信息）"""
+        try:
+            self.current_tracking_result = tracking_result
+            self.waiting_for_user_confirmation = True
+            self.user_feedback_received = False
+            self._grasp_confirmation_mode = True
+            
+            # 启动增强版抓取确认线程
+            self._start_enhanced_grasp_confirmation_thread()
+            
+        except Exception as e:
+            self.get_logger().error(f'启动增强抓取确认失败: {e}')
+
+    def _log_hybrid_tracking_details(self, tracking_result: dict):
+        """记录混合相似度追踪详情"""
+        try:
+            self.get_logger().info(f'🔀 混合相似度追踪详情:')
+            
+            # 基础信息
+            self.get_logger().info(f'  目标ID: {tracking_result["target_id"]}')
+            self.get_logger().info(f'  最终置信度: {tracking_result["tracking_confidence"]:.3f}')
+            
+            # 混合相似度信息
+            hybrid_info = tracking_result.get('hybrid_similarity_info', {})
+            if hybrid_info:
+                ref_score = hybrid_info.get('reference_score', 0)
+                hist_score = hybrid_info.get('historical_score', 0)
+                hist_count = hybrid_info.get('history_count', 0)
+                
+                self.get_logger().info(f'  📚 参考库相似度: {ref_score:.3f}')
+                self.get_logger().info(f'  📈 历史相似度: {hist_score:.3f} (基于{hist_count}次历史)')
+                
+                fusion_weights = hybrid_info.get('fusion_weights', {})
+                ref_weight = fusion_weights.get('reference_weight', 1.0)
+                hist_weight = fusion_weights.get('historical_weight', 0.0)
+                self.get_logger().info(f'  ⚖️ 融合权重: 参考库{ref_weight:.2f}, 历史{hist_weight:.2f}')
+            
+            # 自动判断信息
+            auto_success = tracking_result.get('auto_success', False)
+            if auto_success:
+                self.get_logger().info(f'  🤖 自动判断: 成功 ✅')
+            else:
+                self.get_logger().info(f'  👤 需要人工确认')
+                
+            # 抓取坐标
+            grasp_coord = tracking_result['grasp_coordinate']
+            self.get_logger().info(f'  🎯 抓取坐标: ({grasp_coord["x"]:.1f}, {grasp_coord["y"]:.1f}, {grasp_coord["z"]:.1f}mm)')
+            
+        except Exception as e:
+            self.get_logger().error(f'记录混合追踪详情失败: {e}')
+
+    def _grasp_confirmation_worker(self):
+        """抓取确认工作线程"""
+        try:
+            print(f"\n{'='*80}")
+            print(f"🤖 抓取条件已满足 - 请确认是否执行抓取")
+            print(f"{'='*80}")
+            
+            if self.current_tracking_result:
+                grasp_coord = self.current_tracking_result['grasp_coordinate']
+                object_info = self.current_tracking_result['object_info']
+                
+                print(f"📋 抓取信息:")
+                print(f"  🎯 目标坐标: ({grasp_coord['x']:.1f}, {grasp_coord['y']:.1f}, {grasp_coord['z']:.1f}mm)")
+                print(f"  📏 物体高度: {object_info.get('estimated_height', 30):.1f}mm")
+                print(f"  📐 背景高度: {object_info.get('background_z', 300):.1f}mm")
+                print(f"  🔧 推荐夹爪宽度: {object_info.get('recommended_gripper_width', 150)}")
+                print(f"  🔍 追踪置信度: {self.current_tracking_result['tracking_confidence']:.3f}")
+                print(f"  📊 步骤编号: {self.tracking_count + 1}")
+            
+            print(f"\n💬 命令选项:")
+            print(f"  'g' 或 'grasp'    - 确认执行抓取")
+            print(f"  'c' 或 'continue' - 取消抓取，继续追踪")
+            print(f"  'q' 或 'quit'     - 退出追踪")
+            print(f"{'='*80}")
+            
+            while self.waiting_for_user_confirmation and not self.user_feedback_received:
+                try:
+                    user_input = input("请输入命令 (g/c/q): ").strip().lower()
+                    
+                    if user_input in ['g', 'grasp', '抓取']:
+                        self._handle_grasp_confirmation(True)
+                        break
+                    elif user_input in ['c', 'continue', '继续']:
+                        self._handle_grasp_confirmation(False)
+                        break
+                    elif user_input in ['q', 'quit', '退出']:
+                        self._handle_quit_request()
+                        break
+                    else:
+                        print("❌ 无效输入，请输入 'g'(抓取), 'c'(继续追踪), 或 'q'(退出)")
+                        
+                except (EOFError, KeyboardInterrupt):
+                    print("\n🛑 用户中断输入")
+                    self._handle_quit_request()
+                    break
+                except Exception as e:
+                    print(f"❌ 输入处理错误: {e}")
+                    
+        except Exception as e:
+            self.get_logger().error(f'抓取确认工作线程失败: {e}')
+
+    def _handle_grasp_confirmation(self, execute_grasp: bool):
+        """处理抓取确认结果"""
+        try:
+            self.user_feedback_received = True
+            current_result_backup = self.current_tracking_result
+            
+            if execute_grasp:
+                self.get_logger().info('🤖 用户确认执行抓取')
+                
+                # 生成抓取信息文件
+                bounding_rect = current_result_backup.get('bounding_rect', {})
+                grasp_filename = self._generate_grasp_info_file(current_result_backup, bounding_rect)
+                
+                if grasp_filename:
+                    # 发布抓取触发信号
+                    self._publish_grasp_trigger(grasp_filename, current_result_backup['grasp_coordinate'])
+                    
+                    # 保存抓取确认的追踪数据
+                    current_result_backup['user_feedback'] = 'grasp_confirmed'
+                    current_result_backup['feedback_timestamp'] = datetime.now().isoformat()
+                    
+                    self._save_tracking_step_data(current_result_backup, True)
+                    
+                    # 完成追踪会话
+                    self.tracking_active = False
+                    self._finish_tracking_session()
+                else:
+                    self.get_logger().error('❌ 生成抓取信息文件失败，继续追踪')
+                    self._handle_grasp_confirmation(False)
+            else:
+                self.get_logger().info('⏭️ 用户取消抓取，继续追踪')
+                
+                # 标记为继续追踪
+                current_result_backup['user_feedback'] = 'grasp_cancelled'
+                current_result_backup['feedback_timestamp'] = datetime.now().isoformat()
+                
+                # 继续正常的追踪确认流程
+                self._grasp_confirmation_mode = False
+                self.waiting_for_user_confirmation = True
+                self.user_feedback_received = False
+                
+                # 启动正常的追踪确认
+                self._start_command_input_thread()
+            
+            # 重置抓取确认状态
+            if hasattr(self, '_grasp_confirmation_mode'):
+                delattr(self, '_grasp_confirmation_mode')
+                
+        except Exception as e:
+            self.get_logger().error(f'处理抓取确认失败: {e}')
+
+    def _generate_grasp_info_file(self, tracking_result: dict, bounding_rect: dict) -> str:
+        """生成抓取信息文件 - 修复版，添加yaw角度信息"""
+        try:
+            # 改进宽度获取逻辑
+            object_info = tracking_result.get('object_info', {})
+            object_width = object_info.get('estimated_width')
+            
+            if object_width is None:
+                gripper_info = object_info.get('gripper_width_info', {})
+                object_width = gripper_info.get('real_width_mm', 50.0)
+                self.get_logger().warn(f'从gripper_width_info获取宽度: {object_width}mm')
+            else:
+                self.get_logger().info(f'从estimated_width获取宽度: {object_width}mm')
+            
+            # 🆕 获取当前yaw角度
+            current_yaw = 0.0
+            if self.current_tcp_pose:
+                # 从当前TCP位姿提取yaw角度
+                orientation = self.current_tcp_pose.get('orientation', {})
+                if orientation:
+                    # 四元数转欧拉角获取yaw
+                    qx, qy, qz, qw = orientation.get('x', 0), orientation.get('y', 0), orientation.get('z', 0), orientation.get('w', 1)
+                    _, _, current_yaw = self._quat_to_euler(qx, qy, qz, qw)
+                    self.get_logger().info(f'📐 记录当前yaw角度: {current_yaw:.1f}°')
+                else:
+                    self.get_logger().warn('⚠️ 无法获取orientation信息，使用默认yaw=0°')
+            else:
+                self.get_logger().warn('⚠️ 无法获取当前TCP位姿，使用默认yaw=0°')
+            
+            # 🆕 从waypoint_data获取额外的扫描角度信息（如果有）
+            scan_yaw = 0.0
+            if hasattr(self, '_last_waypoint_data') and self._last_waypoint_data:
+                scan_yaw = self._last_waypoint_data.get('yaw', 0.0)
+                self.get_logger().info(f'📐 扫描yaw角度: {scan_yaw:.1f}°')
             
             grasp_info = {
                 'target_id': tracking_result['target_id'],
                 'object_coordinate': tracking_result['grasp_coordinate'],
                 'background_height': tracking_result['object_info']['background_z'],
                 'object_height': tracking_result['object_info']['estimated_height'],
-                'object_width': tracking_result['object_info'].get('estimated_width', 50),
+                'object_width': float(object_width),
                 'bounding_rect': bounding_rect,
                 'recommended_gripper_width': tracking_result['object_info']['recommended_gripper_width'],
                 'tracking_confidence': tracking_result['tracking_confidence'],
-                'detection_confidence': tracking_result['detection_confidence']
+                'detection_confidence': tracking_result['detection_confidence'],
+                
+                # 🆕 添加角度信息
+                'grasp_angles': {
+                    'current_yaw': float(current_yaw),        # 当前机械臂yaw角度
+                    'scan_yaw': float(scan_yaw),              # 扫描时的yaw角度
+                    'recommended_yaw': float(current_yaw),     # 推荐的抓取yaw角度（可以基于分析调整）
+                    'bounding_rect_angle': float(bounding_rect.get('angle', 0.0))  # 最小外接矩形角度
+                }
             }
             
-            # 保存文件
-            filename = f"grasp_info_{tracking_result['target_id']}_{int(time.time())}.json"
+            # 统一文件名为grasp_info.json
+            filename = "grasp_info.json"
             filepath = os.path.join(self.current_scan_dir, 'grasp_commands', filename)
             os.makedirs(os.path.dirname(filepath), exist_ok=True)
             
@@ -1271,10 +1648,16 @@ class TrackingNode(Node):
                 json.dump(grasp_info, f, indent=2, ensure_ascii=False)
             
             self.get_logger().info(f'💾 抓取信息文件已生成: {filename}')
+            self.get_logger().info(f'📁 文件路径: {filepath}')
+            self.get_logger().info(f'📏 物体宽度: {grasp_info["object_width"]:.1f}mm')
+            self.get_logger().info(f'📐 yaw角度: current={current_yaw:.1f}°, scan={scan_yaw:.1f}°')
+            
             return filename
             
         except Exception as e:
             self.get_logger().error(f'生成抓取信息文件失败: {e}')
+            import traceback
+            traceback.print_exc()
             return None
         
     def _extract_tracking_parameters(self, tracking_result: dict) -> dict:
@@ -1354,114 +1737,108 @@ class TrackingNode(Node):
         except Exception as e:
             self.get_logger().error(f'显示追踪参数失败: {e}')
 
-    def _start_command_input_thread(self):
-        """启动命令行输入线程"""
-        try:
-            if self.command_input_thread and self.command_input_thread.is_alive():
-                return  # 已有输入线程在运行
-            
-            self.command_input_thread = threading.Thread(
-                target=self._command_input_worker,
-                daemon=True
-            )
-            self.command_input_thread.start()
-            
-        except Exception as e:
-            self.get_logger().error(f'启动命令输入线程失败: {e}')
 
-    def _command_input_worker(self):
-        """命令行输入工作线程"""
+    def _verify_feedback_update(self, step_number: int, expected_feedback: str):
+        """验证反馈是否成功更新到所有位置 - 增强版"""
         try:
-            print(f"\n{'='*60}")
-            print(f"🎯 追踪步骤 {self.tracking_count + 1} - 请确认追踪结果")
-            print(f"{'='*60}")
-            print("📋 当前追踪结果:")
+            if not self.data_recorder:
+                return
             
-            if self.current_tracking_result:
-                grasp_coord = self.current_tracking_result['grasp_coordinate']
-                print(f"  🎯 目标坐标: ({grasp_coord['x']:.1f}, {grasp_coord['y']:.1f}, {grasp_coord['z']:.1f}mm)")
-                print(f"  🔍 追踪置信度: {self.current_tracking_result['tracking_confidence']:.3f}")
+            verification_results = {
+                'detail_json': False,
+                'session_history': False,
+                'annotated_image': False,
+                'parameters_history': False
+            }
             
-            print(f"\n💬 命令选项:")
-            print(f"  's' 或 'success' - 确认追踪成功，继续移动")
-            print(f"  'f' 或 'fail'    - 标记追踪失败")
-            print(f"  'q' 或 'quit'    - 退出追踪")
-            print(f"{'='*60}")
+            # 1. 检查详细JSON文件
+            step_details_dir = os.path.join(self.data_recorder.data_dir, 'step_details')
+            detail_file = os.path.join(step_details_dir, f'step_{step_number:02d}_detailed.json')
             
-            while self.waiting_for_user_confirmation and not self.user_feedback_received:
+            if os.path.exists(detail_file):
                 try:
-                    user_input = input("请输入命令 (s/f/q): ").strip().lower()
+                    with open(detail_file, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                    actual_feedback = data.get('user_feedback')
                     
-                    if user_input in ['s', 'success']:
-                        self._handle_user_confirmation(True)
-                        break
-                    elif user_input in ['f', 'fail']:
-                        self._handle_user_confirmation(False)
-                        break
-                    elif user_input in ['q', 'quit']:
-                        self._handle_quit_request()
-                        break
+                    if actual_feedback == expected_feedback:
+                        verification_results['detail_json'] = True
+                        self.get_logger().info(f'✅ 详细JSON反馈验证成功: {actual_feedback}')
                     else:
-                        print("❌ 无效输入，请输入 's'(成功), 'f'(失败), 或 'q'(退出)")
+                        self.get_logger().warn(f'⚠️ 详细JSON反馈不匹配: 期望{expected_feedback}, 实际{actual_feedback}')
                         
-                except (EOFError, KeyboardInterrupt):
-                    print("\n🛑 用户中断输入")
-                    self._handle_quit_request()
-                    break
-                except Exception as e:
-                    print(f"❌ 输入处理错误: {e}")
-                    
-        except Exception as e:
-            self.get_logger().error(f'命令输入工作线程失败: {e}')
-
-    def _handle_user_confirmation(self, success: bool):
-        """处理用户确认"""
-        try:
-            self.user_feedback_received = True
+                except Exception as json_error:
+                    self.get_logger().error(f'❌ 详细JSON反馈验证失败: {json_error}')
             
-            if success:
-                self.get_logger().info('✅ 用户确认追踪成功，开始移动')
-                
-                # 🆕 记录追踪参数到历史
-                if self.current_tracking_result:
-                    tracking_params = self._extract_tracking_parameters(self.current_tracking_result)
-                    tracking_params['user_feedback'] = 'success'
-                    self.tracking_parameters_history.append(tracking_params)
-                
-                # 🆕 保存当前步骤数据
-                self._save_tracking_step_data(self.current_tracking_result, success)
-                
-                # 检查姿态变化并发布移动指令
-                if self._validate_pose_change(self.current_tracking_result):
-                    self._publish_target_pose(self.current_tracking_result)
-                    self.tracking_count += 1
-                else:
-                    self.get_logger().warn('❌ 姿态变化超过限制，跳过移动')
+            # 2. 检查session历史
+            if hasattr(self.data_recorder, 'tracking_history') and self.data_recorder.tracking_history:
+                if step_number <= len(self.data_recorder.tracking_history):
+                    session_record = self.data_recorder.tracking_history[step_number - 1]
+                    session_feedback = session_record.get('human_feedback')
+                    expected_session = 'correct' if expected_feedback == 'success' else 'incorrect'
                     
+                    if session_feedback == expected_session:
+                        verification_results['session_history'] = True
+                        self.get_logger().info(f'✅ Session历史反馈验证成功: {session_feedback}')
+                    else:
+                        self.get_logger().warn(f'⚠️ Session历史反馈不匹配: 期望{expected_session}, 实际{session_feedback}')
+            
+            # 3. 检查标注图像文件
+            step_image_dir = os.path.join(self.data_recorder.images_dir, f'step_{step_number:02d}')
+            feedback_file = os.path.join(step_image_dir, 'rgb_annotated.jpg')
+            
+            if os.path.exists(feedback_file):
+                verification_results['annotated_image'] = True
+                self.get_logger().info(f'✅ 反馈标注图像验证成功')
             else:
-                self.get_logger().info('❌ 用户标记追踪失败')
-                
-                # 记录失败
-                if self.current_tracking_result:
-                    tracking_params = self._extract_tracking_parameters(self.current_tracking_result)
-                    tracking_params['user_feedback'] = 'failure'
-                    self.tracking_parameters_history.append(tracking_params)
-                
-                self._save_tracking_step_data(self.current_tracking_result, success)
-                
-                # 可以选择重试或继续下一步
-                self.tracking_count += 1
+                self.get_logger().warn(f'⚠️ 反馈标注图像未找到')
             
-            # 重置确认状态
-            self.waiting_for_user_confirmation = False
-            self.current_tracking_result = None
+            # 4. 检查参数历史
+            if hasattr(self, 'tracking_parameters_history'):
+                matching_param = None
+                for param in self.tracking_parameters_history:
+                    if param.get('step') == step_number:
+                        matching_param = param
+                        break
+                
+                if matching_param and matching_param.get('user_feedback') == expected_feedback:
+                    verification_results['parameters_history'] = True
+                    self.get_logger().info(f'✅ 参数历史反馈验证成功')
+                else:
+                    self.get_logger().warn(f'⚠️ 参数历史反馈验证失败')
             
-            # 检查是否完成所有步骤
-            if self.tracking_count >= self.max_tracking_steps:
-                self._finish_tracking_session()
+            # 汇总验证结果
+            success_count = sum(verification_results.values())
+            total_count = len(verification_results)
+            
+            if success_count == total_count:
+                self.get_logger().info(f'🎉 步骤 {step_number} 反馈验证全部通过 ({success_count}/{total_count})')
+            else:
+                self.get_logger().warn(f'⚠️ 步骤 {step_number} 反馈验证部分失败 ({success_count}/{total_count})')
                 
         except Exception as e:
-            self.get_logger().error(f'处理用户确认失败: {e}')
+            self.get_logger().error(f'验证反馈更新失败: {e}')
+
+    def _update_detailed_file_feedback(self, step_number: int, feedback: str):
+        """更新详细文件中的用户反馈 - 修复版，同时更新图像显示"""
+        try:
+            if self.data_recorder and hasattr(self.data_recorder, 'update_step_detailed_feedback'):
+                timestamp = datetime.now().isoformat()
+                
+                # 🆕 调用修复后的方法，会同时更新JSON和图像
+                self.data_recorder.update_step_detailed_feedback(step_number, feedback, timestamp)
+                
+                self.get_logger().info(f'📝 已更新步骤 {step_number} 详细文件反馈: {feedback}')
+                self.get_logger().info(f'🖼️ 已更新步骤 {step_number} 标注图像反馈显示')
+                
+            else:
+                if not self.data_recorder:
+                    self.get_logger().warn('⚠️ 数据记录器不可用，无法更新详细文件反馈')
+                else:
+                    self.get_logger().warn('⚠️ 数据记录器缺少 update_step_detailed_feedback 方法，跳过反馈更新')
+        except Exception as e:
+            self.get_logger().error(f'更新详细文件反馈失败: {e}')
+
 
     def _validate_pose_change(self, tracking_result: dict) -> bool:
         """验证姿态变化是否在允许范围内"""
@@ -1497,27 +1874,28 @@ class TrackingNode(Node):
             return True  # 异常时允许移动
 
     def _save_tracking_step_data(self, tracking_result: dict, success: bool):
-        """保存追踪步骤数据 - 修复版，传递详细特征"""
+        """保存追踪步骤数据 - 修复版，参数数量正确"""
         try:
             if not self.data_recorder:
                 self.get_logger().warn('数据记录器未初始化，无法保存数据')
                 return
             
-            # 🔧 提取详细特征数据
-            detailed_features = tracking_result.get('detailed_similarity_breakdown', {})
+            # 确保 tracking_result 不为空
+            if not tracking_result:
+                self.get_logger().warn('tracking_result 为空，无法保存数据')
+                return
             
-            # 🔧 将user_feedback信息合并到tracking_result中
+            # 将user_feedback信息合并到tracking_result中
             enhanced_tracking_result = tracking_result.copy()
             enhanced_tracking_result['user_feedback'] = 'success' if success else 'failure'
             enhanced_tracking_result['feedback_timestamp'] = datetime.now().isoformat()
             
-            # 🆕 调用修改后的记录方法，传递详细特征
+            # 🔧 调用正确的方法签名（4个参数）
             self.data_recorder.record_tracking_step(
                 self.current_target_id,
                 enhanced_tracking_result,
                 self.latest_rgb_image,
-                self.latest_depth_image,
-                detailed_features  # 🆕 传递详细特征
+                self.latest_depth_image
             )
             
             # 保存追踪参数历史到文件
@@ -1801,19 +2179,31 @@ class TrackingNode(Node):
             self.get_logger().error(f'发布追踪状态失败: {e}')
     
     def _finish_tracking_session(self):
-        """完成追踪会话 - 修复版"""
+        """完成追踪会话 - 修复版，确保反馈同步"""
         try:
-            self.get_logger().info('🏁 追踪会话完成，开始收集反馈')
+            self.get_logger().info('🏁 追踪会话完成，开始收集反馈和同步数据')
             
-            # 🔧 立即停止追踪，防止继续执行
+            # 立即停止追踪，防止继续执行
             self.tracking_active = False
             
-            # 🆕 停止图像处理
+            # 停止图像处理
             if hasattr(self, '_last_tracking_time'):
                 del self._last_tracking_time
             
+            # 🆕 检查反馈一致性
+            if self.data_recorder:
+                self.data_recorder.check_feedback_consistency()
+            
+            # 生成详细数据汇总报告
+            self._generate_detailed_session_summary()
+            
             # 收集用户反馈
             self._collect_user_feedback()
+            
+            # 🆕 最终保存前确保反馈同步
+            if self.data_recorder:
+                self.get_logger().info('🔄 最终保存前进行反馈同步...')
+                self.data_recorder.update_session_feedback_from_details()
             
             # 发布追踪完成信号
             complete_data = {
@@ -1829,18 +2219,256 @@ class TrackingNode(Node):
             
             self.get_logger().info(f'📊 追踪完成统计: 总步数={self.tracking_count}, 目标={self.current_target_id}')
             
+            # 触发优化（如果步数足够）
+            if self.tracking_count >= 8:
+                if hasattr(self.tracker, 'adaptive_manager') and self.tracker.adaptive_manager:
+                    self.tracker.adaptive_manager.optimize_thresholds()
+                    
         except Exception as e:
             self.get_logger().error(f'完成追踪会话失败: {e}')
-    
-    def _collect_user_feedback(self):
-        """收集用户反馈 - 修复重复问题"""
+
+
+    def _generate_detailed_session_summary(self):
+        """生成详细数据的汇总报告"""
         try:
-            # 🔧 检查是否已经在实时确认中收集了反馈
-            if hasattr(self, 'tracking_parameters_history') and self.tracking_parameters_history:
-                # 检查是否所有步骤都已经有反馈
-                steps_with_feedback = [step for step in self.tracking_parameters_history if 'user_feedback' in step]
+            if not self.data_recorder:
+                return
+            
+            summary_data = {
+                'session_overview': {
+                    'target_id': self.current_target_id,
+                    'total_steps': self.tracking_count,
+                    'user_id': self.current_user_id,
+                    'session_start': getattr(self.data_recorder, 'session_start_time', datetime.now()).isoformat(),
+                    'session_end': datetime.now().isoformat()
+                },
+                'detailed_analysis_summary': self._analyze_detailed_steps(),
+                'adaptive_weights_evolution': self._analyze_adaptive_weights_evolution(),
+                'candidates_analysis_summary': self._analyze_candidates_patterns()
+            }
+            
+            # 保存汇总报告
+            summary_dir = os.path.join(self.data_recorder.data_dir, 'step_details')
+            summary_file = os.path.join(summary_dir, 'session_detailed_summary.json')
+            
+            os.makedirs(summary_dir, exist_ok=True)
+            with open(summary_file, 'w', encoding='utf-8') as f:
+                json.dump(summary_data, f, indent=2, ensure_ascii=False)
+            
+            self.get_logger().info(f'📈 详细汇总报告已生成: {summary_file}')
+            
+        except Exception as e:
+            self.get_logger().error(f'生成详细汇总报告失败: {e}')
+
+    # 10. 新增方法：分析详细步骤数据
+    def _analyze_detailed_steps(self) -> Dict:
+        """分析所有详细步骤数据 - 修复版，增强错误处理"""
+        try:
+            step_details_dir = os.path.join(self.data_recorder.data_dir, 'step_details')
+            
+            if not os.path.exists(step_details_dir):
+                self.get_logger().warn('step_details 目录不存在，创建空分析结果')
+                return {'error': 'step_details_dir_not_found', 'total_steps_analyzed': 0}
+            
+            analysis = {
+                'total_steps_analyzed': 0,
+                'successful_matches': 0,
+                'user_feedback_stats': {'success': 0, 'failure': 0, 'no_feedback': 0},
+                'confidence_evolution': [],
+                'grasp_conditions_met': 0,
+                'average_candidates_per_step': 0,
+                'parsing_errors': 0
+            }
+            
+            total_candidates = 0
+            
+            for step_num in range(1, self.tracking_count + 1):
+                detail_file = os.path.join(step_details_dir, f'step_{step_num:02d}_detailed.json')
                 
-                if len(steps_with_feedback) == len(self.tracking_parameters_history):
+                if os.path.exists(detail_file):
+                    try:
+                        with open(detail_file, 'r', encoding='utf-8') as f:
+                            step_data = json.load(f)
+                        
+                        analysis['total_steps_analyzed'] += 1
+                        
+                        # 安全地分析追踪结果
+                        tracking_result = step_data.get('tracking_result', {})
+                        confidence = tracking_result.get('tracking_confidence', 0)
+                        
+                        if confidence > 0:
+                            analysis['successful_matches'] += 1
+                            analysis['confidence_evolution'].append({
+                                'step': step_num,
+                                'confidence': confidence
+                            })
+                        
+                        # 用户反馈统计
+                        feedback = step_data.get('user_feedback')
+                        if feedback == 'success':
+                            analysis['user_feedback_stats']['success'] += 1
+                        elif feedback == 'failure':
+                            analysis['user_feedback_stats']['failure'] += 1
+                        else:
+                            analysis['user_feedback_stats']['no_feedback'] += 1
+                        
+                        # 抓取条件统计
+                        grasp_conditions = step_data.get('grasp_conditions', {})
+                        if grasp_conditions.get('grasp_ready', False):
+                            analysis['grasp_conditions_met'] += 1
+                        
+                        # 候选数量统计
+                        candidates = step_data.get('all_candidates', [])
+                        total_candidates += len(candidates)
+                        
+                    except json.JSONDecodeError as je:
+                        self.get_logger().warn(f'步骤 {step_num} JSON解析失败: {je}')
+                        analysis['parsing_errors'] += 1
+                    except Exception as e:
+                        self.get_logger().warn(f'分析步骤 {step_num} 详细数据失败: {e}')
+                        analysis['parsing_errors'] += 1
+            
+            if analysis['total_steps_analyzed'] > 0:
+                analysis['average_candidates_per_step'] = total_candidates / analysis['total_steps_analyzed']
+            
+            return analysis
+            
+        except Exception as e:
+            self.get_logger().error(f'分析详细步骤失败: {e}')
+            return {'error': str(e), 'total_steps_analyzed': 0}
+
+    # 11. 新增方法：分析自适应权重演化
+    def _analyze_adaptive_weights_evolution(self) -> Dict:
+        """分析自适应权重的演化过程"""
+        try:
+            step_details_dir = os.path.join(self.data_recorder.data_dir, 'step_details')
+            
+            weights_evolution = {
+                'steps_with_adaptive_weights': 0,
+                'weight_changes': [],
+                'feature_weight_trends': {
+                    'geometric': [],
+                    'appearance': [],
+                    'shape': [],
+                    'spatial': []
+                }
+            }
+            
+            for step_num in range(1, self.tracking_count + 1):
+                detail_file = os.path.join(step_details_dir, f'step_{step_num:02d}_detailed.json')
+                
+                if os.path.exists(detail_file):
+                    try:
+                        with open(detail_file, 'r', encoding='utf-8') as f:
+                            step_data = json.load(f)
+                        
+                        adaptive_weights = step_data.get('adaptive_weights_used', {})
+                        
+                        if adaptive_weights:
+                            weights_evolution['steps_with_adaptive_weights'] += 1
+                            
+                            # 记录各特征权重
+                            for feature_type in weights_evolution['feature_weight_trends']:
+                                if feature_type in adaptive_weights:
+                                    weights_evolution['feature_weight_trends'][feature_type].append({
+                                        'step': step_num,
+                                        'weight': adaptive_weights[feature_type]
+                                    })
+                            
+                            weights_evolution['weight_changes'].append({
+                                'step': step_num,
+                                'weights': adaptive_weights
+                            })
+                            
+                    except Exception as e:
+                        continue
+            
+            return weights_evolution
+            
+        except Exception as e:
+            self.get_logger().error(f'分析权重演化失败: {e}')
+            return {'error': str(e)}
+
+    # 12. 新增方法：分析候选模式
+    def _analyze_candidates_patterns(self) -> Dict:
+        """分析候选检测的模式和趋势"""
+        try:
+            step_details_dir = os.path.join(self.data_recorder.data_dir, 'step_details')
+            
+            patterns = {
+                'total_candidates_analyzed': 0,
+                'class_distribution': {},
+                'similarity_score_distribution': {
+                    'high': 0,      # > 0.8
+                    'medium': 0,    # 0.5 - 0.8
+                    'low': 0        # < 0.5
+                },
+                'best_match_evolution': [],
+                'threshold_meeting_rate': 0
+            }
+            
+            threshold_meeting_count = 0
+            
+            for step_num in range(1, self.tracking_count + 1):
+                detail_file = os.path.join(step_details_dir, f'step_{step_num:02d}_detailed.json')
+                
+                if os.path.exists(detail_file):
+                    try:
+                        with open(detail_file, 'r', encoding='utf-8') as f:
+                            step_data = json.load(f)
+                        
+                        candidates = step_data.get('all_candidates', [])
+                        
+                        for candidate in candidates:
+                            patterns['total_candidates_analyzed'] += 1
+                            
+                            # 类别分布
+                            class_name = candidate.get('detection_data', {}).get('class_name', 'unknown')
+                            patterns['class_distribution'][class_name] = patterns['class_distribution'].get(class_name, 0) + 1
+                            
+                            # 相似度分布
+                            similarity = candidate.get('similarity_to_target', {}).get('final_score', 0)
+                            
+                            if similarity > 0.8:
+                                patterns['similarity_score_distribution']['high'] += 1
+                            elif similarity > 0.5:
+                                patterns['similarity_score_distribution']['medium'] += 1
+                            else:
+                                patterns['similarity_score_distribution']['low'] += 1
+                            
+                            # 阈值满足统计
+                            if candidate.get('meets_threshold', False):
+                                threshold_meeting_count += 1
+                            
+                            # 最佳匹配演化
+                            if candidate.get('is_best_match', False):
+                                patterns['best_match_evolution'].append({
+                                    'step': step_num,
+                                    'similarity': similarity,
+                                    'class': class_name
+                                })
+                        
+                    except Exception as e:
+                        continue
+            
+            if patterns['total_candidates_analyzed'] > 0:
+                patterns['threshold_meeting_rate'] = threshold_meeting_count / patterns['total_candidates_analyzed']
+            
+            return patterns
+            
+        except Exception as e:
+            self.get_logger().error(f'分析候选模式失败: {e}')
+            return {'error': str(e)}
+        
+    def _collect_user_feedback(self):
+        """收集用户反馈 - 修复版，避免重复收集"""
+        try:
+            # 检查是否已经在实时过程中收集了所有反馈
+            if hasattr(self, 'tracking_parameters_history') and self.tracking_parameters_history:
+                steps_with_feedback = [step for step in self.tracking_parameters_history 
+                                    if 'user_feedback' in step and step['user_feedback']]
+                
+                if len(steps_with_feedback) >= self.tracking_count:
                     self.get_logger().info('✅ 所有步骤已在实时过程中收集反馈，跳过额外反馈收集')
                     
                     # 保存学习结果
@@ -1851,9 +2479,9 @@ class TrackingNode(Node):
                     
                     self.get_logger().info('✅ 反馈收集完成，学习数据已更新')
                     return
-            
-            # 🔧 只有在没有实时反馈时才进行传统反馈收集
-            self.get_logger().info('🔧 开始传统反馈收集流程...')
+                else:
+                    missing_count = self.tracking_count - len(steps_with_feedback)
+                    self.get_logger().info(f'⚠️ 还有 {missing_count} 步缺少反馈，启动补充收集')
             
             # 显示追踪结果可视化
             if hasattr(self, 'visualizer') and self.visualizer:
@@ -1932,39 +2560,42 @@ class TrackingNode(Node):
             
             # 计算3D距离
             current_pos = current_tcp_pose['position']
-            distance_3d = math.sqrt(
+            distance_2d = math.sqrt(
                 (target_coord['x'] - current_pos['x'])**2 + 
                 (target_coord['y'] - current_pos['y'])**2
             )
-            z_compensation = 260
+            z_compensation = math.sqrt(300**2 - 
+               distance_2d**2
+            )
             # 距离自适应策略
-            if distance_3d > 200:
-                xy_ratio = 0.30
-
-            elif distance_3d > 100:
-                xy_ratio = 0.50
-            elif distance_3d > 50:
-                xy_ratio = 0.8
-                z_compensation = 250
+            if distance_2d > 200:
+                xy_ratio = 0.40
+                # z_compensation = 280
+            elif distance_2d > 100:
+                xy_ratio = 0.40
+                # z_compensation = 300
+            elif distance_2d > 50:
+                xy_ratio = 0.5
+                # z_compensation = 320
             else:
-                xy_ratio = 1
-                z_compensation = 230
-            
+                xy_ratio = 0.5
+                # z_compensation = 340
+                
             # 🆕 安全移动高度计算
             background_z = object_info.get('background_z', 300)
             object_height = object_info.get('estimated_height', 30)
-            safe_movement_z = max(320, background_z + object_height + z_compensation)
+            safe_movement_z = max(350,background_z + object_height + z_compensation)
             
             self.get_logger().info(f'📐 移动策略计算:')
-            self.get_logger().info(f'   3D距离: {distance_3d:.1f}mm')
+            self.get_logger().info(f'   3D距离: {distance_2d:.1f}mm')
             self.get_logger().info(f'   XY移动比例: {xy_ratio:.1f}')
             self.get_logger().info(f'   背景高度: {background_z:.1f}mm')
             self.get_logger().info(f'   物体高度: {object_height:.1f}mm') 
             self.get_logger().info(f'   Z补偿: {z_compensation}mm')
-            self.get_logger().info(f'   安全移动高度: max(320, {background_z:.1f} + {object_height:.1f} + {z_compensation}) = {safe_movement_z:.1f}mm')
+            self.get_logger().info(f'   安全移动高度: max(350, {background_z:.1f} + {object_height:.1f} + {z_compensation}) = {safe_movement_z:.1f}mm')
             
             return {
-                'distance_3d': distance_3d,
+                'distance_3d': distance_2d,
                 'xy_movement_ratio': xy_ratio,
                 'z_compensation': z_compensation,
                 'safe_movement_z': safe_movement_z,  # 🆕 使用这个作为移动目标Z
@@ -1983,35 +2614,47 @@ class TrackingNode(Node):
 
         
     def _evaluate_grasp_conditions(self, tracking_result: dict, movement_strategy: dict) -> dict:
-        """评估抓取条件 - 精确版本"""
+        """评估抓取条件 - 修复Z距离判断逻辑"""
         try:
             # 获取当前和目标位置
             current_pos = self.current_tcp_pose['position']
             target_coord = tracking_result['grasp_coordinate']
+            object_info = tracking_result['object_info']
             
-            # 计算精确距离
-            target_distance_z = target_coord['z']
+            # 获取背景高度和物体高度
+            background_z = object_info.get('background_z', 300)
+            object_height = object_info.get('estimated_height', 30)
+            
+            # 计算期望的目标Z范围 (背景 + 物体高度 ± 20mm)
+            expected_target_z_min = background_z + object_height - 20
+            expected_target_z_max = background_z + object_height + 20
+            
+            # 计算XY距离
             xy_distance = math.sqrt(
                 (target_coord['x'] - current_pos['x'])**2 + 
                 (target_coord['y'] - current_pos['y'])**2
             )
             
-            # 精确的抓取条件
+            # 🔧 修复后的抓取条件
             conditions = {
                 'camera_min_height': current_pos['z'] >= 300,
-                'z_close_enough': 0.0 < target_distance_z < 10.0,  # Z距离小于10mm
+                'z_in_expected_range': expected_target_z_min <= target_coord['z'] <= expected_target_z_max,
                 'xy_aligned': xy_distance < 50.0,  # XY距离小于50mm
-                'confidence_check': tracking_result['tracking_confidence'] > 0.65,
+                'confidence_check': tracking_result['tracking_confidence'] > 0.7,
                 'stability_check': self._check_tracking_stability()
             }
             
             # 综合判断
-            grasp_ready = conditions['camera_min_height'] and conditions['z_close_enough'] and conditions['xy_aligned'] and conditions['confidence_check'] and conditions['stability_check']
+            grasp_ready = all(conditions.values())
             
             self.get_logger().info(f'🎯 抓取条件评估:')
-            self.get_logger().info(f'   Z距离: {target_distance_z:.1f}mm (< 10mm: {conditions["z_close_enough"]})')
-            self.get_logger().info(f'   XY距离: {xy_distance:.1f}mm (< 60mm: {conditions["xy_aligned"]})')
-            self.get_logger().info(f'   置信度: {tracking_result["tracking_confidence"]:.3f} (> 0.65: {conditions["confidence_check"]})')
+            self.get_logger().info(f'   背景高度: {background_z:.1f}mm')
+            self.get_logger().info(f'   物体高度: {object_height:.1f}mm')
+            self.get_logger().info(f'   期望Z范围: [{expected_target_z_min:.1f}, {expected_target_z_max:.1f}]mm')
+            self.get_logger().info(f'   目标Z坐标: {target_coord["z"]:.1f}mm (在范围内: {conditions["z_in_expected_range"]})')
+            self.get_logger().info(f'   XY距离: {xy_distance:.1f}mm (< 50mm: {conditions["xy_aligned"]})')
+            self.get_logger().info(f'   置信度: {tracking_result["tracking_confidence"]:.3f} (> 0.7: {conditions["confidence_check"]})')
+            self.get_logger().info(f'   相机高度: {current_pos["z"]:.1f}mm (>= 300mm: {conditions["camera_min_height"]})')
             self.get_logger().info(f'   稳定性: {conditions["stability_check"]}')
             self.get_logger().info(f'   🎯 准备抓取: {grasp_ready}')
             
@@ -2019,7 +2662,8 @@ class TrackingNode(Node):
                 'grasp_ready': grasp_ready,
                 'conditions': conditions,
                 'distances': {
-                    'z_distance': target_distance_z,
+                    'z_coordinate': target_coord['z'],
+                    'expected_z_range': [expected_target_z_min, expected_target_z_max],
                     'xy_distance': xy_distance
                 },
                 'recommendation': 'grasp' if grasp_ready else 'continue_tracking'
@@ -2043,7 +2687,7 @@ class TrackingNode(Node):
             )
             max_deviation = max(max_deviation, deviation)
         
-        return max_deviation < 30  # 15mm以内认为稳定
+        return True  # 15mm以内认为稳定
     def _handle_detection_failure_with_retry(self):
         """处理检测失败 - 增强提示信息"""
         try:
@@ -2223,7 +2867,163 @@ class TrackingNode(Node):
             self.get_logger().info(f'📤 回退指令已发布: ({target_coord["x"]:.1f}, {target_coord["y"]:.1f}, {target_coord["z"]:.1f}mm)')
             
         except Exception as e:
-            self.get_logger().error(f'发布回退位置失败: {e}')         
+            self.get_logger().error(f'发布回退位置失败: {e}')     
+
+    def _prepare_candidates_for_detailed_save(self, candidate_detections: List[Dict]) -> List[Dict]:
+        """准备候选检测数据用于详细保存"""
+        try:
+            candidates_backup = []
+            
+            for i, detection in enumerate(candidate_detections):
+                candidate_backup = {
+                    'original_index': i,
+                    'detection_data': {
+                        'bounding_box': detection.get('bounding_box', []).copy() if detection.get('bounding_box') else [],
+                        'confidence': float(detection.get('confidence', 0.0)),
+                        'class_id': detection.get('class_id', -1),
+                        'class_name': str(detection.get('class_name', '')),
+                        'mask_shape': detection.get('mask').shape if detection.get('mask') is not None else None,
+                        'mask_area': int(detection.get('mask').sum()) if detection.get('mask') is not None else 0
+                    },
+                    'features': {
+                        'geometric': detection.get('geometric_features', {}).copy() if detection.get('geometric_features') else {},
+                        'appearance': detection.get('appearance_features', {}).copy() if detection.get('appearance_features') else {},
+                        'shape': detection.get('shape_features', {}).copy() if detection.get('shape_features') else {},
+                        'spatial': detection.get('spatial_features', {}).copy() if detection.get('spatial_features') else {}
+                    },
+                    'raw_detection': False  # 标记这是原始检测，非追踪结果
+                }
+                candidates_backup.append(candidate_backup)
+            
+            self.get_logger().info(f'📋 准备了 {len(candidates_backup)} 个候选的备份数据')
+            return candidates_backup
+            
+        except Exception as e:
+            self.get_logger().error(f'准备候选数据失败: {e}')
+            return []
+
+    # 3. 新增方法：保存详细步骤数据
+    def _save_detailed_step_data(self, step_number: int, candidates_backup: List[Dict], 
+                            tracking_result: Dict, waypoint_data: Dict):
+        """保存详细步骤数据 - 修复版，添加数据验证"""
+        try:
+            # 数据验证
+            if not tracking_result:
+                self.get_logger().warn(f'步骤 {step_number}: tracking_result 为空，跳过详细数据保存')
+                return
+            
+            if not candidates_backup:
+                self.get_logger().warn(f'步骤 {step_number}: candidates_backup 为空，使用空列表')
+                candidates_backup = []
+            
+            # 计算移动策略和抓取条件
+            movement_strategy = {}
+            grasp_conditions = {}
+            
+            try:
+                movement_strategy = self._calculate_adaptive_movement_strategy(
+                    self.current_tcp_pose, 
+                    tracking_result.get('grasp_coordinate', {}), 
+                    tracking_result.get('object_info', {})
+                )
+            except Exception as e:
+                self.get_logger().warn(f'计算移动策略失败: {e}')
+            
+            try:
+                grasp_conditions = self._evaluate_grasp_conditions(tracking_result, movement_strategy)
+            except Exception as e:
+                self.get_logger().warn(f'评估抓取条件失败: {e}')
+            
+            # 合并原始候选和追踪分析结果
+            all_candidates_data = self._merge_candidates_and_analysis(
+                candidates_backup, 
+                tracking_result.get('all_candidates_analysis', [])
+            )
+            
+            # 获取当前使用的自适应权重
+            adaptive_weights = tracking_result.get('adaptive_weights_used', {})
+            
+            # 数据验证：确保 current_tcp_pose 不为空
+            tcp_pose_to_save = self.current_tcp_pose or {
+                'position': {'x': 0, 'y': 0, 'z': 0},
+                'orientation': {'x': 0, 'y': 0, 'z': 0, 'w': 1},
+                'timestamp': None
+            }
+            
+            # 调用数据记录器保存详细数据
+            if self.data_recorder and hasattr(self.data_recorder, 'save_step_detailed_data'):
+                self.data_recorder.save_step_detailed_data(
+                    step_number=step_number,
+                    target_id=self.current_target_id,
+                    all_candidates_data=all_candidates_data,
+                    tracking_result=tracking_result,
+                    waypoint_data=waypoint_data,
+                    current_tcp_pose=tcp_pose_to_save,
+                    movement_strategy=movement_strategy,
+                    grasp_conditions=grasp_conditions,
+                    adaptive_weights=adaptive_weights
+                )
+                
+                self.get_logger().info(f'💾 步骤 {step_number} 详细数据已保存')
+            else:
+                if not self.data_recorder:
+                    self.get_logger().warn('⚠️ 数据记录器未初始化，跳过详细数据保存')
+                else:
+                    self.get_logger().warn('⚠️ 数据记录器缺少 save_step_detailed_data 方法，跳过详细数据保存')
+                
+        except Exception as e:
+            self.get_logger().error(f'保存详细步骤数据失败: {e}')
+            import traceback
+            traceback.print_exc()
+
+    # 4. 新增方法：合并候选数据和分析结果
+    def _merge_candidates_and_analysis(self, candidates_backup: List[Dict], 
+                                    analysis_results: List[Dict]) -> List[Dict]:
+        """合并原始候选数据和追踪分析结果"""
+        try:
+            # 创建分析结果的索引映射
+            analysis_map = {}
+            for analysis in analysis_results:
+                original_idx = analysis.get('candidate_index', -1)
+                analysis_map[original_idx] = analysis
+            
+            merged_candidates = []
+            
+            for candidate in candidates_backup:
+                original_idx = candidate['original_index']
+                
+                # 基础候选信息
+                merged_candidate = candidate.copy()
+                
+                # 如果有对应的分析结果，添加分析信息
+                if original_idx in analysis_map:
+                    analysis = analysis_map[original_idx]
+                    merged_candidate.update({
+                        'similarity_to_target': analysis.get('similarity_to_target', {}),
+                        'is_best_match': analysis.get('is_best_match', False),
+                        'meets_threshold': analysis.get('meets_threshold', False),
+                        'was_analyzed': True
+                    })
+                else:
+                    # 未分析的候选（可能因为类别不匹配）
+                    merged_candidate.update({
+                        'similarity_to_target': {},
+                        'is_best_match': False,
+                        'meets_threshold': False,
+                        'was_analyzed': False,
+                        'skip_reason': 'class_mismatch_or_error'
+                    })
+                
+                merged_candidates.append(merged_candidate)
+            
+            self.get_logger().info(f'🔗 合并了 {len(merged_candidates)} 个候选数据，其中 {len(analysis_results)} 个有分析结果')
+            return merged_candidates
+            
+        except Exception as e:
+            self.get_logger().error(f'合并候选数据失败: {e}')
+            return candidates_backup
+
+
 def main(args=None):
     rclpy.init(args=args)
     

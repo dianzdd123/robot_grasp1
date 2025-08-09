@@ -9,7 +9,7 @@ import time
 import os
 import json
 from datetime import datetime
-
+from typing import Dict, List, Optional, Tuple
 # 🆕 导入新的增强组件
 from vision_ai.detection.enhanced_detection_pipeline import EnhancedDetectionPipeline
 from vision_ai.detection.utils.coordinate_calculator import CoordinateCalculator, ObjectAnalyzer
@@ -371,7 +371,7 @@ class EnhancedDetectionNode(Node):
                     'description': obj['description'],
                     'bounding_box': obj['bounding_box'],
                     'quality_score': obj.get('quality_score', 0.0),  # 🆕 特征质量分数
-                    'features': obj['features']
+                    'features': self._sanitize_features_for_publishing(obj['features'])
                 }
                 
                 result_data['objects'].append(obj_data)
@@ -392,6 +392,11 @@ class EnhancedDetectionNode(Node):
     def _save_enhanced_detection_results(self, result_data):
         """保存增强检测结果"""
         try:
+            if 'objects' in result_data:
+                for obj in result_data['objects']:
+                    if 'features' in obj:
+                        obj['features'] = self._sanitize_features_for_publishing(obj['features'])
+            
             # 保存到增强管道的输出目录
             results_file = os.path.join(self.enhanced_pipeline.output_dir, "enhanced_detection_results.json")
             
@@ -403,6 +408,40 @@ class EnhancedDetectionNode(Node):
         except Exception as e:
             self.get_logger().error(f'保存增强检测结果失败: {e}')
     
+    def _sanitize_features_for_publishing(self, features: Dict) -> Dict:
+        """清理特征数据用于JSON发布（在detection_node.py中）"""
+        sanitized = {}
+        
+        try:
+            for feature_type, feature_data in features.items():
+                if isinstance(feature_data, dict):
+                    sanitized[feature_type] = {}
+                    for key, value in feature_data.items():
+                        if isinstance(value, np.ndarray):
+                            sanitized[feature_type][key] = value.tolist()
+                        elif isinstance(value, (np.integer, np.floating)):
+                            sanitized[feature_type][key] = float(value)
+                        elif isinstance(value, tuple):
+                            sanitized[feature_type][key] = list(value)
+                        elif hasattr(value, 'item'):  # numpy标量
+                            sanitized[feature_type][key] = value.item()
+                        else:
+                            sanitized[feature_type][key] = value
+                elif isinstance(feature_data, np.ndarray):
+                    sanitized[feature_type] = feature_data.tolist()
+                elif isinstance(feature_data, (np.integer, np.floating)):
+                    sanitized[feature_type] = float(feature_data)
+                elif hasattr(feature_data, 'item'):  # numpy标量
+                    sanitized[feature_type] = feature_data.item()
+                else:
+                    sanitized[feature_type] = feature_data
+            
+            return sanitized
+            
+        except Exception as e:
+            self.get_logger().error(f'特征数据清理失败: {e}')
+            return {}
+        
     def _display_enhanced_detection_results(self, result):
         """显示增强检测结果"""
         objects = result.get('objects', [])

@@ -46,21 +46,18 @@ if [ "$1" = "full_system" ]; then
 
     # 右侧分屏：追踪状态监控和控制
     tmux split-window -h -t vision_ai:4
-    tmux send-keys -t vision_ai:4.1 'echo "📊 追踪状态监控与控制"' Enter
-    tmux send-keys -t vision_ai:4.1 'echo "═══════════════════════════════════════"' Enter
-    tmux send-keys -t vision_ai:4.1 'cd ~/ros2_ws && source install/setup.bash' Enter
-    tmux send-keys -t vision_ai:4.1 'echo ""' Enter
-    tmux send-keys -t vision_ai:4.1 'echo "📋 快捷命令："' Enter
-    tmux send-keys -t vision_ai:4.1 'echo "  📊 追踪状态: ros2 topic echo /tracking/status --once"' Enter
-    tmux send-keys -t vision_ai:4.1 'echo "  🎮 目标位姿: ros2 topic echo /xarm/target_pose --once"' Enter
-    tmux send-keys -t vision_ai:4.1 'echo "  🤏 夹爪控制: ros2 topic echo /xarm/gripper_target --once"' Enter
-    tmux send-keys -t vision_ai:4.1 'echo "  🖼️ 可视化流: ros2 topic echo /tracking/visualization --once"' Enter
-    tmux send-keys -t vision_ai:4.1 'echo "  🚨 紧急停止: ros2 topic pub /tracking/emergency_stop std_msgs/Empty"' Enter
-    tmux send-keys -t vision_ai:4.1 'echo ""' Enter
-    tmux send-keys -t vision_ai:4.1 'echo "等待追踪节点启动..."' Enter
-    tmux send-keys -t vision_ai:4.1 'sleep 3' Enter
+    echo -e "${GREEN}🎯 准备静态抓取系统...${NC}"
+    tmux new-window -t vision_ai:4
+    tmux send-keys -t vision_ai:4 'cd ~/ros2_ws && source install/setup.bash' Enter
+    tmux send-keys -t vision_ai:4 'echo "抓取系统"' Enter
+    tmux send-keys -t vision_ai:4 'echo "等待detection完成后自动启动..."' Enter
+    tmux send-keys -t vision_ai:4 'echo "监听 /detection_complete 话题..."' Enter
+    
+    # 启动完全自动化静态抓取系统
+    tmux send-keys -t vision_ai:4 'echo "🤖 Starting Automated Static Grasp System..."' Enter
+    tmux send-keys -t vision_ai:4 'python3 /home/qi/ros2_ws/src/vision_ai/vision_ai/simple_grasp_validator.py' Enter
     # 连接到会话，默认显示第1个窗口（规划+执行）
-    tmux select-window -t vision_ai:1
+    tmux select-window -t vision_ai:2
     tmux attach-session -t vision_ai
 
 elif [ "$1" = "both" ]; then
