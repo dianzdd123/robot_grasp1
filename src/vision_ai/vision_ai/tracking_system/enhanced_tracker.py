@@ -586,14 +586,21 @@ class EnhancedTracker:
             return False
 
     def record_successful_detection_manual(self, target_id: str, detection: Dict, 
-                                         similarity_result: Dict, user_confirmed: bool = True):
+                                        similarity_result: Dict, user_confirmed: bool = True):
         """手动记录成功检测（用于人工标注阶段）"""
         try:
             if user_confirmed:
+                # 🔧 确保similarity_result包含正确的置信度
+                if not similarity_result or similarity_result.get('final_score', 0.0) == 0.0:
+                    # 从其他地方获取置信度
+                    tracking_confidence = detection.get('tracking_confidence', 0.0)
+                    if tracking_confidence > 0:
+                        similarity_result = similarity_result.copy() if similarity_result else {}
+                        similarity_result['final_score'] = tracking_confidence
+                        print(f"[MANUAL_RECORD] 修正置信度: {tracking_confidence:.3f}")
+                
                 self._record_successful_detection(target_id, detection, similarity_result)
                 print(f"[MANUAL_RECORD] 用户确认成功，已记录到历史: {target_id}")
-            else:
-                print(f"[MANUAL_RECORD] 用户标记失败，不记录历史: {target_id}")
                 
         except Exception as e:
             print(f"[MANUAL_RECORD] 手动记录失败: {e}")

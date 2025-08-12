@@ -360,7 +360,7 @@ class TrackingGraspSystem(Node):
                 
                 # 确保在合理范围内
                 pre_grasp_width = max(600, min(850, pre_grasp_width))
-                final_grasp_width = max(50, min(800, final_grasp_width))
+                final_grasp_width = max(50, min(300, final_grasp_width))
                 
                 self.get_logger().info(f' 抓夹宽度计算:')
                 self.get_logger().info(f'   实际宽度: {real_width_mm:.1f}mm')
@@ -395,7 +395,7 @@ class TrackingGraspSystem(Node):
                 #  根据长宽关系计算yaw_angle
                 if rect_width < rect_height:
                     yaw_angle = -bounding_rect_angle
-                    self.get_logger().info(f' 宽>高，沿长边抓取: yaw_angle = -{bounding_rect_angle:.1f}° = {yaw_angle:.1f}°')
+                    self.get_logger().info(f' 宽>高，沿短边抓取: yaw_angle = -{bounding_rect_angle:.1f}° = {yaw_angle:.1f}°')
                 else:
                     yaw_angle = -bounding_rect_angle + 90
                     self.get_logger().info(f' 高>=宽，沿短边抓取: yaw_angle = -{bounding_rect_angle:.1f}° + 90° = {yaw_angle:.1f}°')
@@ -422,8 +422,6 @@ class TrackingGraspSystem(Node):
                     # 生成所有等效角度（相差360度的倍数）
                     candidates = [
                         target_angle,
-                        target_angle + 360,
-                        target_angle - 360,
                         target_angle + 180,  # 180度等效（对于抓取来说）
                         target_angle - 180
                     ]
@@ -651,7 +649,7 @@ class TrackingGraspSystem(Node):
                 return False
             time.sleep(1)
             
-            placement_z_release = max(z - background_z_compensated + 20, 210)
+            placement_z_release = max(z - background_z_compensated + 10, 200)
             self.get_logger().info(f'⬇️ 步骤8: 下降到放置高度: {placement_z_release:.1f}mm')
             if not self.move_to_pose(placement_x, placement_y, placement_z_release, 180, 0, 0):
                 return False

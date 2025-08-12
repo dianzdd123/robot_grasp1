@@ -56,7 +56,7 @@ class FeatureSimilarityCalculator:
                     similarities[feature_type] = similarity
                     valid_weights_sum += weight
                 except Exception as e:
-                    print(f"[SIMILARITY] {feature_type}相似度计算失败: {e}")
+                    print(f"[SIMILARITY] {feature_type}Similarity calculation failed: {e}")
                     similarities[feature_type] = 0.0
             else:
                 similarities[feature_type] = 0.0
@@ -420,7 +420,7 @@ class FeatureSimilarityCalculator:
             result: 包含final_score和breakdown的结果字典
         """
         try:
-            print(f"[SIMILARITY_CALC] 开始综合相似度计算")
+            print(f"[SIMILARITY_CALC] Start comprehensive similarity calculation")
             
             breakdown = {}
             total_score = 0.0
@@ -437,12 +437,12 @@ class FeatureSimilarityCalculator:
                     breakdown['geometric'] = geometric_sim
                     total_score += geometric_sim * geometric_weight
                     total_weight += geometric_weight
-                    print(f"[SIMILARITY_CALC] 几何相似度: {geometric_sim:.3f}")
+                    print(f"[SIMILARITY_CALC] Geometric similarity: {geometric_sim:.3f}")
                 except Exception as e:
-                    print(f"[SIMILARITY_CALC] 几何相似度计算失败: {e}")
+                    print(f"[SIMILARITY_CALC] Geometric similarity calculation failed: {e}")    
                     breakdown['geometric'] = 0.0
             else:
-                print("[SIMILARITY_CALC] 缺少几何特征")
+                print("[SIMILARITY_CALC] Missing geometric features")
                 breakdown['geometric'] = 0.0
             
             # 🔧 形状特征相似度
@@ -456,15 +456,13 @@ class FeatureSimilarityCalculator:
                     breakdown['shape'] = shape_sim
                     total_score += shape_sim * shape_weight
                     total_weight += shape_weight
-                    print(f"[SIMILARITY_CALC] 形状相似度: {shape_sim:.3f}")
+                    print(f"[SIMILARITY_CALC] Shape similarity: {shape_sim:.3f}")
                 except Exception as e:
-                    print(f"[SIMILARITY_CALC] 形状相似度计算失败: {e}")
+                    print(f"[SIMILARITY_CALC] Shape similarity calculation failed: {e}")
                     breakdown['shape'] = 0.0
             else:
-                print("[SIMILARITY_CALC] 缺少形状特征")
+                print("[SIMILARITY_CALC] Missing shape features")
                 breakdown['shape'] = 0.0
-            
-            # 🔧 外观特征相似度 (权重较低，容易变化)
             appearance_weight = 0.2
             ref_appearance = reference_features.get('appearance', reference_features.get('color', {}))
             cand_appearance = candidate_features.get('appearance', candidate_features.get('color', {}))
@@ -477,12 +475,12 @@ class FeatureSimilarityCalculator:
                     breakdown['appearance'] = appearance_sim
                     total_score += appearance_sim * appearance_weight
                     total_weight += appearance_weight
-                    print(f"[SIMILARITY_CALC] 外观相似度: {appearance_sim:.3f}")
+                    print(f"[SIMILARITY_CALC] Appearance similarity: {appearance_sim:.3f}")
                 except Exception as e:
-                    print(f"[SIMILARITY_CALC] 外观相似度计算失败: {e}")
+                    print(f"[SIMILARITY_CALC] Appearance similarity failed: {e}")
                     breakdown['appearance'] = 0.0
             else:
-                print("[SIMILARITY_CALC] 缺少外观特征")
+                print("[SIMILARITY_CALC] Missing Appearance features")
                 breakdown['appearance'] = 0.0
             
             # 🔧 空间特征相似度
@@ -496,12 +494,12 @@ class FeatureSimilarityCalculator:
                     breakdown['spatial'] = spatial_sim
                     total_score += spatial_sim * spatial_weight
                     total_weight += spatial_weight
-                    print(f"[SIMILARITY_CALC] 空间相似度: {spatial_sim:.3f}")
+                    print(f"[SIMILARITY_CALC] spatial similarity: {spatial_sim:.3f}")
                 except Exception as e:
-                    print(f"[SIMILARITY_CALC] 空间相似度计算失败: {e}")
+                    print(f"[SIMILARITY_CALC] spatial similarity calculation failed: {e}")
                     breakdown['spatial'] = 0.0
             else:
-                print("[SIMILARITY_CALC] 缺少空间特征")
+                print("[SIMILARITY_CALC] Missing spatial features")
                 breakdown['spatial'] = 0.0
             
             # 计算最终得分
@@ -517,12 +515,12 @@ class FeatureSimilarityCalculator:
                 'raw_score': total_score
             }
             
-            print(f"[SIMILARITY_CALC] 综合相似度计算完成: {final_score:.3f}")
+            print(f"[SIMILARITY_CALC] Comprehensive similarity calculation completed: {final_score:.3f}")
             
             return result
             
         except Exception as e:
-            print(f"[SIMILARITY_CALC] 综合相似度计算失败: {e}")
+            print(f"[SIMILARITY_CALC] Comprehensive similarity calculation failed: {e}")
             import traceback
             traceback.print_exc()
             
@@ -535,7 +533,6 @@ class FeatureSimilarityCalculator:
 
     # 🆕 确保基础相似度计算方法存在
     def calculate_geometric_similarity(self, ref_geometric: Dict, cand_geometric: Dict) -> float:
-        """计算几何特征相似度"""
         try:
             if not ref_geometric or not cand_geometric:
                 return 0.0
@@ -589,7 +586,6 @@ class FeatureSimilarityCalculator:
                 return 0.0
                 
         except Exception as e:
-            print(f"[SIMILARITY_CALC] 几何相似度计算异常: {e}")
             return 0.0
 
     def _calculate_hu_moments_similarity(self, hu1: List[float], hu2: List[float]) -> float:
@@ -687,14 +683,7 @@ class FeatureSimilarityCalculator:
     def calculate_detailed_similarity_breakdown(self, reference_features: Dict, 
                                             candidate_features: Dict, 
                                             waypoint_data: Dict = None) -> Dict:
-        """
-        计算详细的细粒度特征相似度分解
-        
-        Returns:
-            result: 包含每个具体特征匹配度的详细结果
-        """
         try:
-            print(f"[DETAILED_SIMILARITY] 开始细粒度特征分析")
             
             detailed_breakdown = {}
             
@@ -735,7 +724,6 @@ class FeatureSimilarityCalculator:
             }
             
         except Exception as e:
-            print(f"[DETAILED_SIMILARITY] 细粒度分析失败: {e}")
             return {'detailed_breakdown': {}, 'final_score': 0.0, 'feature_contributions': {}}
 
     def _analyze_geometric_features_detailed(self, ref_geom: Dict, cand_geom: Dict) -> Dict:
@@ -885,5 +873,5 @@ class FeatureSimilarityCalculator:
             }
             
         except Exception as e:
-            print(f"[WEIGHTED_SCORE] 计算加权分数失败: {e}")
+            print(f"[WEIGHTED_SCORE] Failed to calculate weighted score: {e}")
             return {'final_score': 0.0, 'contributions': {}}

@@ -4,215 +4,216 @@ import numpy as np
 from typing import Tuple, Dict
 
 class ColorFeatureExtractor:
-    """颜色特征提取器"""
-    
+    """Color feature extractor"""
+
     def __init__(self, bins: int = 64):
         """
-        初始化颜色特征提取器
-        
+        Initializes the color feature extractor.
+
         Args:
-            bins: 直方图的bin数量
+            bins: The number of bins for the histogram.
         """
         self.bins = bins
-        
-        # 颜色语义映射
+
+        # Color semantic mapping
         self.color_mapping = {
-            'red': [(150, 255), (0, 100), (0, 100)],        # 红色
-            'yellow': [(200, 255), (200, 255), (0, 100)],   # 黄色
-            'orange': [(200, 255), (100, 200), (0, 100)],   # 橙色
-            'green': [(0, 100), (150, 255), (0, 100)],      # 绿色
-            'white': [(200, 255), (200, 255), (200, 255)],  # 白色
-            'black': [(0, 80), (0, 80), (0, 80)],           # 黑色
-            'purple': [(100, 255), (0, 100), (150, 255)],   # 紫色
-            'brown': [(80, 150), (50, 120), (20, 80)],      # 棕色
+            'red': [(150, 255), (0, 100), (0, 100)],          # Red
+            'yellow': [(200, 255), (200, 255), (0, 100)],     # Yellow
+            'orange': [(200, 255), (100, 200), (0, 100)],     # Orange
+            'green': [(0, 100), (150, 255), (0, 100)],        # Green
+            'white': [(200, 255), (200, 255), (200, 255)],    # White
+            'black': [(0, 80), (0, 80), (0, 80)],             # Black
+            'purple': [(100, 255), (0, 100), (150, 255)],     # Purple
+            'brown': [(80, 150), (50, 120), (20, 80)],        # Brown
         }
-    
+
     def compute_color_histogram(self, image: np.ndarray, mask: np.ndarray) -> np.ndarray:
         """
-        计算mask区域的颜色直方图
-        
+        Computes the color histogram for the masked region.
+
         Args:
-            image: RGB图像 (H, W, 3)
-            mask: 二值掩码 (H, W)
-            
+            image: The RGB image (H, W, 3).
+            mask: The binary mask (H, W).
+
         Returns:
-            hist: 归一化的颜色直方图 (bins*3,)
+            hist: The normalized color histogram (bins*3,).
         """
         if np.sum(mask) == 0:
             return np.zeros((self.bins * 3,))
-        
-        # 确保image是正确的数据类型和内存布局
+
+        # Ensure image has the correct data type and memory layout
         if image.dtype != np.uint8:
             image = image.astype(np.uint8)
-        
-        # 确保image是连续的内存布局
+
+        # Ensure image has a contiguous memory layout
         if not image.flags['C_CONTIGUOUS']:
             image = np.ascontiguousarray(image)
-        
-        # 确保mask是正确的数据类型
+
+        # Ensure mask has the correct data type
         if mask.dtype != np.uint8:
             mask = mask.astype(np.uint8)
-        
-        # 创建mask用于calcHist（必须是uint8，值为0或255）
+
+        # Create a mask for calcHist (must be uint8 with values 0 or 255)
         mask_uint8 = np.zeros_like(mask, dtype=np.uint8)
         mask_uint8[mask > 0] = 255
-        
-        # 确保mask也是连续的
+
+        # Ensure mask is also contiguous
         if not mask_uint8.flags['C_CONTIGUOUS']:
             mask_uint8 = np.ascontiguousarray(mask_uint8)
-        
-        # 分别提取每个通道，确保是连续的
+
+        # Extract each channel separately, ensuring they are contiguous
         r_channel = np.ascontiguousarray(image[:, :, 0])
         g_channel = np.ascontiguousarray(image[:, :, 1])
         b_channel = np.ascontiguousarray(image[:, :, 2])
-        
-        # 计算每个通道的直方图
+
+        # Compute the histogram for each channel
         hist_r = cv2.calcHist([r_channel], [0], mask_uint8, [self.bins], [0, 256])
         hist_g = cv2.calcHist([g_channel], [0], mask_uint8, [self.bins], [0, 256])
         hist_b = cv2.calcHist([b_channel], [0], mask_uint8, [self.bins], [0, 256])
-        
-        # 合并直方图
+
+        # Concatenate the histograms
         hist = np.concatenate([hist_r.flatten(), hist_g.flatten(), hist_b.flatten()])
-        
-        # 归一化
+
+        # Normalize
         hist = hist / (np.sum(hist) + 1e-10)
-        
-        return hist    
+
+        return hist
+
     def extract_dominant_color(self, image: np.ndarray, mask: np.ndarray) -> Tuple[np.ndarray, str]:
         """
-        提取主色调和颜色语义
-        
+        Extracts the dominant color and its semantic name.
+
         Args:
-            image: RGB图像 (H, W, 3)
-            mask: 二值掩码 (H, W)
-            
+            image: The RGB image (H, W, 3).
+            mask: The binary mask (H, W).
+
         Returns:
-            dominant_rgb: 主色调RGB值 (3,)
-            color_name: 颜色语义名称
+            dominant_rgb: The dominant RGB value (3,).
+            color_name: The semantic name of the color.
         """
         if np.sum(mask) == 0:
             return np.array([0, 0, 0]), "unknown"
-        
-        # 提取mask区域的像素
+
+        # Extract pixels from the masked region
         masked_pixels = image[mask > 0]
-        
+
         if len(masked_pixels) == 0:
             return np.array([0, 0, 0]), "unknown"
-        
-        # 计算平均颜色
+
+        # Calculate the average color
         mean_color = np.mean(masked_pixels, axis=0)
-        
-        # 映射到颜色语义
+
+        # Map to a semantic color name
         color_name = self._map_to_color_name(mean_color)
-        
+
         return mean_color.astype(np.uint8), color_name
-    
+
     def _map_to_color_name(self, rgb: np.ndarray) -> str:
         """
-        将RGB值映射到颜色语义名称
-        
+        Maps an RGB value to a semantic color name.
+
         Args:
-            rgb: RGB值 (3,)
-            
+            rgb: The RGB value (3,).
+
         Returns:
-            color_name: 颜色语义名称
+            color_name: The semantic name of the color.
         """
         r, g, b = rgb
-        
-        # 检查每种颜色的范围
+
+        # Check the range for each color
         for color_name, (r_range, g_range, b_range) in self.color_mapping.items():
-            if (r_range[0] <= r <= r_range[1] and 
-                g_range[0] <= g <= g_range[1] and 
+            if (r_range[0] <= r <= r_range[1] and
+                g_range[0] <= g <= g_range[1] and
                 b_range[0] <= b <= b_range[1]):
                 return color_name
-        
-        # 如果没有匹配，返回最接近的颜色
+
+        # If no match is found, return the closest color
         return self._find_closest_color(rgb)
-    
+
     def _find_closest_color(self, rgb: np.ndarray) -> str:
         """
-        找到最接近的颜色
-        
+        Finds the closest color.
+
         Args:
-            rgb: RGB值 (3,)
-            
+            rgb: The RGB value (3,).
+
         Returns:
-            color_name: 最接近的颜色名称
+            color_name: The name of the closest color.
         """
         r, g, b = rgb
         min_distance = float('inf')
         closest_color = "mixed"
-        
+
         for color_name, (r_range, g_range, b_range) in self.color_mapping.items():
-            # 计算到范围中心的距离
+            # Calculate the distance to the center of the range
             r_center = (r_range[0] + r_range[1]) / 2
             g_center = (g_range[0] + g_range[1]) / 2
             b_center = (b_range[0] + b_range[1]) / 2
-            
+
             distance = np.sqrt((r - r_center)**2 + (g - g_center)**2 + (b - b_center)**2)
-            
+
             if distance < min_distance:
                 min_distance = distance
                 closest_color = color_name
-        
+
         return closest_color
-    
+
     def compute_color_similarity(self, hist1: np.ndarray, hist2: np.ndarray) -> float:
         """
-        计算两个颜色直方图的相似度
-        
+        Computes the similarity between two color histograms.
+
         Args:
-            hist1: 第一个直方图
-            hist2: 第二个直方图
-            
+            hist1: The first histogram.
+            hist2: The second histogram.
+
         Returns:
-            similarity: 相似度 (0-1之间)
+            similarity: The similarity value (between 0 and 1).
         """
         return cv2.compareHist(hist1.astype(np.float32), hist2.astype(np.float32), cv2.HISTCMP_CORREL)
-    
+
     def get_color_statistics(self, image: np.ndarray, mask: np.ndarray) -> Dict:
         """
-        获取颜色统计信息
-        
+        Gets color statistics.
+
         Args:
-            image: RGB图像 (H, W, 3)
-            mask: 二值掩码 (H, W)
-            
+            image: The RGB image (H, W, 3).
+            mask: The binary mask (H, W).
+
         Returns:
-            stats: 颜色统计信息字典
+            stats: A dictionary of color statistics.
         """
         if np.sum(mask) == 0:
             return {
                 'mean_color': [0, 0, 0],
                 'std_color': [0, 0, 0],
-                'mean_r': 0.0,  # 🔧 新增单独的R通道均值
-                'mean_g': 0.0,  # 🔧 新增单独的G通道均值
-                'mean_b': 0.0,  # 🔧 新增单独的B通道均值
-                'std_r': 0.0,   # 🔧 新增单独的R通道标准差
-                'std_g': 0.0,   # 🔧 新增单独的G通道标准差
-                'std_b': 0.0,   # 🔧 新增单独的B通道标准差
+                'mean_r': 0.0,
+                'mean_g': 0.0,
+                'mean_b': 0.0,
+                'std_r': 0.0,
+                'std_g': 0.0,
+                'std_b': 0.0,
                 'dominant_color': [0, 0, 0],
                 'color_name': "unknown",
                 'histogram': np.zeros((self.bins * 3,)).tolist()
             }
-        
-        # 提取mask区域的像素
+
+        # Extract pixels from the masked region
         masked_pixels = image[mask > 0]
-        
-        # 计算统计量
+
+        # Compute statistics
         mean_color = np.mean(masked_pixels, axis=0)
         std_color = np.std(masked_pixels, axis=0)
-        
-        # 提取主色调
+
+        # Extract dominant color
         dominant_color, color_name = self.extract_dominant_color(image, mask)
-        
-        # 计算直方图
+
+        # Compute histogram
         histogram = self.compute_color_histogram(image, mask)
-        
+
         return {
             'mean_color': mean_color.tolist(),
             'std_color': std_color.tolist(),
-            # 🔧 新增单独的RGB通道统计
+            # Add separate RGB channel statistics
             'mean_r': float(mean_color[0]),
             'mean_g': float(mean_color[1]),
             'mean_b': float(mean_color[2]),

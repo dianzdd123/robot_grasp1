@@ -474,7 +474,7 @@ class OnlineLearner:
             return optimized_weights
             
         except Exception as e:
-            print(f"[ONLINE_LEARNER] 历史权重优化失败: {e}")
+            print(f"[ONLINE_LEARNER] Historical weight optimization failed: {e}")
             import traceback
             traceback.print_exc()
             return None

@@ -20,7 +20,7 @@ class ScanPlannerNode(Node):
         self.safe_pose = [200, 0, 250, 179, 0, 0]  # mm + deg (x, y, z, roll, pitch, yaw)
         self.workspace_limit = 800  # mm
         self.obstacle_radius = 150  # mm
-        self.max_height = 450  # mm (Maximum reachable height for scanning)
+        self.max_height = 550  # mm (Maximum reachable height for scanning)
         
         # Camera parameters (1280x720 resolution)
         self.camera_width = 1280

@@ -28,10 +28,9 @@ class SAM2Segmentor(ObjectSegmentor):
             self.model = build_sam2(config_name, checkpoint_path, device=self.device)
             self.predictor = SAM2ImagePredictor(self.model)
             
-            print(f"[SAM2] 模型加载成功")
-            print(f"[SAM2] 设备: {self.device}")
-            print(f"[SAM2] 配置: {config_name}")
-            print(f"[SAM2] 检查点: {checkpoint_path}")
+            print(f"[SAM2] Model loaded successfully")
+            print(f"[SAM2] Configuration: {config_name}")
+            print(f"[SAM2] Checkpoint: {checkpoint_path}")
             
         except ImportError as e:
             raise ImportError(
@@ -83,12 +82,9 @@ class SAM2Segmentor(ObjectSegmentor):
                 masks.append(mask[0])  # mask[0] 是最佳掩码
                 
             except Exception as e:
-                print(f"[SAM2] 第 {i} 个目标分割失败: {e}")
-                # 创建空掩码作为后备
+                print(f"[SAM2] Failed to segment target {i}: {e}")
                 empty_mask = np.zeros((image.shape[0], image.shape[1]), dtype=bool)
                 masks.append(empty_mask)
-        
-        print(f"[SAM2] 完成 {len(masks)} 个目标的分割")
         return masks
     
     def segment_single(self, image: np.ndarray, box: np.ndarray) -> np.ndarray:

@@ -10,7 +10,7 @@ import os
 import json
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
-# 🆕 导入新的增强组件
+#  导入新的增强组件
 from vision_ai.detection.enhanced_detection_pipeline import EnhancedDetectionPipeline
 from vision_ai.detection.utils.coordinate_calculator import CoordinateCalculator, ObjectAnalyzer
 from vision_ai.detection.utils.adaptive_learner import AdaptiveThresholdManager
@@ -20,14 +20,14 @@ class EnhancedDetectionNode(Node):
     def __init__(self):
         super().__init__('enhanced_detection_node')
         
-        # 🆕 使用增强的配置管理器
+        #  使用增强的配置管理器
         config_path = os.path.join(os.path.dirname(__file__), 'config', 'enhanced_detection_config.json')
         self.config_manager = EnhancedConfigManager(config_path)
         
         # 显示配置摘要
         self.get_logger().info(f"\n{self.config_manager.get_config_summary()}")
         
-        # 🆕 初始化增强组件
+        #  初始化增强组件
         self._initialize_enhanced_components()
         
         # 状态管理
@@ -41,18 +41,18 @@ class EnhancedDetectionNode(Node):
         # ROS订阅者和发布者
         self._setup_ros_interfaces()
         
-        self.get_logger().info('🚀 增强检测节点启动完成')
+        self.get_logger().info(' Enhanced detection node startup completed')
     
     def _initialize_enhanced_components(self):
         """初始化增强组件"""
         try:
-            # 🆕 增强检测管道
+            #  增强检测管道
             self.enhanced_pipeline = EnhancedDetectionPipeline(
                 config_file=self.config_manager.config_file,
                 output_dir=None  # 将在处理时动态设置
             )
             
-            # 🆕 坐标计算器
+            #  坐标计算器
             camera_config = self.config_manager.get_camera_config()
             calibration_data = {
                 'camera_intrinsics': camera_config.get('intrinsics', {}),
@@ -61,24 +61,24 @@ class EnhancedDetectionNode(Node):
             }
             self.coordinate_calculator = CoordinateCalculator(calibration_data)
             
-            # 🆕 物体分析器
+            #  物体分析器
             self.object_analyzer = ObjectAnalyzer(self.coordinate_calculator)
             
-            # 🆕 自适应学习管理器
+            #  自适应学习管理器
             adaptive_config = self.config_manager.get_adaptive_learning_config()
             if adaptive_config.get('enabled', True):
                 learning_file = adaptive_config.get('learning_data_file', 'data/adaptive_learning.json')
                 learning_file = os.path.join(os.path.dirname(__file__), learning_file)
                 self.adaptive_manager = AdaptiveThresholdManager(learning_file)
-                self.get_logger().info('✅ 自适应学习已启用')
+                self.get_logger().info(' 自适应学习已启用')
             else:
                 self.adaptive_manager = None
-                self.get_logger().info('⚠️ 自适应学习已禁用')
+                self.get_logger().info(' 自适应学习已禁用')
             
-            self.get_logger().info('✅ 增强组件初始化成功')
+            self.get_logger().info(' 增强组件初始化成功')
             
         except Exception as e:
-            self.get_logger().error(f'❌ 增强组件初始化失败: {e}')
+            self.get_logger().error(f' 增强组件初始化失败: {e}')
             raise RuntimeError(f"组件初始化失败: {e}") from e
     
     def _setup_ros_interfaces(self):
@@ -102,17 +102,14 @@ class EnhancedDetectionNode(Node):
     def stitching_complete_callback(self, msg):
         """拼接完成回调 - 使用增强管道处理"""
         try:
-            self.get_logger().info(f'🔔 收到stitching_complete消息: {msg.data}')  # 添加这行调试
             self.current_scan_output_dir = msg.data
-            self.get_logger().info(f'🎯 收到拼接完成信号: {self.current_scan_output_dir}')
-            
-            # 🆕 使用增强的加载和处理逻辑
+            self.get_logger().info(f'Receive stitching_complete message: {self.current_scan_output_dir}')
             self._load_and_process_enhanced()
             
         except Exception as e:
             self.get_logger().error(f'拼接完成处理失败: {e}')
             import traceback
-            traceback.print_exc()  # 添加完整错误堆栈
+            traceback.print_exc()
     
     def _load_and_process_enhanced(self):
         """加载并使用增强管道处理"""
@@ -121,23 +118,23 @@ class EnhancedDetectionNode(Node):
                 self.get_logger().error(f'扫描目录不存在: {self.current_scan_output_dir}')
                 return
             
-            # 🆕 加载融合映射信息
+            #  加载融合映射信息
             self.get_logger().info('🔄 开始加载融合映射信息...')
             self.fusion_mapping_data = self._load_fusion_mapping()
             
             if self.fusion_mapping_data:
-                self.get_logger().info('✅ 映射信息加载成功')
+                self.get_logger().info(' 映射信息加载成功')
             else:
-                self.get_logger().warn('⚠️ 映射信息加载失败，将使用简化模式')
+                self.get_logger().warn(' 映射信息加载失败，将使用简化模式')
             
-            # 🆕 查找并加载图像
+            #  查找并加载图像
             image_rgb, depth_data, waypoint_data = self._load_scan_data()
             
             if image_rgb is None:
                 self.get_logger().error('无法加载扫描数据')
                 return
             
-            # 🆕 使用增强管道构建参考特征库
+            #  使用增强管道构建参考特征库
             self._process_with_enhanced_pipeline(image_rgb, depth_data, waypoint_data)
             
         except Exception as e:
@@ -170,7 +167,7 @@ class EnhancedDetectionNode(Node):
             image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
             self.get_logger().info(f'图像加载成功: {image_rgb.shape}')
             
-            # 🆕 获取深度数据和waypoint信息
+            #  获取深度数据和waypoint信息
             depth_data, waypoint_data = self._extract_depth_and_waypoint_data()
             
             return image_rgb, depth_data, waypoint_data
@@ -191,7 +188,7 @@ class EnhancedDetectionNode(Node):
                 }
                 return placeholder_depth, placeholder_waypoint
             
-            # 🆕 从融合映射数据中提取
+            #  从融合映射数据中提取
             fusion_params = self.fusion_mapping_data.get('fusion_params', {})
             is_single_point = fusion_params.get('single_point', False)
             
@@ -238,14 +235,14 @@ class EnhancedDetectionNode(Node):
         """使用增强管道处理"""
         try:
             self.processing_active = True
-            self.get_logger().info('🚀 开始增强管道处理...')
+            self.get_logger().info(' 开始增强管道处理...')
             
             # 设置增强管道的输出目录
             detection_output_dir = os.path.join(self.current_scan_output_dir, "enhanced_detection_results")
             os.makedirs(detection_output_dir, exist_ok=True)
             self.enhanced_pipeline.output_dir = detection_output_dir
             
-            # 🆕 传递相机内参给管道（用于3D中心点计算）
+            #  传递相机内参给管道（用于3D中心点计算）
             camera_config = self.config_manager.get_camera_config()
             intrinsics = camera_config.get('intrinsics', {})
             self.enhanced_pipeline.camera_fx = intrinsics.get('fx', 912.7)
@@ -262,7 +259,7 @@ class EnhancedDetectionNode(Node):
             )
             
             if result['success']:
-                self.get_logger().info(f'✅ 增强检测完成，构建了 {result["detection_count"]} 个参考特征')
+                self.get_logger().info(f' 增强检测完成，构建了 {result["detection_count"]} 个参考特征')
                 
                 # 转换为与原系统兼容的格式
                 compatible_result = self._convert_to_compatible_format(result)
@@ -270,14 +267,14 @@ class EnhancedDetectionNode(Node):
                 # 发布结果
                 self._publish_enhanced_detection_result(compatible_result)
                 
-                # 🆕 改进的可视化发布（现在包含弹窗显示）
+                #  改进的可视化发布（现在包含弹窗显示）
                 self._publish_visualization_from_enhanced_pipeline(detection_output_dir)
                 
                 self._display_enhanced_detection_results(compatible_result)
                 self._start_enhanced_target_selection(compatible_result)
                 
             else:
-                self.get_logger().error(f'❌ 增强检测失败: {result.get("message", "未知错误")}')
+                self.get_logger().error(f' 增强检测失败: {result.get("message", "未知错误")}')
             
         except Exception as e:
             self.get_logger().error(f'增强管道处理失败: {e}')
@@ -296,7 +293,7 @@ class EnhancedDetectionNode(Node):
                 metadata = entry['metadata']
                 features = entry['features']
                 
-                # 🆕 构建兼容的对象信息
+                #  构建兼容的对象信息
                 compatible_obj = {
                     'object_id': metadata['object_id'],
                     'class_id': metadata['class_id'],
@@ -308,7 +305,7 @@ class EnhancedDetectionNode(Node):
                     'quality_score': entry['quality_score']
                 }
                 
-                # 🆕 添加增强的深度和抓夹信息
+                #  添加增强的深度和抓夹信息
                 if 'spatial' in features:
                     spatial_features = features['spatial']
                     
@@ -351,13 +348,13 @@ class EnhancedDetectionNode(Node):
     def _publish_enhanced_detection_result(self, result):
         """发布增强检测结果"""
         try:
-            # 🆕 使用原有的发布逻辑，但添加了质量分数信息
+            #  使用原有的发布逻辑，但添加了质量分数信息
             result_data = {
                 'detection_count': result['detection_count'],
                 'processing_time': result.get('processing_time', 0.0),
                 'output_directory': self.enhanced_pipeline.output_dir,
                 'timestamp': datetime.now().isoformat(),
-                'enhanced_features': True,  # 🆕 标记使用了增强特征
+                'enhanced_features': True,  #  标记使用了增强特征
                 'objects': []
             }
             
@@ -370,13 +367,13 @@ class EnhancedDetectionNode(Node):
                     'confidence': obj['confidence'],
                     'description': obj['description'],
                     'bounding_box': obj['bounding_box'],
-                    'quality_score': obj.get('quality_score', 0.0),  # 🆕 特征质量分数
+                    'quality_score': obj.get('quality_score', 0.0),  #  特征质量分数
                     'features': self._sanitize_features_for_publishing(obj['features'])
                 }
                 
                 result_data['objects'].append(obj_data)
             
-            # 🆕 保存增强的检测结果
+            #  保存增强的检测结果
             self._save_enhanced_detection_results(result_data)
             
             # 发布ROS消息
@@ -447,7 +444,7 @@ class EnhancedDetectionNode(Node):
         objects = result.get('objects', [])
         
         self.get_logger().info(f"\n{'='*60}")
-        self.get_logger().info("🚀 增强检测结果摘要")
+        self.get_logger().info(" 增强检测结果摘要")
         self.get_logger().info(f"{'='*60}")
         
         if len(objects) == 0:
@@ -470,9 +467,9 @@ class EnhancedDetectionNode(Node):
     def _start_enhanced_target_selection(self, result):
         """启动增强目标选择流程"""
         try:
-            self.get_logger().info('🎯 启动增强目标选择流程...')
+            self.get_logger().info(' 启动增强目标选择流程...')
             
-            # 🆕 使用增强管道的选择功能
+            #  使用增强管道的选择功能
             success = self.enhanced_pipeline.select_tracking_targets()
             
             if success:
@@ -497,8 +494,8 @@ class EnhancedDetectionNode(Node):
                 'center_pose': None,
                 'bounds': None,
                 'waypoint_poses': [],
-                'enhanced_features_available': True,  # 🆕 标记有增强特征
-                'feature_quality_stats': self._get_feature_quality_stats()  # 🆕 特征质量统计
+                'enhanced_features_available': True,  #  标记有增强特征
+                'feature_quality_stats': self._get_feature_quality_stats()  #  特征质量统计
             }
             
             if self.fusion_mapping_data:
@@ -570,7 +567,7 @@ class EnhancedDetectionNode(Node):
                 'status': 'completed',
                 'total_objects': len(result.get('objects', [])),
                 'timestamp': datetime.now().isoformat(),
-                'enhanced_detection': True,  # 🆕 标记使用了增强检测
+                'enhanced_detection': True,  #  标记使用了增强检测
                 
                 # 扫描信息
                 'scan_center_pose': self._serialize_pose_data(scan_info.get('center_pose')),
@@ -580,7 +577,7 @@ class EnhancedDetectionNode(Node):
                     if isinstance(pose, dict)
                 ],
                 
-                # 🆕 增强特征信息
+                #  增强特征信息
                 'reference_features_path': self.enhanced_pipeline.output_dir,
                 'enhanced_detection_results_file': os.path.join(
                     self.enhanced_pipeline.output_dir, 'enhanced_detection_results.json'
@@ -592,10 +589,10 @@ class EnhancedDetectionNode(Node):
                     self.enhanced_pipeline.output_dir, 'tracking_selection.txt'
                 ),
                 
-                # 🆕 特征质量统计
+                #  特征质量统计
                 'feature_quality_stats': scan_info.get('feature_quality_stats', {}),
                 
-                # 🆕 自适应学习状态
+                #  自适应学习状态
                 'adaptive_learning_enabled': self.adaptive_manager is not None,
                 'adaptive_learning_stats': self._get_adaptive_learning_stats()
             }
@@ -607,7 +604,7 @@ class EnhancedDetectionNode(Node):
                 complete_msg.data = json_str
                 self.detection_complete_pub.publish(complete_msg)
                 
-                self.get_logger().info('✅ 增强检测完成信号已发布')
+                self.get_logger().info(' 增强检测完成信号已发布')
                 
             except (TypeError, ValueError) as json_error:
                 self.get_logger().error(f'JSON序列化失败: {json_error}')
@@ -650,14 +647,14 @@ class EnhancedDetectionNode(Node):
             is_single_point = fusion_params.get('single_point', False)
             
             if is_single_point:
-                self.get_logger().info('✅ 单点扫描映射信息加载成功')
+                self.get_logger().info(' 单点扫描映射信息加载成功')
                 waypoint_idx = fusion_params.get('waypoint_index', 0)
                 canvas_size = fusion_params.get('canvas_size', (0, 0))
                 self.get_logger().info(f'  - 主waypoint: {waypoint_idx}')
                 self.get_logger().info(f'  - 画布尺寸: {canvas_size}')
             else:
                 fusion_mapping = mapping_data.get('fusion_mapping', {})
-                self.get_logger().info(f'✅ 多点扫描映射信息加载成功')
+                self.get_logger().info(f' 多点扫描映射信息加载成功')
                 self.get_logger().info(f'  - 映射像素数: {len(fusion_mapping)}')
             
             waypoint_contributions = mapping_data.get('waypoint_contributions', {})
@@ -770,12 +767,12 @@ class EnhancedDetectionNode(Node):
             complete_msg.data = json.dumps(minimal_data)
             self.detection_complete_pub.publish(complete_msg)
             
-            self.get_logger().warn('⚠️ 发布了最小化检测完成信号')
+            self.get_logger().warn(' 发布了最小化检测完成信号')
             
         except Exception as e:
             self.get_logger().error(f'最小化信号发布失败: {e}')
     
-    # 🆕 添加自适应学习反馈接口
+    #  添加自适应学习反馈接口
     def update_tracking_feedback(self, object_id: str, similarity_scores: dict, 
                                 is_correct_match: bool, context: dict = None):
         """
@@ -849,7 +846,7 @@ class EnhancedDetectionNode(Node):
                 if vis_image_bgr is not None:
                     vis_rgb = cv2.cvtColor(vis_image_bgr, cv2.COLOR_BGR2RGB)
                     
-                    # 🆕 显示弹窗
+                    #  显示弹窗
                     self._show_detection_popup(vis_rgb)
                     
                     # 📡 发布ROS消息
@@ -899,7 +896,7 @@ class EnhancedDetectionNode(Node):
             cv2.imshow(window_name, vis_bgr)
             cv2.waitKey(1)  # 非阻塞，让窗口响应
             
-            self.get_logger().info('✅ OpenCV可视化窗口显示成功')
+            self.get_logger().info(' OpenCV可视化窗口显示成功')
             
             # 设置窗口回调（可选）
             def on_key(key):
@@ -932,12 +929,12 @@ def main(args=None):
     
     try:
         node = EnhancedDetectionNode()
-        node.get_logger().info('🚀 增强检测节点运行中...')
+        node.get_logger().info(' 增强检测节点运行中...')
         rclpy.spin(node)
     except KeyboardInterrupt:
         print('🛑 增强检测节点被用户中断')
     except Exception as e:
-        print(f'❌ 增强检测节点运行错误: {e}')
+        print(f' 增强检测节点运行错误: {e}')
     finally:
         if rclpy.ok():
             rclpy.shutdown()

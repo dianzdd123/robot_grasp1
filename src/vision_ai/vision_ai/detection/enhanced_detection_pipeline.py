@@ -40,11 +40,9 @@ class EnhancedDetectionPipeline:
         #  后处理配置
         self.enable_3d_post_processing = True  # 可以通过配置文件控制
         
-        print(f"[ENHANCED_PIPELINE] 增强检测管道初始化完成")
-        print(f"[ENHANCED_PIPELINE] 输出目录: {self.output_dir}")
+        print(f"[ENHANCED_PIPELINE] Enhanced detection pipeline initialization completed")
     
     def _initialize_models(self):
-        """初始化检测和分割模型"""
         try:
             detector_config = self.config_manager.get_detector_config().copy()
             segmentor_config = self.config_manager.get_segmentor_config().copy()
@@ -53,10 +51,10 @@ class EnhancedDetectionPipeline:
                 detector_config, segmentor_config
             )
             
-            print("[ENHANCED_PIPELINE] 模型初始化成功")
+            print("[ENHANCED_PIPELINE] Model initialization successful")
             
         except Exception as e:
-            raise RuntimeError(f"模型初始化失败: {e}") from e
+            raise RuntimeError(f"Model initialization failed: {e}") from e
     
     def _initialize_enhanced_components(self):
         """初始化增强组件"""
@@ -91,8 +89,6 @@ class EnhancedDetectionPipeline:
         
         # 自适应阈值管理器
         self.threshold_manager = AdaptiveThresholdManager()
-        
-        print("[ENHANCED_PIPELINE] 增强组件初始化完成")
     
     def build_reference_library(self, image_rgb: np.ndarray, 
                             depth_image: np.ndarray,
@@ -183,7 +179,7 @@ class EnhancedDetectionPipeline:
                     reference_entry = {
                         'features': features,
                         'quality_score': quality_score,
-                        'post_processing_info': post_processing_info,  #  后处理信息
+                        'post_processing_info': post_processing_info,
                         'metadata': {
                             'object_id': full_object_id,
                             'class_id': int(detection['class_id']),
@@ -212,7 +208,7 @@ class EnhancedDetectionPipeline:
                         'features': features,
                         'description': description,
                         'quality_score': quality_score,
-                        'post_processing_info': post_processing_info  #  传递给可视化
+                        'post_processing_info': post_processing_info
                     }
                     visualization_objects.append(viz_obj)
                     
@@ -250,7 +246,7 @@ class EnhancedDetectionPipeline:
                 'detection_count': len(reference_library),
                 'processing_time': time.time() - start_time,
                 'visualization_image': visualization_image,
-                'post_processing_stats': {  #  后处理统计
+                'post_processing_stats': { 
                     'original_detections': len(initial_detections),
                     'filtered_detections': len(filtered_detections),
                     'duplicates_removed': len(initial_detections) - len(filtered_detections),
@@ -311,16 +307,9 @@ class EnhancedDetectionPipeline:
     def _generate_enhanced_visualization(self, image_rgb: np.ndarray, objects: List[Dict]) -> np.ndarray:
         """生成增强可视化 - 添加详细调试信息"""
         try:
-            print(f"[VISUALIZATION_DEBUG] 开始生成可视化，对象数量: {len(objects)}")
             
             # 检查输入对象数据
             for i, obj in enumerate(objects):
-                print(f"[VISUALIZATION_DEBUG] 对象 {i+1} 数据检查:")
-                print(f"  - class_name: {obj.get('class_name', 'MISSING')}")
-                print(f"  - confidence: {obj.get('confidence', 'MISSING')}")
-                print(f"  - features keys: {list(obj.get('features', {}).keys())}")
-                
-                # 检查特征数据
                 features = obj.get('features', {})
                 if 'appearance' in features:
                     color_name = features['appearance'].get('color_name', 'MISSING')
@@ -334,14 +323,12 @@ class EnhancedDetectionPipeline:
                 else:
                     print(f"  - spatial features: MISSING")
             
-            # ... 原有的亮度增强代码 ...
             vis_image = image_rgb.copy().astype(np.float32)
             mean_brightness = np.mean(vis_image)
             if mean_brightness < 120:
                 vis_image = np.clip(vis_image * 1.2, 0, 255)
             vis_image = vis_image.astype(np.uint8)
             
-            # ... 原有的mask处理代码 ...
             mask_overlay = np.zeros_like(vis_image, dtype=np.float32)
             combined_mask = np.zeros((vis_image.shape[0], vis_image.shape[1]), dtype=bool)
             
@@ -377,15 +364,11 @@ class EnhancedDetectionPipeline:
             # 绘制对象 - 增强调试版本
             font = cv2.FONT_HERSHEY_SIMPLEX
             for obj_idx, (i, obj, mask_bool, color) in enumerate(valid_objects):
-                print(f"[VISUALIZATION_DEBUG] 开始绘制对象 {obj_idx+1}")
                 
                 # 计算mask中心点
                 center_x, center_y = self._calculate_mask_center(mask_bool)
                 bbox = obj['bounding_box']
                 x1, y1, x2, y2 = map(int, bbox)
-                
-                print(f"  - 中心点: ({center_x}, {center_y})")
-                print(f"  - 边界框: ({x1}, {y1}, {x2}, {y2})")
                 
                 # 绘制边框和中心点
                 post_info = obj.get('post_processing_info', {})
@@ -411,18 +394,14 @@ class EnhancedDetectionPipeline:
                 cv2.putText(vis_image, number_text, (text_x, text_y), font, 0.8, (0, 0, 0), 2)
                 
                 # 生成英文描述 - 添加调试
-                print(f"  - 开始生成英文描述...")
                 try:
                     description = self._generate_english_description(obj)
-                    print(f"  - 生成的描述: '{description}'")
                 except Exception as desc_error:
-                    print(f"  - 描述生成失败: {desc_error}")
                     description = f"Object {obj_idx+1} (conf:{obj.get('confidence', 0):.2f})"
                 
                 # 为合并的检测添加标记
                 if post_info.get('was_merged', False):
                     description += f" [M{post_info['merged_from_count']}]"
-                    print(f"  - 添加合并标记后: '{description}'")
                 
                 # 智能标签位置
                 label_positions = [(x1, y1 + 5), (x1, y2 - 25), (x2 - 10, y1 - 20)]
@@ -431,10 +410,6 @@ class EnhancedDetectionPipeline:
                     if pos_x >= 0 and pos_y >= 20 and pos_x + 400 < vis_image.shape[1]:
                         label_x, label_y = pos_x, pos_y
                         break
-                
-                print(f"  - 标签位置: ({label_x}, {label_y})")
-                
-                # 绘制标签 - 改进版本（白底黑字）
                 label_width = max(200, len(description) * 8)  # 确保最小宽度
                 label_height = 25
                 
@@ -455,40 +430,32 @@ class EnhancedDetectionPipeline:
                     
                     # 绘制黑色文字
                     cv2.putText(vis_image, description, (label_x, label_y), 
-                                font, 0.6, (0, 0, 0), 2)  # 加粗黑色文字
-                    
-                    print(f"  - 标签绘制成功")
+                                font, 0.6, (0, 0, 0), 2) 
+                
                     
                 except Exception as draw_error:
-                    print(f"  - 标签绘制失败: {draw_error}")
                     # 备用简化绘制
                     cv2.putText(vis_image, f"Obj{obj_idx+1}", (label_x, label_y), 
                                 font, 0.6, (0, 0, 0), 2)
             
             # 添加信息面板
             self._add_post_processing_info_panel(vis_image, objects)
-            
-            print(f"[VISUALIZATION_DEBUG] 可视化生成完成")
             description_lines = []
             for obj_idx, (i, obj, mask_bool, color) in enumerate(valid_objects):
-                # 生成详细描述
                 features = obj.get('features', {})
                 class_name = obj['class_name']
                 confidence = obj['confidence']
                 object_id = obj.get('object_id', f"{class_name}_{obj_idx}")
                 
-                # 获取颜色和高度信息
                 color_name = features.get('appearance', {}).get('color_name', '')
                 height_mm = features.get('spatial', {}).get('height_mm', 0)
                 distance = features.get('spatial', {}).get('distance_to_camera')
                 
-                # 构建描述
                 desc_parts = []
                 if color_name and color_name != 'unknown':
                     desc_parts.append(color_name.capitalize())
                 desc_parts.append(class_name)
                 
-                # 高度描述
                 if height_mm > 0:
                     if height_mm < 20:
                         desc_parts.append("(flat)")
@@ -499,7 +466,6 @@ class EnhancedDetectionPipeline:
                     else:
                         desc_parts.append("(tall)")
                 
-                # 距离描述
                 if distance is not None:
                     if distance < 0.3:
                         desc_parts.append("nearby")
@@ -511,7 +477,6 @@ class EnhancedDetectionPipeline:
                 full_description = f"{obj_idx + 1}. {' '.join(desc_parts)} (ID: {object_id}, confidence: {confidence:.3f})"
                 description_lines.append(full_description)
 
-            # 扩展画布以容纳描述
             if description_lines:
                 line_height = 25
                 padding = 20
@@ -538,7 +503,6 @@ class EnhancedDetectionPipeline:
             return vis_image
             
         except Exception as e:
-            print(f"[VISUALIZATION_DEBUG] 可视化生成失败: {e}")
             import traceback
             traceback.print_exc()
             return None
@@ -648,48 +612,28 @@ class EnhancedDetectionPipeline:
         features = {}
         
         try:
-            print(f"[FEATURES] 开始提取特征，输入: image{image_rgb.shape}, mask{mask.shape}, depth{depth_image.shape if depth_image is not None else None}")
-            
-            # 1. 几何特征（最稳定 - 权重最高）
             if depth_image is not None:
-                #print("[FEATURES] 开始提取几何特征...")
                 try:
                     geometric_features = self.enhanced_shape_extractor.extract_all_features(
                         mask, depth_image, waypoint_data
                     )
                     features['geometric'] = geometric_features
-                    print(f"[FEATURES] 几何特征提取完成: {list(geometric_features.keys())}")
-                    
-                    # # 调试输出几何特征的内容
-                    # for key, value in geometric_features.items():
-                    #     if isinstance(value, list):
-                    #         print(f"[FEATURES] {key}: list长度={len(value)}, 非零={sum(1 for x in value if abs(x) > 1e-6)}")
-                    #     elif isinstance(value, dict):
-                    #         print(f"[FEATURES] {key}: dict键={list(value.keys())}")
-                    #     else:
-                    #         print(f"[FEATURES] {key}: {type(value)}")
                             
                 except Exception as e:
-                    #print(f"[FEATURES] 几何特征提取失败: {e}")
                     import traceback
                     traceback.print_exc()
                     features['geometric'] = {}
             else:
-                ##print("[FEATURES] 无深度数据，跳过几何特征提取")
                 features['geometric'] = {}
             
             # 2. 形状特征（中等稳定）
-            #print("[FEATURES] 开始提取形状特征...")
             try:
                 shape_features = self.enhanced_shape_extractor._extract_2d_shape_features(mask)
                 features['shape'] = shape_features
-                #print(f"[FEATURES] 形状特征提取完成: {list(shape_features.keys())}")
             except Exception as e:
-                #print(f"[FEATURES] 形状特征提取失败: {e}")
                 features['shape'] = {}
             
             # 3. 外观特征（较不稳定 - 权重较低）
-            ##print("[FEATURES] 开始提取外观特征...")
             try:
                 color_stats = self.color_extractor.get_color_statistics(image_rgb, mask)
                 # 使用改进的颜色直方图
@@ -697,13 +641,10 @@ class EnhancedDetectionPipeline:
                 color_stats['histogram'] = improved_histogram
                 color_stats['color_name'] = self._improve_color_detection(image_rgb, mask)
                 features['appearance'] = color_stats
-                # print(f"[FEATURES] 外观特征提取完成: 颜色={color_stats.get('color_name', 'unknown')}")
             except Exception as e:
-                # print(f"[FEATURES] 外观特征提取失败: {e}")
                 features['appearance'] = {}
             
             # 4. 空间上下文特征（辅助信息）
-            #print("[FEATURES] 开始提取空间特征...")
             try:
                 if depth_image is not None and waypoint_data is not None:
                     spatial_features = self.object_analyzer.calculate_3d_spatial_features(
@@ -717,7 +658,6 @@ class EnhancedDetectionPipeline:
                     spatial_features.update(height_info)
                     
                     features['spatial'] = spatial_features
-                    #print(f"[FEATURES] 空间特征提取完成: 3D坐标={spatial_features.get('world_coordinates', 'N/A')}")
                 else:
                     # 基本的2D空间信息
                     ys, xs = np.where(mask > 0)
@@ -734,17 +674,12 @@ class EnhancedDetectionPipeline:
                             'normalized_coords': (norm_x, norm_y),
                             'region_position': region_position
                         }
-                        #print(f"[FEATURES] 2D空间特征提取完成: 质心=({centroid_x:.1f},{centroid_y:.1f})")
             except Exception as e:
-                #print(f"[FEATURES] 空间特征提取失败: {e}")
                 import traceback
                 traceback.print_exc()
                 features['spatial'] = {}
             
-            #print(f"[FEATURES] 特征提取完成，总类型数: {len(features)}")
-            
         except Exception as e:
-            #print(f"[FEATURES] 特征提取整体失败: {e}")
             import traceback
             traceback.print_exc()
             features['extraction_error'] = str(e)
@@ -875,7 +810,6 @@ class EnhancedDetectionPipeline:
             return enhanced_description
             
         except Exception as e:
-            print(f"[ENHANCED_PIPELINE] 描述生成失败: {e}")
             return f"{class_name}_{object_id}"
     
     def _save_reference_library(self, reference_library: Dict):
@@ -901,10 +835,10 @@ class EnhancedDetectionPipeline:
             # 保存摘要文件
             self._save_library_summary(reference_library)
             
-            print(f"[ENHANCED_PIPELINE] 参考特征库已保存到: {library_file}")
+            print(f"[ENHANCED_PIPELINE] Reference feature library has been saved to: {library_file}")
             
         except Exception as e:
-            print(f"[ENHANCED_PIPELINE] 保存参考特征库失败: {e}")
+            print(f"[ENHANCED_PIPELINE] Failed to save reference feature library: {e}")
     
     def _sanitize_features_for_json(self, features: Dict) -> Dict:
         """清理特征数据用于JSON序列化"""
@@ -960,10 +894,10 @@ class EnhancedDetectionPipeline:
                         f.write(f"  - {obj_id} (quality: {quality:.1f}%)\n")
                     f.write("\n")
             
-            print(f"[ENHANCED_PIPELINE] 特征库摘要已保存到: {summary_file}")
+            print(f"[ENHANCED_PIPELINE] Feature library summary saved to: {summary_file}")
             
         except Exception as e:
-            print(f"[ENHANCED_PIPELINE] 保存摘要失败: {e}")
+            print(f"[ENHANCED_PIPELINE] Failed to save summary: {e}")
 
     
     def get_reference_library(self) -> Dict:
@@ -975,29 +909,29 @@ class EnhancedDetectionPipeline:
         return self.output_dir
     
     def select_tracking_targets(self) -> bool:
-        """选择要追踪的目标"""
+        """Selects the targets to be tracked"""
         if not hasattr(self, 'reference_library') or not self.reference_library:
-            print("[ENHANCED_PIPELINE] 没有参考特征库数据，请先进行检测")
+            print("[ENHANCED_PIPELINE] No reference to feature library data, please perform a test first")
             return False
         
         objects = list(self.reference_library.values())
         
         print(f"\n{'='*50}")
-        print("选择追踪目标")
+        print("Select Tracking Targets")
         print(f"{'='*50}")
         
-        print("\n检测到的对象:")
+        print("\nDetected Objects:")
         for i, (obj_id, entry) in enumerate(self.reference_library.items(), 1):
             metadata = entry['metadata']
             quality = entry['quality_score']
-            print(f"{i:2d}. {metadata['description']} (ID: {obj_id}, 置信度: {metadata['confidence']:.3f}, 质量: {quality:.1f}%)")
+            print(f"{i:2d}. {metadata['description']} (ID: {obj_id}, Confidence: {metadata['confidence']:.3f}, Quality: {quality:.1f}%)")
         
-        print("\n请选择要追踪的对象:")
-        print("格式: 输入数字，用逗号分隔 (例如: 1,3,5)")
+        print("\nPlease select the objects to track:")
+        print("Format: Enter numbers separated by commas (e.g., 1,3,5)")
         
         while True:
             try:
-                user_input = input("\n您的选择: ").strip()
+                user_input = input("\nYour selection: ").strip()
                 
                 if user_input.lower() == 'all':
                     self.selected_tracking_ids = list(self.reference_library.keys())
@@ -1011,38 +945,38 @@ class EnhancedDetectionPipeline:
                     if 1 <= idx <= len(obj_list):
                         selected_ids.append(obj_list[idx-1])
                     else:
-                        print(f"警告: 索引 {idx} 超出范围")
+                        print(f"Warning: Index {idx} is out of range")
                 
                 if selected_ids:
                     self.selected_tracking_ids = selected_ids
                     break
                 else:
-                    print("没有有效选择，请重试。")
+                    print("No valid selection, please try again.")
                     
             except ValueError:
-                print("输入格式错误，请输入数字，用逗号分隔。")
+                print("Invalid input format. Please enter numbers separated by commas.")
             except KeyboardInterrupt:
-                print("\n选择已取消。")
+                print("\nSelection canceled.")
                 return False
         
-        print(f"\n已选择的追踪目标:")
+        print(f"\nSelected tracking targets:")
         for obj_id in self.selected_tracking_ids:
             entry = self.reference_library[obj_id]
             metadata = entry['metadata']
             print(f"  - {metadata['description']} (ID: {obj_id})")
         
-        # 保存选择
+        # Save the selection
         self._save_tracking_selection()
         
         return True
 
     def _save_tracking_selection(self):
-        """保存追踪选择"""
+        """Save tracking selection"""
         try:
             selection_file = os.path.join(self.output_dir, "tracking_selection.txt")
             
             with open(selection_file, 'w', encoding='utf-8') as f:
-                f.write("选择的追踪目标:\n")
+                f.write("Selected tracking targets:\n")
                 f.write("=" * 50 + "\n")
                 
                 for obj_id in getattr(self, 'selected_tracking_ids', []):
@@ -1051,57 +985,57 @@ class EnhancedDetectionPipeline:
                         metadata = entry['metadata']
                         f.write(f"- {metadata['description']} (ID: {obj_id})\n")
             
-            print(f"[ENHANCED_PIPELINE] 追踪选择已保存到: {selection_file}")
+            print(f"[ENHANCED_PIPELINE] Tracking selection saved to: {selection_file}")
             
         except Exception as e:
-            print(f"[ENHANCED_PIPELINE] 保存追踪选择失败: {e}")
+            print(f"[ENHANCED_PIPELINE] Failed to save tracking selection: {e}")
 
     def get_selected_tracking_ids(self) -> List[str]:
-        """获取选择的追踪目标ID"""
+        """Get selected tracking target IDs"""
         return getattr(self, 'selected_tracking_ids', [])
     
     def _display_and_publish_visualization(self, vis_image: np.ndarray, output_dir: str):
-        """显示和发布可视化图像"""
+        """Display and publish visualization image"""
         try:
             if vis_image is None:
-                print("[DISPLAY] 可视化图像为空，跳过显示")
+                print("[DISPLAY] Visualization image is empty, skipping display")
                 return
             
-            # 保存图像
+            # Save image
             vis_file = os.path.join(output_dir, "detection_visualization.jpg")
             success = cv2.imwrite(vis_file, cv2.cvtColor(vis_image, cv2.COLOR_RGB2BGR))
             
             if success:
-                print(f"[DISPLAY]  可视化图像已保存: {vis_file}")
+                print(f"[DISPLAY] Visualization image saved: {vis_file}")
             else:
-                print(f"[DISPLAY]  可视化图像保存失败: {vis_file}")
+                print(f"[DISPLAY] Failed to save visualization image: {vis_file}")
                 return
             
-            # 🖼️ 尝试显示图像
+            # 🖼️ Try to display image
             self._show_visualization_popup(vis_image)
             
-            # 📡 发布ROS可视化消息
+            # 📡 Publish ROS visualization message
             self._publish_visualization_message(vis_image)
             
         except Exception as e:
-            print(f"[DISPLAY] 显示和发布可视化失败: {e}")
+            print(f"[DISPLAY] Failed to display and publish visualization: {e}")
 
     def _show_visualization_popup(self, vis_image: np.ndarray):
-        """显示可视化弹窗"""
+        """Show visualization popup"""
         try:
             import os
             
-            # 检查显示环境
+            # Check display environment
             display_mode = os.environ.get('VISION_AI_DISPLAY', 'auto')
             
             if display_mode == 'off':
-                print("[DISPLAY] 显示功能已禁用")
+                print("[DISPLAY] Display function disabled")
                 return
             
-            # 尝试matplotlib显示
+            # Try matplotlib display
             try:
                 import matplotlib
-                matplotlib.use('TkAgg')  # 使用TkAgg后端
+                matplotlib.use('TkAgg')  # Use TkAgg backend
                 import matplotlib.pyplot as plt
                 
                 plt.figure(figsize=(16, 12))
@@ -1109,83 +1043,71 @@ class EnhancedDetectionPipeline:
                 plt.title('Enhanced Detection Results', fontsize=16, fontweight='bold')
                 plt.axis('off')
                 
-                # 添加说明文字
+                # Add description text
                 plt.figtext(0.5, 0.02, 
                         'Enhanced detection with 3D point cloud features. Numbers indicate object centers in 3D space.',
                         ha='center', fontsize=10, style='italic')
                 
                 plt.tight_layout()
-                plt.show(block=False)  # 非阻塞显示
+                plt.show(block=False)  # Non-blocking display
                 plt.pause(0.1)
-                print("[DISPLAY]  matplotlib弹窗显示成功")
+                print("[DISPLAY] matplotlib popup display successful")
                 
             except Exception as e:
-                print(f"[DISPLAY] matplotlib显示失败: {e}")
+                print(f"[DISPLAY] matplotlib display failed: {e}")
                 
-                # 尝试OpenCV显示
+                # Try OpenCV display
                 try:
                     cv2.namedWindow('Enhanced Detection Results', cv2.WINDOW_NORMAL)
                     cv2.resizeWindow('Enhanced Detection Results', 1200, 800)
                     cv2.imshow('Enhanced Detection Results', cv2.cvtColor(vis_image, cv2.COLOR_RGB2BGR))
-                    cv2.waitKey(1)  # 非阻塞
-                    print("[DISPLAY]  OpenCV窗口显示成功")
+                    cv2.waitKey(1)  # Non-blocking
+                    print("[DISPLAY] OpenCV window display successful")
                     
                 except Exception as e2:
-                    print(f"[DISPLAY] OpenCV显示也失败: {e2}")
-                    print("[DISPLAY] 无法显示可视化窗口，仅保存文件")
+                    print(f"[DISPLAY] OpenCV display also failed: {e2}")
+                    print("[DISPLAY] Unable to display visualization window, only saving file")
             
         except Exception as e:
-            print(f"[DISPLAY] 显示弹窗失败: {e}")
+            print(f"[DISPLAY] Failed to show visualization popup: {e}")
 
     def _publish_visualization_message(self, vis_image: np.ndarray):
-        """发布ROS可视化消息"""
+        """Publish ROS visualization message"""
         try:
-            # 这个方法应该在detection_node.py中调用
-            # 这里只是预留接口
-            print("[PUBLISH] 可视化消息发布接口预留")
+            print("[PUBLISH] Visualization message publishing interface reserved")
             
         except Exception as e:
-            print(f"[PUBLISH] 发布可视化消息失败: {e}")
+            print(f"[PUBLISH] Failed to publish visualization message: {e}")
+    
     def process_single_image(self, image_rgb: np.ndarray, 
                         depth_image: Optional[np.ndarray] = None,
                         camera_pose: Optional[Dict] = None) -> Dict:
-        """
-        处理单张图像 - 用于追踪系统的实时检测
-        
-        Args:
-            image_rgb: RGB图像 (H, W, 3)
-            depth_image: 深度图像 (H, W)，可选
-            camera_pose: 相机位姿，可选
-            
-        Returns:
-            result: 检测结果字典，包含objects列表
-        """
         try:
-            print(f"[ENHANCED_PIPELINE] 开始处理单张图像...")
+            print(f"[ENHANCED_PIPELINE] Starting to process single image...")
             
-            # 🔧 确保RGB和深度图像分辨率匹配
+            # 🔧 Ensure RGB and depth image resolutions match
             if image_rgb.shape[:2] != depth_image.shape:
-                print(f'[ENHANCED_PIPELINE] 调整深度图像分辨率: {depth_image.shape} -> {image_rgb.shape[:2]}')
+                print(f'[ENHANCED_PIPELINE] Adjusting depth image resolution: {depth_image.shape} -> {image_rgb.shape[:2]}')
                 depth_image = cv2.resize(
                     depth_image, 
                     (image_rgb.shape[1], image_rgb.shape[0]), 
                     interpolation=cv2.INTER_LINEAR
                 )
             
-            # 1. YOLO检测
+            # 1. YOLO detection
             boxes, class_ids, confidences = self.detector.detect(image_rgb)
             
             if len(boxes) == 0:
-                print("[ENHANCED_PIPELINE] 未检测到任何目标")
+                print("[ENHANCED_PIPELINE] No targets detected")
                 return {'objects': []}
             
-            print(f"[ENHANCED_PIPELINE] YOLO检测到 {len(boxes)} 个目标")
+            print(f"[ENHANCED_PIPELINE] YOLO detected {len(boxes)} targets")
             
-            # 2. SAM2分割
+            # 2. SAM2 segmentation
             masks = self.segmentor.segment(image_rgb, boxes)
-            print("[ENHANCED_PIPELINE] SAM2分割完成")
+            print("[ENHANCED_PIPELINE] SAM2 segmentation completed")
             
-            # 3. 处理检测结果（不使用3D后处理，避免合并）
+            # 3. Process detection results (no 3D post-processing to avoid merging)
             objects = []
             class_names = self.detector.get_class_names()
             
@@ -1193,23 +1115,23 @@ class EnhancedDetectionPipeline:
                 try:
                     class_name = class_names.get(class_id, f'class_{class_id}')
                     
-                    # 🔧 安全的特征提取，确保mask和图像尺寸匹配
+                    # 🔧 Safe feature extraction, ensure mask and image dimensions match
                     if mask.shape != image_rgb.shape[:2]:
-                        print(f'[ENHANCED_PIPELINE] 调整mask尺寸: {mask.shape} -> {image_rgb.shape[:2]}')
+                        print(f'[ENHANCED_PIPELINE] Adjusting mask size: {mask.shape} -> {image_rgb.shape[:2]}')
                         mask = cv2.resize(
                             mask.astype(np.uint8), 
                             (image_rgb.shape[1], image_rgb.shape[0]), 
                             interpolation=cv2.INTER_NEAREST
                         ).astype(bool)
                     
-                    # 🔧 构建waypoint数据（如果没有提供camera_pose）
+                    # 🔧 Build waypoint data (if camera_pose is not provided)
                     if camera_pose is None:
                         camera_pose = {
                             'world_pos': [0, 0, 350],
                             'roll': 179, 'pitch': 0, 'yaw': 0
                         }
                     
-                    # 提取增强特征
+                    # Extract enhanced features
                     features = self._extract_enhanced_features(
                         image_rgb, mask, depth_image, camera_pose, box.tolist()
                     )
@@ -1226,10 +1148,10 @@ class EnhancedDetectionPipeline:
                     objects.append(obj)
                     
                 except Exception as e:
-                    print(f'[ENHANCED_PIPELINE] 处理对象 {i} 时出错: {e}')
+                    print(f'[ENHANCED_PIPELINE] Error processing object {i}: {e}')
                     continue
             
-            print(f"[ENHANCED_PIPELINE] 单张图像处理完成，检测到 {len(objects)} 个有效目标")
+            print(f"[ENHANCED_PIPELINE] Single image processing completed, detected {len(objects)} valid targets")
             
             return {
                 'objects': objects,
@@ -1238,7 +1160,7 @@ class EnhancedDetectionPipeline:
             }
             
         except Exception as e:
-            print(f"[ENHANCED_PIPELINE] 单张图像处理失败: {e}")
+            print(f"[ENHANCED_PIPELINE] Single image processing failed: {e}")
             import traceback
             traceback.print_exc()
             return {'objects': []}

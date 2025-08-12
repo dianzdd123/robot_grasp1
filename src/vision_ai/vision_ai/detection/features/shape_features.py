@@ -17,8 +17,6 @@ except ImportError:
     print("[WARNING] scikit-learn not available, some features will be disabled")
 
 class EnhancedShapeFeatureExtractor:
-    """增强的形状特征提取器 - 集成2D和3D特征"""
-    
     def __init__(self, camera_intrinsics: Optional[Dict] = None):
         self.camera_intrinsics = camera_intrinsics or {
             'fx': 912.694580078125,
@@ -30,13 +28,10 @@ class EnhancedShapeFeatureExtractor:
     def extract_all_features(self, mask: np.ndarray, 
                            depth_data: Optional[np.ndarray] = None,
                            waypoint_data: Optional[Dict] = None) -> Dict:
-        """提取所有形状特征"""
         features = {}
         
-        # 传统2D特征（作为补充）
         features.update(self._extract_2d_shape_features(mask))
         
-        # 3D点云特征（主要特征）
         if depth_data is not None:
             pointcloud_features = self._extract_pointcloud_features(mask, depth_data)
             features.update(pointcloud_features)
@@ -199,7 +194,7 @@ class EnhancedShapeFeatureExtractor:
                 convex_area = cv2.contourArea(convex_hull)
                 features['convex_area'] = float(convex_area)
             except Exception as e:
-                print(f"[SHAPE_FEATURES] 凸包面积计算失败: {e}")
+                print(f"[SHAPE_FEATURES] Convex hull area calculation failed: {e}")
                 features['convex_area'] = 0.0
         else:
             # 🆕 如果没有找到轮廓，确保 convex_area 存在
@@ -208,7 +203,6 @@ class EnhancedShapeFeatureExtractor:
         return features
     
     def _extract_pointcloud_features(self, mask: np.ndarray, depth_data: np.ndarray) -> Dict:
-        """提取3D点云特征（核心特征）"""
         features = {}
         
         try:
@@ -444,12 +438,9 @@ class FeatureQualityAssessor:
         quality_score = 0.0
         max_score = 0.0
         
-        # print(f"[QUALITY] 开始评估特征质量，输入特征类型: {list(features.keys())}")
-        
         # 评估几何特征质量
         if 'geometric' in features:
             geometric_features = features['geometric']
-            #print(f"[QUALITY] 几何特征内容: {list(geometric_features.keys())}")
             
             geometric_quality = 0.0
             geometric_max = 0.0
@@ -461,7 +452,6 @@ class FeatureQualityAssessor:
                     non_zero_count = sum(1 for x in fpfh_data if abs(x) > 1e-6)
                     fpfh_quality = non_zero_count / len(fpfh_data) * 100
                     geometric_quality += fpfh_quality * 0.4
-                    #print(f"[QUALITY] FPFH质量: {fpfh_quality:.1f}% ({non_zero_count}/{len(fpfh_data)})")
                 geometric_max += 40
             
             # 评估PCA特征
@@ -474,9 +464,6 @@ class FeatureQualityAssessor:
                         e1, e2, e3 = eigenvals[0], eigenvals[1], eigenvals[2]
                         balance = (e2 / e1 + e3 / e1) / 2 * 100  # 归一化到0-100
                         geometric_quality += balance * 0.3
-                        #print(f"[QUALITY] PCA质量: {balance:.1f}% (eigenvals: {eigenvals})")
-                    # else:
-                    #     print(f"[QUALITY] PCA特征值无效: {eigenvals}")
                 geometric_max += 30
             
             # 评估包围盒特征
@@ -487,7 +474,6 @@ class FeatureQualityAssessor:
                     if all(d > 0.001 for d in bbox_dims):  # 至少1mm
                         bbox_quality = min(100, sum(bbox_dims) * 1000)  # 转换为mm并限制
                         geometric_quality += bbox_quality * 0.2
-                        # print(f"[QUALITY] 包围盒质量: {bbox_quality:.1f}% (dims: {bbox_dims})")
                 geometric_max += 20
             
             # 评估3D形状上下文
@@ -497,13 +483,11 @@ class FeatureQualityAssessor:
                     non_zero_ratio = sum(1 for x in context_data if abs(x) > 1e-6) / len(context_data)
                     context_quality = non_zero_ratio * 100
                     geometric_quality += context_quality * 0.1
-                    # print(f"[QUALITY] 3D形状上下文质量: {context_quality:.1f}%")
                 geometric_max += 10
             
             if geometric_max > 0:
                 quality_score += geometric_quality
                 max_score += geometric_max
-                # print(f"[QUALITY] 几何特征总质量: {geometric_quality:.1f}/{geometric_max}")
         
         # 评估外观特征质量
         if 'appearance' in features:
@@ -518,18 +502,15 @@ class FeatureQualityAssessor:
                     non_zero_ratio = sum(1 for x in hist_data if abs(x) > 1e-6) / len(hist_data)
                     hist_quality = non_zero_ratio * 100
                     appearance_quality += hist_quality * 0.7
-                    #print(f"[QUALITY] 颜色直方图质量: {hist_quality:.1f}%")
             
             # 评估颜色名称
             if 'color_name' in appearance_features:
                 color_name = appearance_features['color_name']
                 if color_name and color_name != 'unknown':
                     appearance_quality += 30  # 有效颜色名称给30分
-                    #print(f"[QUALITY] 颜色名称: {color_name} (+30分)")
             
             quality_score += appearance_quality
             max_score += appearance_max
-            #print(f"[QUALITY] 外观特征总质量: {appearance_quality:.1f}/{appearance_max}")
         
         # 评估形状特征质量
         if 'shape' in features:
@@ -544,18 +525,15 @@ class FeatureQualityAssessor:
                     valid_hu = sum(1 for x in hu_data if not (np.isnan(x) or np.isinf(x)))
                     hu_quality = (valid_hu / 7) * 100
                     shape_quality += hu_quality * 0.5
-                    #print(f"[QUALITY] Hu矩质量: {hu_quality:.1f}% ({valid_hu}/7)")
             
             # 评估轮廓特征
             if 'area' in shape_features:
                 area = shape_features['area']
                 if area > 0:
                     shape_quality += 50  # 有效面积给50分
-                    #print(f"[QUALITY] 轮廓面积: {area} (+50分)")
             
             quality_score += shape_quality
             max_score += shape_max
-            #print(f"[QUALITY] 形状特征总质量: {shape_quality:.1f}/{shape_max}")
         
         # 评估空间特征质量
         if 'spatial' in features:
@@ -569,15 +547,11 @@ class FeatureQualityAssessor:
                 if isinstance(coords, (list, tuple)) and len(coords) == 3:
                     if all(isinstance(c, (int, float)) and not np.isnan(c) for c in coords):
                         spatial_quality += 100  # 有效3D坐标给满分
-                        #print(f"[QUALITY] 3D坐标有效: {coords}")
             
             quality_score += spatial_quality
             max_score += spatial_max
-            #print(f"[QUALITY] 空间特征总质量: {spatial_quality:.1f}/{spatial_max}")
         
         # 计算最终质量分数
         final_quality = (quality_score / max_score * 100) if max_score > 0 else 0.0
-        print(f"[QUALITY] 最终质量分数: {final_quality:.1f}% ({quality_score:.1f}/{max_score})")
-        
         # 确保返回合理的分数
         return max(0.0, min(100.0, final_quality))

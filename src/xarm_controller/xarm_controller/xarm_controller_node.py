@@ -140,7 +140,7 @@ class XArmControllerNode(Node):
             if code == 0:
                 response.success = True
                 response.message = f"Gripper moved to position {position}"
-                self.get_logger().info(f"✅ Gripper moved to position: {position}")
+                self.get_logger().info(f" Gripper moved to position: {position}")
             else:
                 response.success = False
                 response.message = f"Failed to move gripper, error code: {code}"
@@ -204,7 +204,7 @@ class XArmControllerNode(Node):
             self.arm.set_tcp_maxacc(500)
             self.arm.set_tcp_jerk(2000)
             
-            self.get_logger().info('✅ xArm initialized')
+            self.get_logger().info(' xArm initialized')
             
             code, pos = self.arm.get_position()
             if code == 0:
@@ -223,9 +223,9 @@ class XArmControllerNode(Node):
             code = self.arm.set_gripper_position(self.gripper_positions['fully_open'], wait=True)
             
             if code == 0:
-                self.get_logger().info('✅ Gripper initialized and opened')
+                self.get_logger().info(' Gripper initialized and opened')
             else:
-                self.get_logger().error(f'❌ Gripper initialization failed, error code: {code}')
+                self.get_logger().error(f' Gripper initialization failed, error code: {code}')
                 
         except Exception as e:
             self.get_logger().error(f'Failed to initialize gripper: {e}')
@@ -238,9 +238,9 @@ class XArmControllerNode(Node):
             code = self.arm.set_position(*initial_pose, speed=80, wait=True)
             
             if code == 0:
-                self.get_logger().info('✅ 已到达初始位置')
+                self.get_logger().info(' 已到达初始位置')
             else:
-                self.get_logger().error(f'❌ 初始化移动失败，错误码: {code}')
+                self.get_logger().error(f' 初始化移动失败，错误码: {code}')
                 
         except Exception as e:
             self.get_logger().error(f'初始化移动异常: {e}')
@@ -358,9 +358,9 @@ class XArmControllerNode(Node):
             code = self.arm.set_gripper_position(target_position, wait=True)
             
             if code == 0:
-                self.get_logger().info(f'✅ Gripper moved to position: {target_position}')
+                self.get_logger().info(f' Gripper moved to position: {target_position}')
             else:
-                self.get_logger().error(f'❌ Gripper movement failed, error code: {code}')
+                self.get_logger().error(f' Gripper movement failed, error code: {code}')
                 
         except Exception as e:
             self.get_logger().error(f'Error in gripper position callback: {e}')
@@ -494,10 +494,10 @@ class XArmControllerNode(Node):
             code = self.arm.set_tcp_load(weight, center_of_gravity)
             
             if code == 0:
-                self.get_logger().info(f'✅ TCP load set: weight={weight}kg, cog={center_of_gravity}')
+                self.get_logger().info(f' TCP load set: weight={weight}kg, cog={center_of_gravity}')
                 return True
             else:
-                self.get_logger().error(f'❌ Failed to set TCP load, error code: {code}')
+                self.get_logger().error(f' Failed to set TCP load, error code: {code}')
                 return False
                 
         except Exception as e:
@@ -537,9 +537,9 @@ class XArmControllerNode(Node):
                 success = self.execute_path(safe_path, roll, pitch, yaw)
                 
                 if success:
-                    self.get_logger().info(f'✅ 安全到达目标位置')
+                    self.get_logger().info(f' 安全到达目标位置')
                 else:
-                    self.get_logger().error(f'❌ 路径执行失败')
+                    self.get_logger().error(f' 路径执行失败')
                 
             except Exception as e:
                 self.get_logger().error(f'Error in pose callback: {e}')
@@ -676,9 +676,9 @@ class XArmControllerNode(Node):
             code = self.arm.set_position(px, py, pz, roll_deg, pitch_deg, yaw_deg, wait=True)
             
             if code == 0:
-                self.get_logger().info(f'✅ Waypoint {i+1}/{len(path)}: ({px:.1f}, {py:.1f}, {pz:.1f})')
+                self.get_logger().info(f' Waypoint {i+1}/{len(path)}: ({px:.1f}, {py:.1f}, {pz:.1f})')
             else:
-                self.get_logger().error(f'❌ Failed at waypoint {i+1}, error: {code}')
+                self.get_logger().error(f' Failed at waypoint {i+1}, error: {code}')
                 return False
         
         # 🆕 路径执行完成后发布移动完成信号

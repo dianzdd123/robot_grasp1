@@ -4,16 +4,8 @@ import math
 from typing import Dict, Tuple, Optional
 
 class SpatialFeatureExtractor:
-    """空间特征提取器"""
-    
     def __init__(self, camera_intrinsics: Dict, scan_region_bounds: Optional[Dict] = None):
-        """
-        初始化空间特征提取器
-        
-        Args:
-            camera_intrinsics: 相机内参 {'fx', 'fy', 'cx', 'cy'}
-            scan_region_bounds: 扫描区域边界 {'x_min', 'x_max', 'y_min', 'y_max'}
-        """
+
         self.camera_intrinsics = camera_intrinsics
         self.scan_region_bounds = scan_region_bounds
         
@@ -32,18 +24,6 @@ class SpatialFeatureExtractor:
     
     def pixel_to_world_coordinates(self, pixel_x: float, pixel_y: float, 
                                  depth: float, camera_pose: Dict) -> Tuple[float, float, float]:
-        """
-        将像素坐标转换为世界坐标
-        
-        Args:
-            pixel_x: 像素x坐标
-            pixel_y: 像素y坐标
-            depth: 深度值（mm）
-            camera_pose: 相机位姿 {'x', 'y', 'z', 'qx', 'qy', 'qz', 'qw'}
-            
-        Returns:
-            world_coords: 世界坐标 (x, y, z)
-        """
         # 像素坐标转相机坐标
         fx, fy = self.camera_intrinsics['fx'], self.camera_intrinsics['fy']
         cx, cy = self.camera_intrinsics['cx'], self.camera_intrinsics['cy']
@@ -66,17 +46,6 @@ class SpatialFeatureExtractor:
     
     def compute_spatial_position(self, mask: np.ndarray, depth_image: np.ndarray, 
                                camera_pose: Dict) -> Dict:
-        """
-        计算空间位置特征
-        
-        Args:
-            mask: 二值掩码 (H, W)
-            depth_image: 深度图像 (H, W)，单位：毫米
-            camera_pose: 相机位姿
-            
-        Returns:
-            spatial_features: 空间特征字典
-        """
         if np.sum(mask) == 0:
             return {
                 'world_coordinates': (0, 0, 0),
@@ -133,16 +102,6 @@ class SpatialFeatureExtractor:
         }
     
     def _determine_region_position(self, norm_x: float, norm_y: float) -> str:
-        """
-        根据归一化坐标确定区域位置
-        
-        Args:
-            norm_x: 归一化x坐标 (0-1)
-            norm_y: 归一化y坐标 (0-1)
-            
-        Returns:
-            region: 区域名称
-        """
         for region_name, (x_min, x_max, y_min, y_max) in self.spatial_regions.items():
             if x_min <= norm_x < x_max and y_min <= norm_y < y_max:
                 return region_name
@@ -151,16 +110,6 @@ class SpatialFeatureExtractor:
     
     def compute_relative_positions(self, current_features: Dict, 
                                  all_objects_features: list) -> Dict:
-        """
-        计算相对位置关系
-        
-        Args:
-            current_features: 当前对象的空间特征
-            all_objects_features: 所有对象的空间特征列表
-            
-        Returns:
-            relative_features: 相对位置特征
-        """
         current_coords = current_features['world_coordinates']
         
         if not all_objects_features:
@@ -198,16 +147,6 @@ class SpatialFeatureExtractor:
     
     def _compute_3d_distance(self, coords1: Tuple[float, float, float], 
                            coords2: Tuple[float, float, float]) -> float:
-        """
-        计算两个3D点之间的距离
-        
-        Args:
-            coords1: 第一个点的坐标
-            coords2: 第二个点的坐标
-            
-        Returns:
-            distance: 3D距离
-        """
         x1, y1, z1 = coords1
         x2, y2, z2 = coords2
         
@@ -215,16 +154,6 @@ class SpatialFeatureExtractor:
     
     def _generate_relative_position_desc(self, nearest_distance: float, 
                                        average_distance: float) -> str:
-        """
-        生成相对位置描述
-        
-        Args:
-            nearest_distance: 到最近邻居的距离
-            average_distance: 到其他对象的平均距离
-            
-        Returns:
-            description: 位置描述
-        """
         if nearest_distance < 50:  # 50mm
             return "clustered"
         elif nearest_distance < 100:  # 100mm
@@ -235,15 +164,6 @@ class SpatialFeatureExtractor:
             return "isolated"
     
     def compute_scan_region_position(self, world_coords: Tuple[float, float, float]) -> Dict:
-        """
-        计算在扫描区域中的位置
-        
-        Args:
-            world_coords: 世界坐标
-            
-        Returns:
-            region_info: 区域信息
-        """
         if not self.scan_region_bounds:
             return {
                 'in_scan_region': True,
@@ -254,11 +174,9 @@ class SpatialFeatureExtractor:
         x, y, z = world_coords
         bounds = self.scan_region_bounds
         
-        # 检查是否在扫描区域内
         in_region = (bounds['x_min'] <= x <= bounds['x_max'] and 
                     bounds['y_min'] <= y <= bounds['y_max'])
         
-        # 计算到边界的距离
         if in_region:
             dist_to_x_min = x - bounds['x_min']
             dist_to_x_max = bounds['x_max'] - x
@@ -268,12 +186,10 @@ class SpatialFeatureExtractor:
             distance_to_boundary = min(dist_to_x_min, dist_to_x_max, 
                                      dist_to_y_min, dist_to_y_max)
         else:
-            # 计算到区域的最短距离
             dx = max(bounds['x_min'] - x, 0, x - bounds['x_max'])
             dy = max(bounds['y_min'] - y, 0, y - bounds['y_max'])
             distance_to_boundary = -math.sqrt(dx**2 + dy**2)  # 负值表示在区域外
         
-        # 确定区域内的相对位置
         if in_region:
             norm_x = (x - bounds['x_min']) / (bounds['x_max'] - bounds['x_min'])
             norm_y = (y - bounds['y_min']) / (bounds['y_max'] - bounds['y_min'])
@@ -288,16 +204,6 @@ class SpatialFeatureExtractor:
         }
     
     def compute_position_similarity(self, pos1: Dict, pos2: Dict) -> float:
-        """
-        计算两个空间位置的相似度
-        
-        Args:
-            pos1: 第一个位置特征
-            pos2: 第二个位置特征
-            
-        Returns:
-            similarity: 位置相似度 (0-1)
-        """
         # 3D坐标距离相似度
         coords1 = pos1['world_coordinates']
         coords2 = pos2['world_coordinates']
@@ -326,18 +232,6 @@ class SpatialFeatureExtractor:
     
     def extract_all_features(self, mask: np.ndarray, depth_image: np.ndarray, 
                            camera_pose: Dict, all_objects_features: list = None) -> Dict:
-        """
-        提取所有空间特征
-        
-        Args:
-            mask: 二值掩码
-            depth_image: 深度图像
-            camera_pose: 相机位姿
-            all_objects_features: 其他对象的特征（用于计算相对位置）
-            
-        Returns:
-            features: 所有空间特征
-        """
         # 基本空间特征
         spatial_features = self.compute_spatial_position(mask, depth_image, camera_pose)
         
@@ -358,17 +252,6 @@ class SpatialFeatureExtractor:
     
     def generate_position_description(self, spatial_features: Dict, class_name: str, 
                                     color_name: str) -> str:
-        """
-        生成英文位置描述
-        
-        Args:
-            spatial_features: 空间特征
-            class_name: 类别名称
-            color_name: 颜色名称
-            
-        Returns:
-            description: 英文描述
-        """
         region = spatial_features['region_position']
         
         # 构建描述字符串
