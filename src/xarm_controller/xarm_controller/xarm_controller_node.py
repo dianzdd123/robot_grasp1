@@ -59,7 +59,7 @@ class XArmControllerNode(Node):
             'z': (100, 800)
         }
         self.obstacle_center = (0, 0)
-        self.obstacle_radius = 150
+        self.obstacle_radius = 200
         self.safety_margin = 20  # mm
         
         # 连接机械臂
@@ -624,7 +624,7 @@ class XArmControllerNode(Node):
             waypoint_3d = [best_waypoint[0], best_waypoint[1], start[2]]
             return [waypoint_3d]
         else:
-            safe_height = max(start[2], end[2]) + 100
+            safe_height = max(start[2], end[2]) + 155
             return [[start[0], start[1], safe_height], [end[0], end[1], safe_height]]
 
     def get_tangent_points(self, point, circle_center, circle_radius):

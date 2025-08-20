@@ -527,7 +527,7 @@ class TrackingGraspSystem(Node):
             self.get_logger().info(f'⬇️ 步骤4: 下降到最终抓取位置: [{x:.1f}, {y:.1f}, {z:.1f}]')
             if not self.move_to_pose(x, y, z, 180, strategy['pitch'], yaw):
                 return False
-            time.sleep(2)
+            time.sleep(10)
             
             # 5. 执行抓取
             self.get_logger().info(f'🤏 步骤5: 执行最终抓取，宽度: {final_width}')

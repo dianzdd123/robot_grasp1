@@ -592,36 +592,40 @@ class ScanExecutorNode(Node):
             self.get_logger().error(f'Scan completion handling failed: {e}')
 
     def _start_stitching_process(self):
-        """
-        Initiates the image stitching process by calling the ProcessStitching service.
-        Prepares image data and sends it to the stitching service.
-        """
+        """修复图像数据传递，确保深度文件路径正确"""
         try:
-            # 🆕 Removed single-point check, all cases now go through stitching service
             self.get_logger().info('Starting smart image stitching process...')
             
-            # Create a client for the stitching service
             stitch_client = self.create_client(ProcessStitching, 'process_stitching')
             
             if not stitch_client.wait_for_service(timeout_sec=5.0):
                 self.get_logger().error('Stitching service not available.')
-                # 🆕 Fallback: If stitching service is unavailable, trigger detection directly
                 self._trigger_detection_for_fallback()
                 return
             
-            # Prepare the stitching request
             request = ProcessStitching.Request()
             request.scan_plan = self.current_scan_plan
             request.output_directory = self.output_dir
             
-            # 🆕 Improved image data preparation
+            # 🆕 改进的图像数据准备 - 确保深度文件信息正确传递
             for img_data in self.captured_images:
                 image_msg = ImageData()
                 
-                # Use full file path
-                image_msg.filename = img_data.get('color_filename', f'waypoint_{img_data["waypoint_index"]}')
+                # 🆕 只传递文件名，不传递完整路径
+                color_full_path = img_data.get('color_filename', '')
+                depth_full_path = img_data.get('depth_raw_filename', '')
+                
+                # 提取文件名（去掉路径）
+                color_filename = os.path.basename(color_full_path) if color_full_path else f'color_waypoint_{img_data["waypoint_index"]:03d}.jpg'
+                depth_filename = os.path.basename(depth_full_path) if depth_full_path else f'depth_raw_waypoint_{img_data["waypoint_index"]:03d}.npy'
+                
+                image_msg.filename = color_filename
                 image_msg.timestamp = img_data['timestamp']
                 image_msg.waypoint = img_data['waypoint']
+                
+                # 🆕 添加自定义字段来传递深度文件名（如果接口支持）
+                # 如果不支持，需要修改接口定义
+                # image_msg.depth_filename = depth_filename
                 
                 # Convert OpenCV image to ROS Image message
                 img_rgb = img_data['color_image']
@@ -630,24 +634,22 @@ class ScanExecutorNode(Node):
                 
                 request.image_data.append(image_msg)
                 
-                # Log debug information
-                scan_type_log = "single_point" if len(self.captured_images) == 1 else "multi-point"
-                self.get_logger().info(f'Preparing {scan_type_log} image data: waypoint_{img_data["waypoint_index"]}.')
-                self.get_logger().info(f'  - Color file: {img_data.get("color_filename", "N/A")}')
-                self.get_logger().info(f'  - Depth file: {img_data.get("depth_raw_filename", "N/A")}')
+                self.get_logger().info(f'📤 准备图像数据: waypoint_{img_data["waypoint_index"]}')
+                self.get_logger().info(f'  - Color文件: {color_filename}')
+                self.get_logger().info(f'  - Depth文件: {depth_filename}')
+                self.get_logger().info(f'  - Depth完整路径: {depth_full_path}')
+                self.get_logger().info(f'  - 文件存在: {os.path.exists(depth_full_path)}')
             
             scan_type_msg = "Single-point scan" if len(self.captured_images) == 1 else "Multi-point scan"
-            self.get_logger().info(f'📤 Sending {scan_type_msg} data to stitching service: {len(request.image_data)} images.')
+            self.get_logger().info(f'📤 发送{scan_type_msg}数据到拼接服务: {len(request.image_data)} 张图像')
             
-            # Asynchronously call the stitching service
             future = stitch_client.call_async(request)
             future.add_done_callback(self.stitching_response_callback)
             
         except Exception as e:
-            self.get_logger().error(f'Stitching process initiation failed: {e}')
+            self.get_logger().error(f'拼接进程启动失败: {e}')
             import traceback
             traceback.print_exc()
-            # 🆕 Fallback in case of error
             self._trigger_detection_for_fallback()
 
     def _trigger_detection_for_fallback(self):

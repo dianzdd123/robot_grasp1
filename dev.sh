@@ -8,7 +8,7 @@ if [ "$1" = "full_system" ]; then
     # 创建tmux会话，包含所有必需的窗口
     tmux new-session -d -s vision_ai
 
-    # 窗口0：硬件节点（相机+机械臂）
+    # # 窗口0：硬件节点（相机+机械臂）
     tmux send-keys -t vision_ai:0 'ros2 run camera_node realsense_publisher' Enter
     tmux split-window -h -t vision_ai:0
     tmux send-keys -t vision_ai:0.1 'ros2 run xarm_controller xarm_controller' Enter
@@ -53,7 +53,7 @@ if [ "$1" = "full_system" ]; then
     tmux send-keys -t vision_ai:4 'echo "等待detection完成后自动启动..."' Enter
     tmux send-keys -t vision_ai:4 'echo "监听 /detection_complete 话题..."' Enter
     
-    # 启动完全自动化静态抓取系统
+    # # 启动完全自动化静态抓取系统
     tmux send-keys -t vision_ai:4 'echo "🤖 Starting Automated Static Grasp System..."' Enter
     tmux send-keys -t vision_ai:4 'python3 /home/qi/ros2_ws/src/vision_ai/vision_ai/simple_grasp_validator.py' Enter
     # 连接到会话，默认显示第1个窗口（规划+执行）

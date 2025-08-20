@@ -134,7 +134,10 @@ class GuiConfigNode(Node):
         regions = {
             'Small Square (200x200mm)': [(150, -150), (150, 100), (350, 100), (350, -150)],
             'Medium Rectangle (435x290mm)': [(-250, -390), (-250, -100), (235, -100), (235, -390)],
-            'Large Rectangle (696x464mm)': [(669.52,-334.55),(592.41,6.85),(124.20,-98.90),(201.31,-440.30)]
+            'Large Rectangle (696x464mm)': [(437.97, -94.11),
+(39.45, -128.52),
+(86.78, -676.48),
+(485.29, -642.07)]
         }
 
         selected_region = tk.StringVar(value=list(regions.keys())[0])
@@ -489,8 +492,20 @@ Area: {area/1000:.1f} cm²"""
             fov_h_rad = math.radians(fov_h_deg / 2)
             fov_v_rad = math.radians(fov_v_deg / 2)
             effective_height = scan_plan.scan_height - scan_plan.object_height
-            fov_1280_size = 2 * effective_height * math.tan(fov_h_rad)
-            fov_720_size = 2 * effective_height * math.tan(fov_v_rad)
+            if scan_plan.waypoints:
+                # 使用实际扫描参数计算FOV
+                fov_h_deg = 70.1  # 从相机参数获取
+                fov_v_deg = 43.2
+                fov_h_rad = math.radians(fov_h_deg / 2)
+                fov_v_rad = math.radians(fov_v_deg / 2)
+                
+                # 动态计算FOV覆盖范围
+                effective_height = scan_plan.scan_height - scan_plan.object_height
+                fov_1280_size = 2 * effective_height * math.tan(fov_h_rad)
+                fov_720_size = 2 * effective_height * math.tan(fov_v_rad)
+                
+                self.get_logger().info(f'动态FOV计算: 有效高度={effective_height}mm, '
+                                    f'FOV={fov_1280_size:.0f}×{fov_720_size:.0f}mm')
 
             waypoint_colors = plt.cm.viridis(np.linspace(0, 1, len(scan_plan.waypoints)))
             

@@ -3193,8 +3193,8 @@ class TrackingNode(Node):
             object_height = object_info.get('estimated_height', 30)
             
             # 计算期望的目标Z范围 (背景 + Object height ± 20mm)
-            expected_target_z_min = background_z + object_height - 20
-            expected_target_z_max = background_z + object_height + 20
+            expected_target_z_min = background_z + object_height - 25
+            expected_target_z_max = background_z + object_height + 25
             
             # 计算XY距离
             xy_distance = math.sqrt(

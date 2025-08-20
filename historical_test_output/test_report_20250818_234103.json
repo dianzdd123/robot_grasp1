@@ -1,0 +1,193 @@
+{
+  "test_time": "20250818_234103",
+  "data_source": "/home/qi/ros2_ws/test_images",
+  "input_images": 6,
+  "result_size": [
+    2250,
+    3000,
+    3
+  ],
+  "waypoint_info": {
+    "waypoints": [
+      {
+        "index": 0,
+        "world_pos": [
+          -200,
+          -100,
+          430.0
+        ],
+        "yaw": 0.0,
+        "grid_info": {
+          "grid_x": 0,
+          "grid_y": 0,
+          "total_x": 3,
+          "total_y": 2
+        },
+        "relative_info": {
+          "camera_x": -200,
+          "camera_y": -100,
+          "neighbors": [
+            "right",
+            "bottom"
+          ]
+        },
+        "overlap_info": {
+          "overlap_x": 0.25,
+          "overlap_y": 0.25
+        }
+      },
+      {
+        "index": 1,
+        "world_pos": [
+          0,
+          -100,
+          430.0
+        ],
+        "yaw": 0.0,
+        "grid_info": {
+          "grid_x": 1,
+          "grid_y": 0,
+          "total_x": 3,
+          "total_y": 2
+        },
+        "relative_info": {
+          "camera_x": 0,
+          "camera_y": -100,
+          "neighbors": [
+            "left",
+            "right",
+            "bottom"
+          ]
+        },
+        "overlap_info": {
+          "overlap_x": 0.25,
+          "overlap_y": 0.25
+        }
+      },
+      {
+        "index": 2,
+        "world_pos": [
+          200,
+          -100,
+          430.0
+        ],
+        "yaw": 0.0,
+        "grid_info": {
+          "grid_x": 2,
+          "grid_y": 0,
+          "total_x": 3,
+          "total_y": 2
+        },
+        "relative_info": {
+          "camera_x": 200,
+          "camera_y": -100,
+          "neighbors": [
+            "left",
+            "bottom"
+          ]
+        },
+        "overlap_info": {
+          "overlap_x": 0.25,
+          "overlap_y": 0.25
+        }
+      },
+      {
+        "index": 3,
+        "world_pos": [
+          -200,
+          100,
+          430.0
+        ],
+        "yaw": 0.0,
+        "grid_info": {
+          "grid_x": 0,
+          "grid_y": 1,
+          "total_x": 3,
+          "total_y": 2
+        },
+        "relative_info": {
+          "camera_x": -200,
+          "camera_y": 100,
+          "neighbors": [
+            "right",
+            "top"
+          ]
+        },
+        "overlap_info": {
+          "overlap_x": 0.25,
+          "overlap_y": 0.25
+        }
+      },
+      {
+        "index": 4,
+        "world_pos": [
+          0,
+          100,
+          430.0
+        ],
+        "yaw": 0.0,
+        "grid_info": {
+          "grid_x": 1,
+          "grid_y": 1,
+          "total_x": 3,
+          "total_y": 2
+        },
+        "relative_info": {
+          "camera_x": 0,
+          "camera_y": 100,
+          "neighbors": [
+            "left",
+            "right",
+            "top"
+          ]
+        },
+        "overlap_info": {
+          "overlap_x": 0.25,
+          "overlap_y": 0.25
+        }
+      },
+      {
+        "index": 5,
+        "world_pos": [
+          200,
+          100,
+          430.0
+        ],
+        "yaw": 0.0,
+        "grid_info": {
+          "grid_x": 2,
+          "grid_y": 1,
+          "total_x": 3,
+          "total_y": 2
+        },
+        "relative_info": {
+          "camera_x": 200,
+          "camera_y": 100,
+          "neighbors": [
+            "left",
+            "top"
+          ]
+        },
+        "overlap_info": {
+          "overlap_x": 0.25,
+          "overlap_y": 0.25
+        }
+      }
+    ],
+    "scan_plan": {
+      "strategy": "multi_point",
+      "scan_height": 430.0,
+      "object_height": 50.0,
+      "overlap_ratio": 0.25
+    }
+  },
+  "planning_info": {
+    "grid_layout": {
+      "total_x": 3,
+      "total_y": 2,
+      "is_regular_grid": true,
+      "num_waypoints": 6
+    },
+    "relationships_count": 6
+  }
+}

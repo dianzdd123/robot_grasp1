@@ -33,6 +33,8 @@ find_package(rosidl_default_generators REQUIRED)
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/ScanPlan.msg"
   "msg/Waypoint.msg"
+  "msg/GridPosition.msg"      # 🆕 新增
+  "msg/RelativePosition.msg"  # 🆕 新增
   "msg/StitchResult.msg"
   "msg/ImageData.msg"
   "msg/DetectedObject.msg"

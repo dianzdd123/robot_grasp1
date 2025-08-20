@@ -148,9 +148,9 @@ class EnhancedDetectionNode(Node):
             # 查找融合后的最终彩色图像
             color_files = []
             for file in os.listdir(self.current_scan_output_dir):
-                if file.startswith('final_') and file.endswith('.jpg'):
+                if file.startswith('multi_point_') and file.endswith('.jpg'):
                     color_files.insert(0, file)
-                elif file.startswith('color_waypoint_') and file.endswith('.jpg'):
+                elif file.startswith('single_point_') and file.endswith('.jpg'):
                     color_files.append(file)
             
             if not color_files:

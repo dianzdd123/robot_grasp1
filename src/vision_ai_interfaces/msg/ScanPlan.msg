@@ -5,3 +5,4 @@ Waypoint[] waypoints        # waypoint list
 geometry_msgs/Point[] scan_region  # scan region points
 float64 object_height       # object height in mm
 string mode                 # mode from request
+float64 overlap_ratio
