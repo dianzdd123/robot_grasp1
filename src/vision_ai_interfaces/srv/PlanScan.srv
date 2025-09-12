@@ -9,3 +9,6 @@ geometry_msgs/Point[] points  # scan region 4 points
 bool success                  # planning success
 string message               # error message or status
 ScanPlan scan_plan          # scan plan details
+geometry_msgs/Pose[] waypoints
+float64 path_length
+float64 coverage

@@ -63,7 +63,7 @@ class DataRecorder:
             depth_colormap = self._create_enhanced_depth_colormap(depth_image)
             cv2.imwrite(depth_file, depth_colormap)
             np.save(depth_raw_file, depth_image)
-            
+            position_info = self._extract_position_info(tracking_result)
             # 🔧 修复：从tracking_result中提取用户反馈
             user_feedback = tracking_result.get('user_feedback')  # 可能是 'success', 'failure' 或 None
             feedback_timestamp = tracking_result.get('feedback_timestamp')
@@ -74,7 +74,7 @@ class DataRecorder:
                 'target_id': target_id,
                 'timestamp': timestamp.isoformat(),
                 'tracking_result': self._serialize_tracking_result(tracking_result),
-                
+                'position_info': position_info,
                 'image_files': {
                     'rgb': os.path.relpath(rgb_file, self.data_dir),
                     'rgb_annotated': os.path.relpath(annotated_rgb_file, self.data_dir),
@@ -106,6 +106,67 @@ class DataRecorder:
         else:
             return None
         
+    def _extract_position_info(self, tracking_result: Dict) -> Dict:
+        """从追踪结果中提取位置信息"""
+        try:
+            position_info = {}
+            
+            # 提取目标抓取坐标
+            grasp_coordinate = tracking_result.get('grasp_coordinate', {})
+            if grasp_coordinate:
+                position_info['target_x'] = float(grasp_coordinate.get('x', 0))
+                position_info['target_y'] = float(grasp_coordinate.get('y', 0))
+                position_info['target_z'] = float(grasp_coordinate.get('z', 0))
+            
+            # 提取当前TCP位置（如果有的话）
+            current_tcp_pose = tracking_result.get('current_tcp_pose')
+            if current_tcp_pose:
+                tcp_position = current_tcp_pose.get('position', {})
+                if tcp_position:
+                    position_info['current_tcp_x'] = float(tcp_position.get('x', 0))
+                    position_info['current_tcp_y'] = float(tcp_position.get('y', 0))
+                    position_info['current_tcp_z'] = float(tcp_position.get('z', 0))
+            
+            # 提取对象信息中的高度数据
+            object_info = tracking_result.get('object_info', {})
+            if object_info:
+                position_info['object_height'] = float(object_info.get('estimated_height', 0))
+                position_info['background_z'] = float(object_info.get('background_z', 0))
+                position_info['estimated_width'] = float(object_info.get('estimated_width', 0))
+            
+            # 计算移动距离（如果有当前和目标位置）
+            if ('current_tcp_x' in position_info and 'target_x' in position_info):
+                import math
+                distance_2d = math.sqrt(
+                    (position_info['target_x'] - position_info['current_tcp_x'])**2 + 
+                    (position_info['target_y'] - position_info['current_tcp_y'])**2
+                )
+                distance_3d = math.sqrt(
+                    distance_2d**2 + 
+                    (position_info['target_z'] - position_info['current_tcp_z'])**2
+                )
+                position_info['distance_to_target_2d'] = distance_2d
+                position_info['distance_to_target_3d'] = distance_3d
+            
+            # 添加waypoint数据（如果tracking_result中包含）
+            waypoint_data = tracking_result.get('waypoint_data', {})
+            if waypoint_data:
+                world_pos = waypoint_data.get('world_pos', [])
+                if len(world_pos) >= 3:
+                    position_info['waypoint_x'] = float(world_pos[0])
+                    position_info['waypoint_y'] = float(world_pos[1])
+                    position_info['waypoint_z'] = float(world_pos[2])
+                
+                position_info['waypoint_roll'] = float(waypoint_data.get('roll', 0))
+                position_info['waypoint_pitch'] = float(waypoint_data.get('pitch', 0))
+                position_info['waypoint_yaw'] = float(waypoint_data.get('yaw', 0))
+            
+            return position_info
+            
+        except Exception as e:
+            print(f"[DATA_RECORDER] 提取位置信息失败: {e}")
+            return {}
+    
     def _create_depth_colormap(self, depth_image: np.ndarray) -> np.ndarray:
         """创建深度图像的彩色映射"""
         try:
@@ -315,7 +376,7 @@ class DataRecorder:
             # 反馈统计
             feedback_steps = [r for r in self.tracking_history if r.get('human_feedback') is not None]
             correct_feedback = [r for r in feedback_steps if r['human_feedback'] == 'correct']
-            
+            position_stats = self._calculate_position_statistics()
             # 置信度统计
             confidences = []
             for record in successful_steps:
@@ -331,7 +392,8 @@ class DataRecorder:
                 'human_accuracy': len(correct_feedback) / len(feedback_steps) if feedback_steps else 0,
                 'avg_confidence': np.mean(confidences) if confidences else 0,
                 'min_confidence': np.min(confidences) if confidences else 0,
-                'max_confidence': np.max(confidences) if confidences else 0
+                'max_confidence': np.max(confidences) if confidences else 0,
+                'position_statistics': position_stats
             }
             
             return statistics
@@ -340,6 +402,58 @@ class DataRecorder:
             print(f"[DATA_RECORDER] 计算统计信息失败: {e}")
             return {'error': str(e)}
     
+    def _calculate_position_statistics(self) -> Dict:
+        """计算位置相关统计"""
+        try:
+            position_stats = {
+                'total_distance_moved': 0,
+                'average_target_z': 0,
+                'z_range': {'min': float('inf'), 'max': float('-inf')},
+                'position_records': []
+            }
+            
+            valid_positions = []
+            total_distance = 0
+            
+            for record in self.tracking_history:
+                pos_info = record.get('position_info', {})
+                if pos_info and 'target_z' in pos_info:
+                    target_z = pos_info['target_z']
+                    valid_positions.append(target_z)
+                    
+                    # 更新Z值范围
+                    position_stats['z_range']['min'] = min(position_stats['z_range']['min'], target_z)
+                    position_stats['z_range']['max'] = max(position_stats['z_range']['max'], target_z)
+                    
+                    # 记录位置信息
+                    position_record = {
+                        'step': record['step_number'],
+                        'target_z': target_z,
+                        'target_x': pos_info.get('target_x', 0),
+                        'target_y': pos_info.get('target_y', 0)
+                    }
+                    
+                    if 'distance_to_target_3d' in pos_info:
+                        total_distance += pos_info['distance_to_target_3d']
+                        position_record['distance_moved'] = pos_info['distance_to_target_3d']
+                    
+                    position_stats['position_records'].append(position_record)
+            
+            if valid_positions:
+                position_stats['average_target_z'] = sum(valid_positions) / len(valid_positions)
+                position_stats['total_distance_moved'] = total_distance
+                position_stats['valid_position_count'] = len(valid_positions)
+            
+            # 处理无效范围
+            if position_stats['z_range']['min'] == float('inf'):
+                position_stats['z_range'] = {'min': 0, 'max': 0}
+            
+            return position_stats
+            
+        except Exception as e:
+            print(f"[DATA_RECORDER] 计算位置统计失败: {e}")
+            return {}
+        
     def _create_session_summary(self):
         """创建可读的会话摘要 - 修复版，包含反馈统计"""
         try:
@@ -378,7 +492,16 @@ class DataRecorder:
                         f.write(f"成功 (置信度: {confidence:.3f})")
                     else:
                         f.write("失败")
-                    
+                    # 🔧 添加位置信息
+                    pos_info = record.get('position_info', {})
+                    if pos_info and 'target_z' in pos_info:
+                        target_z = pos_info['target_z']
+                        f.write(f" - 目标Z: {target_z:.1f}mm")
+                        
+                        if 'distance_to_target_3d' in pos_info:
+                            distance = pos_info['distance_to_target_3d']
+                            f.write(f" - 移动: {distance:.1f}mm")
+                        
                     # 🆕 添加反馈信息显示
                     feedback = record.get('human_feedback')
                     if feedback == 'correct':
@@ -802,24 +925,34 @@ class DataRecorder:
         保存带有bbox和置信度标注的RGB图像 - 修复版，支持反馈信息
         """
         try:
-            # 计算需要扩展的区域
-            header_height = 150
-            bottom_height = 100
+            # 🔧 调整区域大小 - 增加黑色标注区域，减少绿色原图区域
+            header_height = 150  # 增加顶部标注区域（原150 -> 200）
+            bottom_height = 80  # 增加底部标注区域（原100 -> 150）
             
             # 🆕 检查是否有反馈信息需要额外空间
             user_feedback = tracking_result.get('user_feedback')
             if user_feedback:
-                header_height += 60  # 为反馈信息预留额外空间
+                header_height += 20  # 增加反馈区域（原60 -> 80）
             
             original_h, original_w = rgb_image.shape[:2]
-            new_h = original_h + header_height + bottom_height
-            new_w = original_w
+            
+            # 🔧 可选：缩放原始图像，进一步减少绿色区域
+            scale_factor = 0.9  # 将原图缩放到80%
+            scaled_h = int(original_h * scale_factor)
+            scaled_w = int(original_w * scale_factor)
+            
+            # 缩放原始图像
+            scaled_rgb = cv2.resize(rgb_image, (scaled_w, scaled_h))
+            
+            new_h = scaled_h + header_height + bottom_height
+            new_w = max(original_w, scaled_w)  # 保持画布宽度
             
             # 创建扩展的画布（黑色背景）
             extended_image = np.zeros((new_h, new_w, 3), dtype=np.uint8)
             
-            # 将原图放在中间区域
-            extended_image[header_height:header_height + original_h, 0:original_w] = rgb_image
+            # 🔧 将缩放后的图像居中放置
+            x_offset = (new_w - scaled_w) // 2
+            extended_image[header_height:header_height + scaled_h, x_offset:x_offset + scaled_w] = scaled_rgb
             
             # 转换为BGR用于OpenCV
             annotated_bgr = cv2.cvtColor(extended_image, cv2.COLOR_RGB2BGR)
@@ -832,9 +965,11 @@ class DataRecorder:
             all_candidates = tracking_result.get('all_candidates_analysis', [])
             
             # 在扩展画布上绘制标注
-            self._draw_all_candidates_bbox_extended(annotated_bgr, all_candidates, header_height)
-            self._draw_best_match_bbox_extended(annotated_bgr, all_candidates, tracking_confidence, 
-                                            header_height, original_h, original_w)
+            self._draw_all_candidates_bbox_extended(
+            annotated_bgr, all_candidates, header_height, scale_factor, x_offset)
+            self._draw_best_match_bbox_extended(
+            annotated_bgr, all_candidates, tracking_result.get('tracking_confidence', 0),
+            header_height, original_h, original_w, scale_factor, x_offset)
             
             # 绘制抓取点
             if grasp_coordinate and 'x' in grasp_coordinate:
@@ -926,17 +1061,14 @@ class DataRecorder:
                     bg_color = (0, 120, 0)  # 深绿色
                     text_color = (255, 255, 255)
                     feedback_text = "USER CONFIRMED: SUCCESS"
-                    status_symbol = "✓"
                 elif user_feedback == 'failure':
                     bg_color = (0, 0, 150)  # 深红色
                     text_color = (255, 255, 255)
                     feedback_text = "USER MARKED: FAILED"
-                    status_symbol = "✗"
                 else:
                     bg_color = (80, 80, 80)  # 灰色
                     text_color = (255, 255, 255)
                     feedback_text = f"USER FEEDBACK: {user_feedback.upper()}"
-                    status_symbol = "?"
                 
                 # 绘制反馈背景
                 cv2.rectangle(image, (0, feedback_y_start), (img_width, header_height), bg_color, -1)
@@ -945,22 +1077,14 @@ class DataRecorder:
                 # 添加反馈文字
                 cv2.putText(image, feedback_text, (10, feedback_y_start + 30), 
                         cv2.FONT_HERSHEY_SIMPLEX, 1.0, text_color, 2)
-                
-                # 添加状态符号
-                cv2.putText(image, status_symbol, (img_width - 50, feedback_y_start + 35), 
-                        cv2.FONT_HERSHEY_SIMPLEX, 1.5, text_color, 3)
-                
-                # 添加反馈时间
-                feedback_time = datetime.now().strftime("%H:%M:%S")
-                cv2.putText(image, f"Feedback at: {feedback_time}", (10, feedback_y_start + 50), 
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, text_color, 1)
                         
         except Exception as e:
             print(f"[DATA_RECORDER] 带反馈的顶部标注失败: {e}")
 
     # 3. 绘制所有候选的bbox
-    def _draw_all_candidates_bbox_extended(self, image: np.ndarray, candidates: List[Dict], y_offset: int):
-        """绘制所有候选的边界框 - 扩展画布版"""
+    def _draw_all_candidates_bbox_extended(self, image: np.ndarray, candidates: List[Dict], 
+                                        y_offset: int, scale_factor: float = 1.0, x_offset: int = 0):
+        """绘制所有候选的边界框 - 扩展画布版，支持缩放和偏移"""
         try:
             for i, candidate in enumerate(candidates):
                 detection_data = candidate.get('detection_data', {})
@@ -972,9 +1096,11 @@ class DataRecorder:
                 if len(bbox) >= 4:
                     x1, y1, x2, y2 = map(int, bbox[:4])
                     
-                    # 🆕 调整坐标到扩展画布
-                    y1 += y_offset
-                    y2 += y_offset
+                    # 🔧 应用缩放和偏移调整
+                    x1 = int(x1 * scale_factor) + x_offset
+                    y1 = int(y1 * scale_factor) + y_offset
+                    x2 = int(x2 * scale_factor) + x_offset
+                    y2 = int(y2 * scale_factor) + y_offset
                     
                     # 选择颜色
                     if not was_analyzed:
@@ -990,7 +1116,9 @@ class DataRecorder:
                     
                     if not is_best_match:
                         text = f"#{i} {class_name}"
-                        cv2.putText(image, text, (x1, y1 - 5), 
+                        # 🔧 文字位置也需要调整
+                        text_y = max(y1 - 5, 10)  # 确保文字不超出边界
+                        cv2.putText(image, text, (x1, text_y), 
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.4, color, 1)
                         
         except Exception as e:
@@ -999,8 +1127,9 @@ class DataRecorder:
     # 3. 新增方法：绘制最佳匹配bbox（智能位置调整）
     def _draw_best_match_bbox_extended(self, image: np.ndarray, candidates: List[Dict], 
                                     tracking_confidence: float, y_offset: int, 
-                                    original_h: int, original_w: int):
-        """绘制最佳匹配的边界框 - 扩展画布版，智能位置调整"""
+                                    original_h: int, original_w: int, 
+                                    scale_factor: float = 1.0, x_offset: int = 0):
+        """绘制最佳匹配的边界框 - 扩展画布版，支持缩放和偏移"""
         try:
             # 找到最佳匹配
             best_candidate = None
@@ -1022,9 +1151,11 @@ class DataRecorder:
             if len(bbox) >= 4:
                 x1, y1, x2, y2 = map(int, bbox[:4])
                 
-                # 调整坐标到扩展画布
-                y1 += y_offset
-                y2 += y_offset
+                # 🔧 应用缩放和偏移调整
+                x1 = int(x1 * scale_factor) + x_offset
+                y1 = int(y1 * scale_factor) + y_offset
+                x2 = int(x2 * scale_factor) + x_offset
+                y2 = int(y2 * scale_factor) + y_offset
                 
                 # 选择颜色
                 if tracking_confidence > 0.8:
@@ -1037,14 +1168,18 @@ class DataRecorder:
                 thickness = 3
                 cv2.rectangle(image, (x1, y1), (x2, y2), color, thickness)
                 
-                # 🆕 智能角标位置
-                marker_x, marker_y = self._get_smart_marker_position(x1, y1, x2, y2, 
-                                                                    y_offset, original_h, original_w)
+                # 🔧 智能角标位置（考虑缩放后的坐标）
+                scaled_original_h = int(original_h * scale_factor)
+                scaled_original_w = int(original_w * scale_factor)
+                
+                marker_x, marker_y = self._get_smart_marker_position(
+                    x1, y1, x2, y2, y_offset, scaled_original_h, scaled_original_w, x_offset
+                )
                 cv2.circle(image, (marker_x, marker_y), 8, color, -1)
                 cv2.putText(image, "T", (marker_x - 3, marker_y + 5), 
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
                 
-                # 🆕 智能信息框位置
+                # 🔧 智能信息框位置
                 info_text = [
                     f"Target: {str(class_name)}",
                     f"Track: {float(tracking_confidence):.3f}",
@@ -1056,10 +1191,11 @@ class DataRecorder:
                 info_height = len(info_text) * 20 + 10
                 
                 # 智能选择信息框位置
-                info_x, info_y = self._get_smart_info_position(x1, y1, x2, y2, 
-                                                            info_width, info_height,
-                                                            y_offset, original_h, original_w, 
-                                                            image.shape[0])
+                info_x, info_y = self._get_smart_info_position(
+                    x1, y1, x2, y2, info_width, info_height,
+                    y_offset, scaled_original_h, scaled_original_w, 
+                    image.shape[0], x_offset
+                )
                 
                 # 绘制信息框
                 cv2.rectangle(image, (info_x, info_y), (info_x + info_width, info_y + info_height), 
@@ -1079,11 +1215,11 @@ class DataRecorder:
                             
         except Exception as e:
             print(f"[DATA_RECORDER] 绘制扩展最佳匹配失败: {e}")
-
     # 4. 新增方法：智能角标位置
     def _get_smart_marker_position(self, x1: int, y1: int, x2: int, y2: int,
-                                y_offset: int, original_h: int, original_w: int) -> Tuple[int, int]:
-        """智能选择角标位置，避免超出边界"""
+                                y_offset: int, original_h: int, original_w: int, 
+                                x_offset: int = 0) -> Tuple[int, int]:
+        """智能选择角标位置，避免超出边界 - 支持偏移版本"""
         positions = [
             (x1, y1),           # 左上角
             (x2, y1),           # 右上角  
@@ -1091,20 +1227,24 @@ class DataRecorder:
             (x2, y2),           # 右下角
         ]
         
+        # 考虑偏移和缩放后的边界
+        min_x = x_offset + 10
+        max_x = x_offset + original_w - 10
+        min_y = y_offset + 10
+        max_y = y_offset + original_h - 10
+        
         for pos_x, pos_y in positions:
-            if (10 <= pos_x <= original_w - 10 and 
-                y_offset + 10 <= pos_y <= y_offset + original_h - 10):
+            if (min_x <= pos_x <= max_x and min_y <= pos_y <= max_y):
                 return pos_x, pos_y
         
         # 如果都超出边界，固定在bbox中心
         return (x1 + x2) // 2, (y1 + y2) // 2
 
-    # 5. 新增方法：智能信息框位置
     def _get_smart_info_position(self, x1: int, y1: int, x2: int, y2: int,
                             info_width: int, info_height: int,
                             y_offset: int, original_h: int, original_w: int,
-                            total_height: int) -> Tuple[int, int]:
-        """智能选择信息框位置"""
+                            total_height: int, x_offset: int = 0) -> Tuple[int, int]:
+        """智能选择信息框位置 - 支持偏移版本"""
         # 尝试的位置顺序：右下、右上、左下、左上、底部区域
         positions = [
             (x2 + 5, y2 + 5),                    # 右下
@@ -1113,21 +1253,27 @@ class DataRecorder:
             (x1 - info_width - 5, y1 - info_height - 5), # 左上
         ]
         
+        # 考虑偏移后的边界
+        min_x = x_offset
+        max_x = x_offset + original_w - info_width
+        min_y = y_offset
+        max_y = y_offset + original_h - info_height
+        
         # 检查每个位置是否在边界内
         for pos_x, pos_y in positions:
-            if (0 <= pos_x <= original_w - info_width and
-                y_offset <= pos_y <= y_offset + original_h - info_height):
+            if (min_x <= pos_x <= max_x and min_y <= pos_y <= max_y):
                 return pos_x, pos_y
         
-        # 🆕 如果都不合适，放在底部区域
+        # 🔧 如果都不合适，放在底部区域
         bottom_y = y_offset + original_h + 10
-        bottom_x = max(5, min(x1, original_w - info_width - 5))
+        bottom_x = max(x_offset + 5, min(x1, x_offset + original_w - info_width - 5))
         
         if bottom_y + info_height <= total_height - 10:
             return bottom_x, bottom_y
         
         # 最后备用：图像右下角
-        return max(0, original_w - info_width - 5), max(0, y_offset + original_h - info_height - 5)
+        return max(x_offset, x_offset + original_w - info_width - 5), \
+            max(y_offset, y_offset + original_h - info_height - 5)
 
     # 6. 新增方法：顶部标注
     def _add_header_annotations(self, image: np.ndarray, target_id: str, 

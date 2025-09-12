@@ -617,49 +617,54 @@ class SmartStitcherNode(Node):
             traceback.print_exc()
             return None, (0, 0)
     def _create_grid_overlap_mask(self, image_shape, neighbors, overlap_info):
-        """🆕 为直接Grid拼接创建重叠mask"""
+        """🆕 修复版本：创建更合理的重叠mask"""
         h, w = image_shape
         mask = np.ones((h, w), dtype=np.float32)
         
         overlap_x = overlap_info.get('overlap_x', 0.0)
         overlap_y = overlap_info.get('overlap_y', 0.0)
         
-        # 基于图像尺寸的固定重叠区域
-        blend_size_x = max(1, int(w * overlap_x)) if overlap_x > 0 else 0
-        blend_size_y = max(1, int(h * overlap_y)) if overlap_y > 0 else 0
+        # 🔧 修复：减小重叠区域的权重范围
+        blend_size_x = max(1, int(w * overlap_x * 0.3)) if overlap_x > 0 else 0  # 降低到30%
+        blend_size_y = max(1, int(h * overlap_y * 0.3)) if overlap_y > 0 else 0
         
-        self.get_logger().info(f'🎭 Grid重叠Mask - WP邻居: {neighbors}')
+        self.get_logger().info(f'🎭 修复版Grid重叠Mask:')
         self.get_logger().info(f'    重叠区域: X={blend_size_x}px({overlap_x:.1%}), Y={blend_size_y}px({overlap_y:.1%})')
         
-        # 只在有邻居的边缘创建重叠区域
+        # 🆕 修复：使用更平滑的权重过渡
         if 'left' in neighbors and blend_size_x > 0:
             for i in range(blend_size_x):
-                weight = i / blend_size_x
+                # 使用平方根函数创建更平滑的过渡
+                weight = math.sqrt(i / blend_size_x)
                 mask[:, i] = weight
-            self.get_logger().info(f'    ✅ 左边缘重叠: {blend_size_x}px')
         
         if 'right' in neighbors and blend_size_x > 0:
             for i in range(blend_size_x):
-                weight = i / blend_size_x
+                weight = math.sqrt(i / blend_size_x)
                 mask[:, -(i+1)] = weight
-            self.get_logger().info(f'    ✅ 右边缘重叠: {blend_size_x}px')
         
         if 'top' in neighbors and blend_size_y > 0:
             for i in range(blend_size_y):
-                weight = i / blend_size_y
+                weight = math.sqrt(i / blend_size_y)
                 mask[i, :] = weight
-            self.get_logger().info(f'    ✅ 上边缘重叠: {blend_size_y}px')
         
         if 'bottom' in neighbors and blend_size_y > 0:
             for i in range(blend_size_y):
-                weight = i / blend_size_y
+                weight = math.sqrt(i / blend_size_y)
                 mask[-(i+1), :] = weight
-            self.get_logger().info(f'    ✅ 下边缘重叠: {blend_size_y}px')
+        
+        # 🆕 修复：确保中心区域权重不会过高
+        center_h_start, center_h_end = h//4, 3*h//4
+        center_w_start, center_w_end = w//4, 3*w//4
+        mask[center_h_start:center_h_end, center_w_start:center_w_end] = np.minimum(
+            mask[center_h_start:center_h_end, center_w_start:center_w_end], 
+            0.9  # 限制中心区域最大权重
+        )
         
         return mask
 
     def _place_image_at_position(self, canvas, weight_map, image, mask, pos_x, pos_y, neighbors, overlap_info, waypoint_idx):
-        """🆕 将图像放置到指定位置"""
+        """🆕 修复版本：正确处理重叠区域的像素融合"""
         try:
             img_h, img_w = image.shape[:2]
             canvas_h, canvas_w = canvas.shape[:2]
@@ -670,9 +675,7 @@ class SmartStitcherNode(Node):
             
             # 边界检查
             if pos_x < 0 or pos_y < 0 or end_x > canvas_w or end_y > canvas_h:
-                self.get_logger().error(f'❌ WP{waypoint_idx} 超出画布边界:')
-                self.get_logger().error(f'    位置: ({pos_x},{pos_y}) -> ({end_x},{end_y})')
-                self.get_logger().error(f'    画布: {canvas_w}×{canvas_h}')
+                self.get_logger().error(f'❌ WP{waypoint_idx} 超出画布边界')
                 return
             
             # 获取目标区域
@@ -680,55 +683,57 @@ class SmartStitcherNode(Node):
             weight_region = weight_map[pos_y:end_y, pos_x:end_x]
             
             # 检测重叠区域
-            overlap_regions = mask < 1.0
-            non_overlap_regions = mask >= 1.0
             existing_content = weight_region > 0
             
-            overlap_count = np.sum(overlap_regions)
-            existing_overlap = np.sum(overlap_regions & existing_content)
-            
-            self.get_logger().info(f'🔧 WP{waypoint_idx} 直接放置:')
+            self.get_logger().info(f'🔧 WP{waypoint_idx} 修复版融合:')
             self.get_logger().info(f'    位置: ({pos_x},{pos_y})')
-            self.get_logger().info(f'    重叠像素: {overlap_count}, 实际混合: {existing_overlap}')
+            self.get_logger().info(f'    已有内容: {np.sum(existing_content)} 像素')
             
-            # 融合图像
+            # 🆕 修复：正确的融合算法
             for c in range(3):
                 channel_data = image[:, :, c]
+                canvas_channel = canvas_region[:, :, c]
                 
-                # 重叠区域处理
-                if existing_overlap > 0:
-                    overlap_and_existing = overlap_regions & existing_content
-                    overlap_and_new = overlap_regions & ~existing_content
-                    
-                    if np.any(overlap_and_existing):
-                        # 加权平均混合
-                        old_weight = weight_region[overlap_and_existing]
-                        new_weight = mask[overlap_and_existing]
-                        total_weight = old_weight + new_weight
-                        
-                        canvas_region[:, :, c][overlap_and_existing] = (
-                            canvas_region[:, :, c][overlap_and_existing] * old_weight +
-                            channel_data[overlap_and_existing] * new_weight
-                        ) / (total_weight + 1e-8)
-                    
-                    if np.any(overlap_and_new):
-                        # 新重叠区域
-                        canvas_region[:, :, c][overlap_and_new] += channel_data[overlap_and_new] * mask[overlap_and_new]
-                else:
-                    # 无现有重叠，直接应用mask
-                    canvas_region[:, :, c][overlap_regions] += channel_data[overlap_regions] * mask[overlap_regions]
+                # 分别处理重叠和非重叠区域
+                overlap_areas = existing_content & (mask > 0)
+                new_areas = ~existing_content & (mask > 0)
                 
-                # 非重叠区域直接添加
-                canvas_region[:, :, c][non_overlap_regions] += channel_data[non_overlap_regions]
+                if np.any(overlap_areas):
+                    # 重叠区域：加权平均融合
+                    old_weight = weight_region[overlap_areas]
+                    new_weight = mask[overlap_areas]
+                    total_weight = old_weight + new_weight
+                    
+                    # 🔧 关键修复：正确的加权平均
+                    canvas_channel[overlap_areas] = (
+                        canvas_channel[overlap_areas] * old_weight +
+                        channel_data[overlap_areas] * new_weight
+                    ) / total_weight
+                    
+                    self.get_logger().info(f'    🔀 通道{c} 重叠融合: {np.sum(overlap_areas)} 像素')
+                
+                if np.any(new_areas):
+                    # 新区域：直接赋值
+                    canvas_channel[new_areas] = channel_data[new_areas]
+                    self.get_logger().info(f'    🆕 通道{c} 新区域: {np.sum(new_areas)} 像素')
+                
+                # 更新画布
+                canvas_region[:, :, c] = canvas_channel
             
-            # 更新权重图
-            weight_map[pos_y:end_y, pos_x:end_x] = np.maximum(weight_region, mask)
+            # 🆕 修复：正确更新权重图
+            # 重叠区域保持原权重，新区域设置为mask值
+            new_weight_map = weight_region.copy()
+            new_areas_mask = ~existing_content & (mask > 0)
+            overlap_areas_mask = existing_content & (mask > 0)
             
-            # 更新画布
+            new_weight_map[new_areas_mask] = mask[new_areas_mask]
+            # 重叠区域权重保持不变，因为已经在像素值计算中处理了
+            
+            weight_map[pos_y:end_y, pos_x:end_x] = new_weight_map
             canvas[pos_y:end_y, pos_x:end_x] = canvas_region
             
         except Exception as e:
-            self.get_logger().error(f'放置图像失败: {e}')
+            self.get_logger().error(f'修复版放置图像失败: {e}')
 
 
 
@@ -1212,7 +1217,7 @@ class SmartStitcherNode(Node):
 
     def _advanced_blend_with_layout_awareness(self, canvas, weight_map, image, mask, 
                                             pos_x, pos_y, overlap_ratio, layout_info, waypoint_idx):
-        """🆕 布局感知的高级混合算法"""
+        """🆕 修复版本：布局感知的高级混合算法"""
         try:
             img_h, img_w = image.shape[:2]
             canvas_h, canvas_w = canvas.shape[:2]
@@ -1246,44 +1251,54 @@ class SmartStitcherNode(Node):
                     existing_weight = weight_map[canvas_top:canvas_bottom, canvas_left:canvas_right]
                     overlap_areas = existing_weight > 0
                     
+                    self.get_logger().info(f'🔧 WP{waypoint_idx} 修复版高级融合')
+                    
                     if np.any(overlap_areas):
-                        # 🆕 布局感知的重叠处理
-                        if layout_info['is_regular_grid']:
-                            # 规则网格：使用加权平均
-                            blend_weight = mask_region * (1.0 - overlap_ratio * 0.3)
-                        else:
-                            # 非规则布局：更保守的混合
-                            blend_weight = mask_region * (1.0 - overlap_ratio * 0.5)
-                        
+                        # 🆕 修复：重叠区域的正确处理
                         for c in range(3):
-                            canvas_region = canvas[canvas_top:canvas_bottom, canvas_left:canvas_right, c]
-                            new_contribution = img_region[:, :, c] * blend_weight
+                            canvas_channel = canvas[canvas_top:canvas_bottom, canvas_left:canvas_right, c]
                             
-                            # 智能混合
-                            canvas_region[overlap_areas] = (
-                                canvas_region[overlap_areas] * existing_weight[overlap_areas] + 
-                                new_contribution[overlap_areas]
-                            ) / (existing_weight[overlap_areas] + blend_weight[overlap_areas] + 1e-8)
+                            # 分离重叠和非重叠区域
+                            overlap_mask = overlap_areas & (mask_region > 0)
+                            new_mask = ~overlap_areas & (mask_region > 0)
                             
-                            canvas_region[~overlap_areas] += new_contribution[~overlap_areas]
-                            canvas[canvas_top:canvas_bottom, canvas_left:canvas_right, c] = canvas_region
+                            if np.any(overlap_mask):
+                                # 重叠区域：加权平均
+                                old_weights = existing_weight[overlap_mask]
+                                new_weights = mask_region[overlap_mask]
+                                total_weights = old_weights + new_weights
+                                
+                                # 🔧 关键修复：避免像素值累加
+                                canvas_channel[overlap_mask] = (
+                                    canvas_channel[overlap_mask] * old_weights +
+                                    img_region[:, :, c][overlap_mask] * new_weights
+                                ) / total_weights
+                            
+                            if np.any(new_mask):
+                                # 新区域：直接赋值
+                                canvas_channel[new_mask] = img_region[:, :, c][new_mask]
+                            
+                            canvas[canvas_top:canvas_bottom, canvas_left:canvas_right, c] = canvas_channel
                         
-                        weight_map[canvas_top:canvas_bottom, canvas_left:canvas_right] = np.maximum(
-                            existing_weight, blend_weight
+                        # 🆕 修复：权重图正确更新
+                        weight_map[canvas_top:canvas_bottom, canvas_left:canvas_right] = np.where(
+                            overlap_areas,
+                            existing_weight,  # 重叠区域保持原权重
+                            np.maximum(existing_weight, mask_region)  # 新区域使用mask权重
                         )
                         
-                        overlap_pixels = np.sum(overlap_areas)
-                        self.get_logger().info(f'🔀 WP{waypoint_idx} 重叠混合: {overlap_pixels}个像素')
+                        overlap_pixels = np.sum(overlap_areas & (mask_region > 0))
+                        self.get_logger().info(f'🔀 修复版重叠融合: {overlap_pixels} 像素')
                     else:
                         # 无重叠区域：正常混合
                         for c in range(3):
                             canvas[canvas_top:canvas_bottom, canvas_left:canvas_right, c] += img_region[:, :, c] * mask_region
                         
                         weight_map[canvas_top:canvas_bottom, canvas_left:canvas_right] += mask_region
-                        self.get_logger().info(f'🆕 WP{waypoint_idx} 新区域混合')
+                        self.get_logger().info(f'🆕 修复版新区域融合')
                         
         except Exception as e:
-            self.get_logger().error(f'布局感知混合失败: {e}')
+            self.get_logger().error(f'修复版布局感知融合失败: {e}')
 
     def _advanced_blend_to_canvas(self, canvas, weight_map, image, mask, pos_x, pos_y, overlap_ratio):
         """🆕 高级混合算法，考虑重叠度 - 修复坐标系统"""
@@ -1435,16 +1450,45 @@ class SmartStitcherNode(Node):
             self.get_logger().error(f'画布融合失败: {e}')
 
     def _normalize_canvas(self, canvas, weight_map):
-        """归一化画布"""
-        valid_mask = weight_map > 0
-        result = np.zeros_like(canvas, dtype=np.uint8)
-        
-        for c in range(3):
-            channel = canvas[:, :, c].copy()
-            channel[valid_mask] /= weight_map[valid_mask]
-            result[:, :, c] = np.clip(channel, 0, 255).astype(np.uint8)
-        
-        return result
+        """🆕 修复版本：改进的画布归一化"""
+        try:
+            valid_mask = weight_map > 1e-6  # 避免除零
+            result = np.zeros_like(canvas, dtype=np.uint8)
+            
+            self.get_logger().info(f'🎨 修复版归一化: 有效像素 {np.sum(valid_mask)} / {weight_map.size}')
+            
+            for c in range(3):
+                channel = canvas[:, :, c].copy()
+                
+                # 🔧 修复：只对有效区域进行归一化
+                if np.any(valid_mask):
+                    # 检查异常值
+                    valid_pixels = channel[valid_mask]
+                    valid_weights = weight_map[valid_mask]
+                    
+                    # 归一化前的值检查
+                    max_before = np.max(valid_pixels) if len(valid_pixels) > 0 else 0
+                    self.get_logger().info(f'  通道{c} 归一化前最大值: {max_before:.1f}')
+                    
+                    # 正确归一化
+                    normalized_values = valid_pixels / valid_weights
+                    
+                    # 检查归一化后的值
+                    max_after = np.max(normalized_values) if len(normalized_values) > 0 else 0
+                    self.get_logger().info(f'  通道{c} 归一化后最大值: {max_after:.1f}')
+                    
+                    # 安全的值范围限制
+                    channel[valid_mask] = np.clip(normalized_values, 0, 255)
+                
+                result[:, :, c] = channel.astype(np.uint8)
+            
+            return result
+            
+        except Exception as e:
+            self.get_logger().error(f'修复版归一化失败: {e}')
+            # 返回安全的结果
+            return np.clip(canvas, 0, 255).astype(np.uint8)
+
 
     def _record_waypoint_mapping(self, image, canvas_pos_x, canvas_pos_y, waypoint_idx, 
                                 canvas_width, canvas_height, img_data):

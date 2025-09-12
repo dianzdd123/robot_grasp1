@@ -102,7 +102,7 @@ class GuiConfigNode(Node):
         mode_window.title("Scan Configuration")
         mode_window.geometry("300x150")
         
-        tk.Label(mode_window, text="Choose Input Mode", font=("Arial", 12)).pack(pady=10)
+        tk.Label(mode_window, text="Choose Input Mode", font=("Arial", 22)).pack(pady=10)
         tk.Button(mode_window, text="Preset Regions", 
                  command=lambda: self.on_mode_selected("preset", mode_window)).pack(pady=5)
         tk.Button(mode_window, text="Manual Input", 
@@ -125,7 +125,7 @@ class GuiConfigNode(Node):
         window.geometry("350x350")
 
         # Object height
-        tk.Label(window, text="Object Height (mm):").pack(pady=5)
+        tk.Label(window, text="Object Height (mm):",font=("Arial", 18)).pack(pady=5)
         height_entry = tk.Entry(window, width=10)
         height_entry.insert(0, "50.00")
         height_entry.pack()
@@ -134,10 +134,10 @@ class GuiConfigNode(Node):
         regions = {
             'Small Square (200x200mm)': [(150, -150), (150, 100), (350, 100), (350, -150)],
             'Medium Rectangle (435x290mm)': [(-250, -390), (-250, -100), (235, -100), (235, -390)],
-            'Large Rectangle (696x464mm)': [(437.97, -94.11),
-(39.45, -128.52),
-(86.78, -676.48),
-(485.29, -642.07)]
+            'Large Rectangle (696x464mm)': [(778.55, -124.23),
+(323.60, 83.20),
+(95.43, -417.24),
+(550.37, -624.67)]
         }
 
         selected_region = tk.StringVar(value=list(regions.keys())[0])
@@ -161,7 +161,7 @@ class GuiConfigNode(Node):
         window.geometry("350x400") # Adjust window size for more space if needed
 
         # Object height
-        tk.Label(window, text="Object Height (mm):").pack(pady=5)
+        tk.Label(window, text="Object Height (mm):",font=("Arial", 18)).pack(pady=5)
         height_entry = tk.Entry(window, width=10)
         height_entry.insert(0, "50")
         height_entry.pack()
@@ -173,17 +173,17 @@ class GuiConfigNode(Node):
         for name in point_names:
             frame = tk.Frame(window)
             frame.pack(pady=5)
-            tk.Label(frame, text=f"{name}: X:").pack(side=tk.LEFT)
+            tk.Label(frame, text=f"{name}: X:",font=("Arial", 18)).pack(side=tk.LEFT)
             x_entry = tk.Entry(frame, width=8)
             x_entry.pack(side=tk.LEFT)
-            tk.Label(frame, text="Y:").pack(side=tk.LEFT)
+            tk.Label(frame, text="Y:",font=("Arial", 18)).pack(side=tk.LEFT)
             y_entry = tk.Entry(frame, width=8)
             y_entry.pack(side=tk.LEFT)
             entries.append((x_entry, y_entry))
         
         # Add a note for coordinate range
-        tk.Label(window, text="Note: X, Y coordinates must be between -900 and 900 mm.", 
-                 font=("Arial", 8), fg="red").pack(pady=5)
+        tk.Label(window, text="Note: X, Y coordinates\n must be between -900 and 900 mm.", 
+                 font=("Arial", 15), fg="red").pack(pady=5)
 
         tk.Button(window, text="Preview Region", 
                  command=lambda: self.preview_region(self.get_manual_points(entries))).pack(pady=10)
@@ -268,7 +268,7 @@ class GuiConfigNode(Node):
         for i, (px, py) in enumerate(plot_points):
             ax.annotate(f'{point_labels[i]}\n({points[i][0]:.0f},{points[i][1]:.0f})', 
                        (px, py), xytext=(10, 10), textcoords='offset points',
-                       fontsize=8, ha='left')
+                       fontsize=18, ha='left')
         
         # Calculate and display region info
         x_coords = [p[0] for p in points]
@@ -293,14 +293,14 @@ Area: {area/1000:.1f} cm²"""
         
         ax.text(0.02, 0.98, info_text, transform=ax.transAxes, 
                verticalalignment='top', bbox=dict(boxstyle='round', 
-               facecolor='wheat', alpha=0.8), fontsize=9)
+               facecolor='wheat', alpha=0.8), fontsize=19)
         
         # Add coordinate system reminder
         coord_text = "Coordinate System:\nX: Up(-) → Down(+)\nY: Left(-) → Right(+)"
         ax.text(0.98, 0.02, coord_text, transform=ax.transAxes,
                horizontalalignment='right', verticalalignment='bottom',
                bbox=dict(boxstyle='round', facecolor='lightblue', alpha=0.8),
-               fontsize=8)
+               fontsize=18)
         
         ax.legend(loc='upper right')
         plt.tight_layout()
@@ -545,7 +545,7 @@ Area: {area/1000:.1f} cm²"""
                         markeredgecolor='white', markeredgewidth=2)
                 ax.annotate(f'WP{i+1}\n{yaw_deg:.0f}°', (plot_x, plot_y), 
                             xytext=(10, 10), textcoords='offset points',
-                            fontsize=9, color='darkred', weight='bold',
+                            fontsize=19, color='darkred', weight='bold',
                             bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.8))
             
             # Draw path
@@ -591,14 +591,14 @@ Area: {area/1000:.1f} cm²"""
         
         ax.text(0.02, 0.98, info_text, transform=ax.transAxes, 
                 verticalalignment='top', bbox=dict(boxstyle='round', 
-                facecolor='wheat', alpha=0.9), fontsize=10)
+                facecolor='wheat', alpha=0.9), fontsize=15)
 
         existing_handles, existing_labels = ax.get_legend_handles_labels()
         new_elements = [
             plt.Rectangle((0, 0), 1, 1, facecolor=plt.cm.viridis(0.5), alpha=0.3, label='FOV Coverage')
         ]
         all_handles = existing_handles + new_elements
-        ax.legend(handles=all_handles, loc='upper right', fontsize=9)
+        ax.legend(handles=all_handles, loc='upper right', fontsize=19)
         
         coord_text = """ Coordinate System:
     X: Up(-) → Down(+)
@@ -607,7 +607,7 @@ Area: {area/1000:.1f} cm²"""
         ax.text(0.98, 0.02, coord_text, transform=ax.transAxes,
                 horizontalalignment='right', verticalalignment='bottom',
                 bbox=dict(boxstyle='round', facecolor='lightblue', alpha=0.8),
-                fontsize=9)
+                fontsize=19)
         
         plt.tight_layout()
         plt.show()

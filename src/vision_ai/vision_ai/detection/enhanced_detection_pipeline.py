@@ -36,7 +36,8 @@ class EnhancedDetectionPipeline:
         self.selected_tracking_ids = []
         self.next_object_id = {}
         self.post_processor = Detection3DPostProcessor(self.coordinate_calculator)
-        
+        self.performance_data = []
+        self.current_test_metadata = None
         #  后处理配置
         self.enable_3d_post_processing = True  # 可以通过配置文件控制
         
@@ -90,161 +91,87 @@ class EnhancedDetectionPipeline:
         # 自适应阈值管理器
         self.threshold_manager = AdaptiveThresholdManager()
     
+    def set_test_metadata(self, metadata: Dict):
+        """设置当前测试的元数据"""
+        self.current_test_metadata = metadata
+    
     def build_reference_library(self, image_rgb: np.ndarray, 
-                            depth_image: np.ndarray,
-                            waypoint_data: Dict,
-                            generate_visualization: bool = True) -> Dict:
-        """构建参考特征库 - 集成3D后处理"""
-        print("[ENHANCED_PIPELINE] Starting reference library construction...")
+                                depth_image: np.ndarray,
+                                waypoint_data: Dict,
+                                generate_visualization: bool = True) -> Dict:
+        """构建参考特征库 - 添加性能数据收集"""
         start_time = time.time()
+        start_timestamp = datetime.now()
+        
+        # 记录各阶段的时间
+        stage_times = {}
         
         try:
             # 1. YOLO检测
+            yolo_start = time.time()
             boxes, class_ids, confidences = self.detector.detect(image_rgb)
-            print(f"[ENHANCED_PIPELINE] YOLO detected {len(boxes)} targets")
+            stage_times['yolo_detection'] = time.time() - yolo_start
             
             if len(boxes) == 0:
-                return {
-                    'success': True,
-                    'reference_library': {},
-                    'detection_count': 0,
-                    'processing_time': time.time() - start_time,
-                    'message': 'No targets detected'
-                }
+                return self._create_empty_result(start_time, stage_times)
             
             # 2. SAM2分割
+            sam_start = time.time()
             masks = self.segmentor.segment(image_rgb, boxes)
-            print(f"[ENHANCED_PIPELINE] SAM2 segmentation completed")
+            stage_times['sam_segmentation'] = time.time() - sam_start
             
-            # 3.  构建初始检测结果（用于后处理）
-            initial_detections = []
-            class_names = self.detector.get_class_names()
+            # 3. 构建初始检测结果
+            preprocessing_start = time.time()
+            initial_detections = self._build_initial_detections(boxes, class_ids, confidences, masks)
+            stage_times['preprocessing'] = time.time() - preprocessing_start
             
-            for i, (box, class_id, confidence, mask) in enumerate(zip(boxes, class_ids, confidences, masks)):
-                class_name = class_names.get(class_id, f'class_{class_id}')
-                detection = {
-                    'bounding_box': box.tolist(),
-                    'class_id': int(class_id),
-                    'class_name': class_name,
-                    'confidence': float(confidence),
-                    'mask': mask,
-                    'original_index': i
-                }
-                initial_detections.append(detection)
-            
-            # 4.  3D后处理（过滤重复检测）
+            # 4. 3D后处理
+            postprocessing_start = time.time()
             if self.enable_3d_post_processing and depth_image is not None and len(initial_detections) > 1:
-                print(f"[ENHANCED_PIPELINE] Applying 3D post-processing to {len(initial_detections)} detections...")
                 filtered_detections = self.post_processor.process_detections(
                     initial_detections, image_rgb, depth_image, waypoint_data
                 )
-                print(f"[ENHANCED_PIPELINE] Post-processing: {len(initial_detections)} -> {len(filtered_detections)} detections")
             else:
                 filtered_detections = initial_detections
-                print("[ENHANCED_PIPELINE] 3D post-processing skipped")
+            stage_times['3d_post_processing'] = time.time() - postprocessing_start
             
-            # 5. 构建参考特征库（使用过滤后的检测结果）
-            reference_library = {}
-            visualization_objects = []
+            # 5. 特征提取
+            feature_start = time.time()
+            reference_library, visualization_objects = self._extract_features_and_build_library(
+                filtered_detections, image_rgb, depth_image, waypoint_data
+            )
+            stage_times['feature_extraction'] = time.time() - feature_start
             
-            for i, detection in enumerate(filtered_detections):
-                try:
-                    # 分配对象ID
-                    object_id = self._assign_object_id(detection['class_id'])
-                    class_name = detection['class_name']
-                    full_object_id = f"{class_name}_{object_id}"
-                    
-                    # 提取多层次特征
-                    features = self._extract_enhanced_features(
-                        image_rgb, detection['mask'], depth_image, waypoint_data, detection['bounding_box']
-                    )
-                    
-                    # 评估特征质量
-                    quality_score = self.quality_assessor.assess_feature_quality(features)
-                    
-                    # 生成描述
-                    description = self._generate_enhanced_description(
-                        class_name, features, object_id
-                    )
-                    
-                    #  添加后处理信息
-                    post_processing_info = {
-                        'was_merged': detection.get('merged_from', 1) > 1,
-                        'merged_from_count': detection.get('merged_from', 1),
-                        'original_confidences': detection.get('original_confidences', [detection['confidence']]),
-                        'post_processed': self.enable_3d_post_processing
-                    }
-                    
-                    # 构建参考特征条目
-                    reference_entry = {
-                        'features': features,
-                        'quality_score': quality_score,
-                        'post_processing_info': post_processing_info,
-                        'metadata': {
-                            'object_id': full_object_id,
-                            'class_id': int(detection['class_id']),
-                            'class_name': class_name,
-                            'confidence': float(detection['confidence']),
-                            'bounding_box': detection['bounding_box'],
-                            'description': description,
-                            'detection_timestamp': datetime.now().isoformat(),
-                            'waypoint_info': {
-                                'world_pos': waypoint_data['world_pos'],
-                                'orientation': [waypoint_data['roll'], waypoint_data['pitch'], waypoint_data['yaw']]
-                            }
-                        }
-                    }
-                    
-                    reference_library[full_object_id] = reference_entry
-                    
-                    # 为可视化准备对象信息
-                    viz_obj = {
-                        'object_id': full_object_id,
-                        'class_id': int(detection['class_id']),
-                        'class_name': class_name,
-                        'confidence': float(detection['confidence']),
-                        'bounding_box': detection['bounding_box'],
-                        'mask': detection['mask'],
-                        'features': features,
-                        'description': description,
-                        'quality_score': quality_score,
-                        'post_processing_info': post_processing_info
-                    }
-                    visualization_objects.append(viz_obj)
-                    
-                    print(f"[ENHANCED_PIPELINE] Built reference entry: {full_object_id} (quality: {quality_score:.1f}%)")
-                    
-                    #  记录合并信息
-                    if post_processing_info['was_merged']:
-                        print(f"[ENHANCED_PIPELINE] --> Merged from {post_processing_info['merged_from_count']} original detections")
-                        print(f"[ENHANCED_PIPELINE] --> Original confidences: {post_processing_info['original_confidences']}")
-                    
-                except Exception as e:
-                    print(f"[ENHANCED_PIPELINE] Error processing detection {i}: {e}")
-                    import traceback
-                    traceback.print_exc()
-                    continue
-            
-            # 6. 保存参考特征库
-            self._save_reference_library(reference_library)
-            
-            # 7. 生成可视化
+            # 6. 可视化生成
+            viz_start = time.time()
             visualization_image = None
             if generate_visualization and len(visualization_objects) > 0:
-                print("[ENHANCED_PIPELINE] Generating enhanced visualization...")
                 visualization_image = self._generate_enhanced_visualization(image_rgb, visualization_objects)
-                
                 if visualization_image is not None:
                     vis_filename = os.path.join(self.output_dir, "detection_visualization.jpg")
-                    success = cv2.imwrite(vis_filename, cv2.cvtColor(visualization_image, cv2.COLOR_RGB2BGR))
-                    if success:
-                        print(f"[ENHANCED_PIPELINE] Visualization saved: {vis_filename}")
+                    cv2.imwrite(vis_filename, cv2.cvtColor(visualization_image, cv2.COLOR_RGB2BGR))
+            stage_times['visualization'] = time.time() - viz_start
+            
+            # 7. 保存参考库
+            save_start = time.time()
+            self._save_reference_library(reference_library)
+            stage_times['save_library'] = time.time() - save_start
+            
+            total_time = time.time() - start_time
+            
+            # 收集性能数据
+            performance_data = self._collect_performance_data(
+                start_timestamp, total_time, stage_times, 
+                len(initial_detections), len(filtered_detections),
+                reference_library, visualization_objects
+            )
             
             result = {
                 'success': True,
                 'reference_library': reference_library,
                 'detection_count': len(reference_library),
-                'processing_time': time.time() - start_time,
+                'processing_time': total_time,
+                'stage_times': stage_times,
                 'visualization_image': visualization_image,
                 'post_processing_stats': { 
                     'original_detections': len(initial_detections),
@@ -252,28 +179,39 @@ class EnhancedDetectionPipeline:
                     'duplicates_removed': len(initial_detections) - len(filtered_detections),
                     'post_processing_enabled': self.enable_3d_post_processing
                 },
+                'performance_data': performance_data,
                 'message': f'Successfully built {len(reference_library)} reference features'
             }
-            
-            # 存储到实例变量
+            # 在3D后处理后添加
+            if hasattr(self.post_processor, 'detailed_processing_stats'):
+                result['detailed_3d_processing'] = self.post_processor.detailed_processing_stats
+
+            if hasattr(self.post_processor, 'similarity_analyses'):
+                result['merge_decision_data'] = self.post_processor.similarity_analyses
+
+            print(f"[DEBUG] Result keys: {list(result.keys())}")
+            if 'detailed_3d_processing' in result:
+                print("[DEBUG] 成功添加 detailed_3d_processing")
+            if 'merge_decision_data' in result:
+                print("[DEBUG] 成功添加 merge_decision_data")
             self.reference_library = reference_library
-            
-            print(f"[ENHANCED_PIPELINE] Reference library construction completed: {len(reference_library)} targets")
-            
-            #  显示后处理摘要
-            self._log_post_processing_summary(result['post_processing_stats'], filtered_detections)
-            
             return result
             
         except Exception as e:
+            total_time = time.time() - start_time
             print(f"[ENHANCED_PIPELINE] Reference library construction failed: {e}")
             import traceback
             traceback.print_exc()
+            
+            # 即使失败也收集性能数据
+            performance_data = self._collect_error_performance_data(start_timestamp, total_time, str(e))
+            
             return {
                 'success': False,
                 'reference_library': {},
                 'detection_count': 0,
-                'processing_time': time.time() - start_time,
+                'processing_time': total_time,
+                'performance_data': performance_data,
                 'message': f'Construction failed: {str(e)}'
             }
 
@@ -384,14 +322,14 @@ class EnhancedDetectionPipeline:
                 
                 # 绘制编号
                 number_text = str(obj_idx + 1)
-                text_size = cv2.getTextSize(number_text, font, 0.8, 2)[0]
+                text_size = cv2.getTextSize(number_text, font, 1.2, 2)[0]
                 text_x = center_x - text_size[0] // 2
                 text_y = center_y + text_size[1] // 2
                 
                 # 白色背景 + 黑色文字
                 cv2.circle(vis_image, (center_x, center_y), 18, (255, 255, 255), -1)
                 cv2.circle(vis_image, (center_x, center_y), 18, color, 3)
-                cv2.putText(vis_image, number_text, (text_x, text_y), font, 0.8, (0, 0, 0), 2)
+                cv2.putText(vis_image, number_text, (text_x, text_y), font, 1.2, (0, 0, 0), 2)
                 
                 # 生成英文描述 - 添加调试
                 try:
@@ -491,8 +429,8 @@ class EnhancedDetectionPipeline:
                 
                 # 绘制描述文本
                 font = cv2.FONT_HERSHEY_SIMPLEX
-                font_scale = 0.6
-                font_thickness = 1
+                font_scale = 0.8
+                font_thickness = 2
                 
                 for i, desc in enumerate(description_lines):
                     y_pos = vis_image.shape[0] + padding + (i + 1) * line_height
@@ -1040,13 +978,13 @@ class EnhancedDetectionPipeline:
                 
                 plt.figure(figsize=(16, 12))
                 plt.imshow(vis_image)
-                plt.title('Enhanced Detection Results', fontsize=16, fontweight='bold')
+                plt.title('Enhanced Detection Results', fontsize=26, fontweight='bold')
                 plt.axis('off')
                 
                 # Add description text
                 plt.figtext(0.5, 0.02, 
                         'Enhanced detection with 3D point cloud features. Numbers indicate object centers in 3D space.',
-                        ha='center', fontsize=10, style='italic')
+                        ha='center', fontsize=20, style='italic')
                 
                 plt.tight_layout()
                 plt.show(block=False)  # Non-blocking display
@@ -1071,6 +1009,213 @@ class EnhancedDetectionPipeline:
         except Exception as e:
             print(f"[DISPLAY] Failed to show visualization popup: {e}")
 
+    def _collect_performance_data(self, start_timestamp, total_time, stage_times, 
+                                  original_count, filtered_count, reference_library, 
+                                  visualization_objects):
+        """收集详细的性能数据"""
+        # 计算质量分数统计
+        quality_scores = [entry['quality_score'] for entry in reference_library.values()]
+        
+        # 计算置信度统计
+        confidences = []
+        feature_stats = {'geometric': 0, 'shape': 0, 'appearance': 0, 'spatial': 0}
+        
+        for viz_obj in visualization_objects:
+            confidences.append(viz_obj['confidence'])
+            features = viz_obj.get('features', {})
+            for feature_type in feature_stats.keys():
+                if feature_type in features and features[feature_type]:
+                    feature_stats[feature_type] += 1
+        
+        performance_data = {
+            'timestamp': start_timestamp.isoformat(),
+            'test_metadata': self.current_test_metadata,
+            'timing': {
+                'total_time': total_time,
+                'stage_breakdown': stage_times,
+                'fps': 1.0 / total_time if total_time > 0 else 0
+            },
+            'detection_stats': {
+                'original_detections': original_count,
+                'filtered_detections': filtered_count,
+                'final_objects': len(reference_library),
+                'duplicates_removed': original_count - filtered_count,
+                'removal_rate': (original_count - filtered_count) / original_count if original_count > 0 else 0
+            },
+            'quality_stats': {
+                'mean_quality': np.mean(quality_scores) if quality_scores else 0,
+                'std_quality': np.std(quality_scores) if quality_scores else 0,
+                'min_quality': np.min(quality_scores) if quality_scores else 0,
+                'max_quality': np.max(quality_scores) if quality_scores else 0,
+                'quality_distribution': self._calculate_quality_distribution(quality_scores)
+            },
+            'confidence_stats': {
+                'mean_confidence': np.mean(confidences) if confidences else 0,
+                'std_confidence': np.std(confidences) if confidences else 0,
+                'min_confidence': np.min(confidences) if confidences else 0,
+                'max_confidence': np.max(confidences) if confidences else 0
+            },
+            'feature_extraction_success': feature_stats,
+            'post_processing': {
+                'enabled': self.enable_3d_post_processing,
+                'effectiveness': (original_count - filtered_count) / original_count if original_count > 1 else 0
+            }
+        }
+        
+        # 保存到实例变量中
+        self.performance_data.append(performance_data)
+        
+        return performance_data
+    def _collect_error_performance_data(self, start_timestamp, total_time, error_message):
+        """收集错误情况下的性能数据"""
+        return {
+            'timestamp': start_timestamp.isoformat(),
+            'test_metadata': self.current_test_metadata,
+            'timing': {'total_time': total_time, 'fps': 0},
+            'detection_stats': {'error': True, 'error_message': error_message},
+            'success': False
+        }
+    
+    def _calculate_quality_distribution(self, quality_scores):
+        """计算质量分数分布"""
+        if not quality_scores:
+            return {'excellent': 0, 'good': 0, 'fair': 0, 'poor': 0}
+        
+        distribution = {'excellent': 0, 'good': 0, 'fair': 0, 'poor': 0}
+        for score in quality_scores:
+            if score >= 90:
+                distribution['excellent'] += 1
+            elif score >= 75:
+                distribution['good'] += 1
+            elif score >= 60:
+                distribution['fair'] += 1
+            else:
+                distribution['poor'] += 1
+        
+        return distribution
+    
+    def _create_empty_result(self, start_time, stage_times):
+        """创建空结果"""
+        total_time = time.time() - start_time
+        performance_data = {
+            'timestamp': datetime.now().isoformat(),
+            'test_metadata': self.current_test_metadata,
+            'timing': {'total_time': total_time, 'stage_breakdown': stage_times},
+            'detection_stats': {'original_detections': 0, 'filtered_detections': 0, 'final_objects': 0},
+            'no_detections': True
+        }
+        
+        return {
+            'success': True,
+            'reference_library': {},
+            'detection_count': 0,
+            'processing_time': total_time,
+            'performance_data': performance_data,
+            'message': 'No targets detected'
+        }
+    
+    def _build_initial_detections(self, boxes, class_ids, confidences, masks):
+        """构建初始检测结果"""
+        initial_detections = []
+        class_names = self.detector.get_class_names()
+        
+        for i, (box, class_id, confidence, mask) in enumerate(zip(boxes, class_ids, confidences, masks)):
+            class_name = class_names.get(class_id, f'class_{class_id}')
+            detection = {
+                'bounding_box': box.tolist(),
+                'class_id': int(class_id),
+                'class_name': class_name,
+                'confidence': float(confidence),
+                'mask': mask,
+                'original_index': i
+            }
+            initial_detections.append(detection)
+        
+        return initial_detections
+    
+    def _extract_features_and_build_library(self, filtered_detections, image_rgb, depth_image, waypoint_data):
+        """提取特征并构建参考库"""
+        reference_library = {}
+        visualization_objects = []
+        
+        for i, detection in enumerate(filtered_detections):
+            try:
+                object_id = self._assign_object_id(detection['class_id'])
+                class_name = detection['class_name']
+                full_object_id = f"{class_name}_{object_id}"
+                
+                features = self._extract_enhanced_features(
+                    image_rgb, detection['mask'], depth_image, waypoint_data, detection['bounding_box']
+                )
+                
+                quality_score = self.quality_assessor.assess_feature_quality(features)
+                description = self._generate_enhanced_description(class_name, features, object_id)
+                
+                post_processing_info = {
+                    'was_merged': detection.get('merged_from', 1) > 1,
+                    'merged_from_count': detection.get('merged_from', 1),
+                    'original_confidences': detection.get('original_confidences', [detection['confidence']]),
+                    'post_processed': self.enable_3d_post_processing
+                }
+                
+                reference_entry = {
+                    'features': features,
+                    'quality_score': quality_score,
+                    'post_processing_info': post_processing_info,
+                    'metadata': {
+                        'object_id': full_object_id,
+                        'class_id': int(detection['class_id']),
+                        'class_name': class_name,
+                        'confidence': float(detection['confidence']),
+                        'bounding_box': detection['bounding_box'],
+                        'description': description,
+                        'detection_timestamp': datetime.now().isoformat(),
+                        'waypoint_info': {
+                            'world_pos': waypoint_data['world_pos'],
+                            'orientation': [waypoint_data['roll'], waypoint_data['pitch'], waypoint_data['yaw']]
+                        }
+                    }
+                }
+                
+                reference_library[full_object_id] = reference_entry
+                
+                viz_obj = {
+                    'object_id': full_object_id,
+                    'class_id': int(detection['class_id']),
+                    'class_name': class_name,
+                    'confidence': float(detection['confidence']),
+                    'bounding_box': detection['bounding_box'],
+                    'mask': detection['mask'],
+                    'features': features,
+                    'description': description,
+                    'quality_score': quality_score,
+                    'post_processing_info': post_processing_info
+                }
+                visualization_objects.append(viz_obj)
+                
+            except Exception as e:
+                print(f"[ENHANCED_PIPELINE] Error processing detection {i}: {e}")
+                continue
+        
+        return reference_library, visualization_objects
+    
+    def get_all_performance_data(self):
+        """获取所有收集的性能数据"""
+        return self.performance_data
+    
+    def clear_performance_data(self):
+        """清空性能数据"""
+        self.performance_data = []
+    
+    def save_performance_data(self, filename):
+        """保存性能数据到文件"""
+        try:
+            with open(filename, 'w', encoding='utf-8') as f:
+                json.dump(self.performance_data, f, indent=2, ensure_ascii=False)
+            print(f"[ENHANCED_PIPELINE] Performance data saved to: {filename}")
+        except Exception as e:
+            print(f"[ENHANCED_PIPELINE] Failed to save performance data: {e}")
+
     def _publish_visualization_message(self, vis_image: np.ndarray):
         """Publish ROS visualization message"""
         try:
@@ -1083,7 +1228,7 @@ class EnhancedDetectionPipeline:
                         depth_image: Optional[np.ndarray] = None,
                         camera_pose: Optional[Dict] = None) -> Dict:
         try:
-            print(f"[ENHANCED_PIPELINE] Starting to process single image...")
+            # print(f"[ENHANCED_PIPELINE] Starting to process single image...")
             
             # 🔧 Ensure RGB and depth image resolutions match
             if image_rgb.shape[:2] != depth_image.shape:
@@ -1101,11 +1246,11 @@ class EnhancedDetectionPipeline:
                 print("[ENHANCED_PIPELINE] No targets detected")
                 return {'objects': []}
             
-            print(f"[ENHANCED_PIPELINE] YOLO detected {len(boxes)} targets")
+            # print(f"[ENHANCED_PIPELINE] YOLO detected {len(boxes)} targets")
             
             # 2. SAM2 segmentation
             masks = self.segmentor.segment(image_rgb, boxes)
-            print("[ENHANCED_PIPELINE] SAM2 segmentation completed")
+            # print("[ENHANCED_PIPELINE] SAM2 segmentation completed")
             
             # 3. Process detection results (no 3D post-processing to avoid merging)
             objects = []
@@ -1151,7 +1296,7 @@ class EnhancedDetectionPipeline:
                     print(f'[ENHANCED_PIPELINE] Error processing object {i}: {e}')
                     continue
             
-            print(f"[ENHANCED_PIPELINE] Single image processing completed, detected {len(objects)} valid targets")
+            # print(f"[ENHANCED_PIPELINE] Single image processing completed, detected {len(objects)} valid targets")
             
             return {
                 'objects': objects,

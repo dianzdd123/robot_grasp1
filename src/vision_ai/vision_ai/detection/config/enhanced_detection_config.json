@@ -1,16 +1,13 @@
 {
-  "detector": {
-    "type": "yolo",
-    "model_path": "models/yolo11n.pt",
-    "confidence_threshold": 0.5,
-    "iou_threshold": 0.45,
-    "device": "cuda",
-    "classes": null
+    "detector": {
+        "type": "yolo",
+        "model_path": "/home/qi/下载/best2.pt",
+        "confidence_threshold": 0.4
   },
-  "segmentor": {
-    "type": "sam2",
-    "model_type": "sam2_hiera_tiny",
-    "device": "cuda"
+    "segmentor": {
+        "config_name": "sam2_hiera_l.yaml",
+        "checkpoint_path": "/home/qi/ros2_ws/src/vision_ai/models/sam2/sam2_hiera_large.pt",
+        "device": "cuda"
   },
   "camera": {
     "intrinsics": {

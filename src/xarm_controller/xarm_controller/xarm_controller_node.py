@@ -59,7 +59,7 @@ class XArmControllerNode(Node):
             'z': (100, 800)
         }
         self.obstacle_center = (0, 0)
-        self.obstacle_radius = 200
+        self.obstacle_radius = 180
         self.safety_margin = 20  # mm
         
         # 连接机械臂

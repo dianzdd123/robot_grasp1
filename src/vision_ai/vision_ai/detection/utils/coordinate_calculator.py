@@ -76,7 +76,7 @@ class CoordinateCalculator:
         self.yaw_angles = np.array([-180, 0, 180])  # yaw角度 (度)
         
         # 对应的TCP补偿 [x, y, z] (米)
-        self.compensation_x = np.array([0.015, 0.02, 0.025])
+        self.compensation_x = np.array([-0.005, 0.0, 0.005])
         self.compensation_y = np.array([0.005, 0.002, -0.003])
         self.compensation_z = np.array([0.0, 0.0, 0.0])
         

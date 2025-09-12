@@ -265,7 +265,7 @@ class EnhancedDetectionNode(Node):
                 compatible_result = self._convert_to_compatible_format(result)
                 
                 # 发布结果
-                self._publish_enhanced_detection_result(compatible_result)
+                self._publish_enhanced_detection_result(compatible_result, result)  # 添加result参数
                 
                 #  改进的可视化发布（现在包含弹窗显示）
                 self._publish_visualization_from_enhanced_pipeline(detection_output_dir)
@@ -345,7 +345,7 @@ class EnhancedDetectionNode(Node):
             self.get_logger().error(f'格式转换失败: {e}')
             return {'success': False, 'objects': [], 'detection_count': 0}
     
-    def _publish_enhanced_detection_result(self, result):
+    def _publish_enhanced_detection_result(self, result, original_enhanced_result=None):
         """发布增强检测结果"""
         try:
             #  使用原有的发布逻辑，但添加了质量分数信息
@@ -372,13 +372,22 @@ class EnhancedDetectionNode(Node):
                 }
                 
                 result_data['objects'].append(obj_data)
+            if original_enhanced_result:
+                if 'detailed_3d_processing' in original_enhanced_result:
+                    result_data['detailed_3d_processing'] = original_enhanced_result['detailed_3d_processing']
+                
+                if 'merge_decision_data' in original_enhanced_result:
+                    result_data['merge_decision_data'] = original_enhanced_result['merge_decision_data']
             
-            #  保存增强的检测结果
-            self._save_enhanced_detection_results(result_data)
+            # 保存增强的检测结果
+            self._save_enhanced_detection_results(result_data, original_enhanced_result)
             
+            # 清理数据用于ROS消息发布
+            sanitized_result_data = self._sanitize_features_for_publishing(result_data)
+
             # 发布ROS消息
             json_msg = String()
-            json_msg.data = json.dumps(result_data, indent=2)
+            json_msg.data = json.dumps(sanitized_result_data, indent=2)
             self.detection_result_pub.publish(json_msg)
             
             self.get_logger().info('📤 增强检测结果已发布')
@@ -386,14 +395,47 @@ class EnhancedDetectionNode(Node):
         except Exception as e:
             self.get_logger().error(f'发布增强检测结果失败: {e}')
     
-    def _save_enhanced_detection_results(self, result_data):
+    def _save_enhanced_detection_results(self, result_data, original_enhanced_result=None):
         """保存增强检测结果"""
         try:
+            # 深拷贝以避免修改原数据
+            import copy
+            sanitized_data = copy.deepcopy(result_data)
+            # 添加原始增强结果中的统计信息
+            if original_enhanced_result:
+                # 添加后处理统计
+                if 'post_processing_stats' in original_enhanced_result:
+                    result_data['post_processing_stats'] = original_enhanced_result['post_processing_stats']
+                
+                # 添加各阶段时间统计
+                if 'stage_times' in original_enhanced_result:
+                    result_data['stage_times'] = original_enhanced_result['stage_times']
+                
+                # 添加性能数据
+                if 'performance_data' in original_enhanced_result:
+                    result_data['performance_data'] = original_enhanced_result['performance_data']
+
+                if 'detailed_3d_processing' in original_enhanced_result:
+                    result_data['detailed_3d_processing'] = original_enhanced_result['detailed_3d_processing']
+                
+                if 'merge_decision_data' in original_enhanced_result:
+                    result_data['merge_decision_data'] = original_enhanced_result['merge_decision_data']
+            result_data = self._sanitize_features_for_publishing(result_data)
+            # 清理features数据用于JSON序列化
             if 'objects' in result_data:
                 for obj in result_data['objects']:
                     if 'features' in obj:
                         obj['features'] = self._sanitize_features_for_publishing(obj['features'])
-            
+        
+            # 测试JSON序列化
+            try:
+                json_str = json.dumps(result_data, indent=2)
+                self.get_logger().info("JSON序列化测试通过")
+            except Exception as json_error:
+                self.get_logger().error(f"JSON序列化测试失败: {json_error}")
+                # 继续寻找问题
+                self._find_non_serializable_objects(result_data)
+                return
             # 保存到增强管道的输出目录
             results_file = os.path.join(self.enhanced_pipeline.output_dir, "enhanced_detection_results.json")
             
@@ -404,40 +446,76 @@ class EnhancedDetectionNode(Node):
             
         except Exception as e:
             self.get_logger().error(f'保存增强检测结果失败: {e}')
-    
-    def _sanitize_features_for_publishing(self, features: Dict) -> Dict:
-        """清理特征数据用于JSON发布（在detection_node.py中）"""
-        sanitized = {}
+
+    def _find_non_serializable_objects(self, obj, path="root"):
+        """找出不可序列化的对象"""
+        import numpy as np
+        
+        if isinstance(obj, dict):
+            for key, value in obj.items():
+                self._find_non_serializable_objects(value, f"{path}.{key}")
+        elif isinstance(obj, (list, tuple)):
+            for i, item in enumerate(obj):
+                self._find_non_serializable_objects(item, f"{path}[{i}]")
+        elif isinstance(obj, (np.integer, np.floating, np.bool_)):
+            self.get_logger().error(f"发现numpy类型在 {path}: {type(obj)} = {obj}")
+        elif not isinstance(obj, (bool, int, float, str, type(None))):
+            self.get_logger().error(f"发现不可序列化类型在 {path}: {type(obj)} = {obj}")
+
+    def _sanitize_features_for_publishing(self, data, path="root") -> any:
+        """递归清理所有数据用于JSON发布，带调试信息"""
+        import numpy as np
         
         try:
-            for feature_type, feature_data in features.items():
-                if isinstance(feature_data, dict):
-                    sanitized[feature_type] = {}
-                    for key, value in feature_data.items():
-                        if isinstance(value, np.ndarray):
-                            sanitized[feature_type][key] = value.tolist()
-                        elif isinstance(value, (np.integer, np.floating)):
-                            sanitized[feature_type][key] = float(value)
-                        elif isinstance(value, tuple):
-                            sanitized[feature_type][key] = list(value)
-                        elif hasattr(value, 'item'):  # numpy标量
-                            sanitized[feature_type][key] = value.item()
-                        else:
-                            sanitized[feature_type][key] = value
-                elif isinstance(feature_data, np.ndarray):
-                    sanitized[feature_type] = feature_data.tolist()
-                elif isinstance(feature_data, (np.integer, np.floating)):
-                    sanitized[feature_type] = float(feature_data)
-                elif hasattr(feature_data, 'item'):  # numpy标量
-                    sanitized[feature_type] = feature_data.item()
-                else:
-                    sanitized[feature_type] = feature_data
-            
-            return sanitized
-            
+            if isinstance(data, dict):
+                sanitized = {}
+                for key, value in data.items():
+                    current_path = f"{path}.{key}"
+                    try:
+                        sanitized[key] = self._sanitize_features_for_publishing(value, current_path)
+                    except Exception as e:
+                        self.get_logger().error(f'清理失败在路径 {current_path}, 类型 {type(value)}: {e}')
+                        sanitized[key] = str(value)
+                return sanitized
+                
+            elif isinstance(data, (list, tuple)):
+                sanitized_list = []
+                for i, item in enumerate(data):
+                    current_path = f"{path}[{i}]"
+                    try:
+                        sanitized_list.append(self._sanitize_features_for_publishing(item, current_path))
+                    except Exception as e:
+                        self.get_logger().error(f'清理失败在路径 {current_path}, 类型 {type(item)}: {e}')
+                        sanitized_list.append(str(item))
+                return sanitized_list
+                
+            elif isinstance(data, np.ndarray):
+                return data.tolist()
+                
+            elif isinstance(data, np.integer):
+                return int(data)
+                
+            elif isinstance(data, np.floating):
+                return float(data)
+                
+            elif isinstance(data, np.bool_):
+                return bool(data)
+                
+            elif hasattr(data, 'item') and callable(getattr(data, 'item')):
+                return data.item()
+                
+            elif isinstance(data, (bool, int, float, str)) or data is None:
+                return data
+                
+            else:
+                # 检测可能的问题类型
+                data_type_str = str(type(data))
+                self.get_logger().warn(f'未知类型在路径 {path}: {data_type_str}, 值: {data}')
+                return str(data)
+                
         except Exception as e:
-            self.get_logger().error(f'特征数据清理失败: {e}')
-            return {}
+            self.get_logger().error(f'数据清理失败在路径 {path}, 类型 {type(data)}: {e}')
+            return str(data)
         
     def _display_enhanced_detection_results(self, result):
         """显示增强检测结果"""
@@ -870,7 +948,7 @@ class EnhancedDetectionNode(Node):
             
             plt.figure(figsize=(14, 10))
             plt.imshow(vis_image)
-            plt.title('Enhanced Detection Results', fontsize=14, fontweight='bold')
+            plt.title('Enhanced Detection Results', fontsize=24, fontweight='bold')
             plt.axis('off')
             plt.tight_layout()
             plt.show(block=False)

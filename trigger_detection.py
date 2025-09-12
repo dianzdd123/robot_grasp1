@@ -470,6 +470,13 @@ class EnhancedDetectionTrigger(Node):
         
         return "\n".join(summary)
     
+    def batch_test_with_metadata(self, test_scenarios):
+        results = []
+        for scenario in test_scenarios:
+            result = self.run_single_test(scenario)
+            results.append({**result, **scenario['metadata']})
+        return self._generate_charts(results)
+
     def _check_topic_connections(self):
         """🆕 检查话题连接状态"""
         try:
@@ -533,7 +540,7 @@ def main():
     print("=" * 50)
     
     # 获取扫描目录
-    default_scan_dir = '/home/qi/ros2_ws/scan_output_20250727_181333'
+    default_scan_dir = '/home/qi/ros2_ws/scan_output_20250903_211959'
     
     print(f"📁 默认扫描目录: {default_scan_dir}")
     scan_dir = input(f"请输入扫描目录路径 (回车使用默认): ").strip()

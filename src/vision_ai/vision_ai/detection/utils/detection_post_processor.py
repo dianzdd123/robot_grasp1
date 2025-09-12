@@ -49,7 +49,7 @@ class Detection3DPostProcessor:
                 return detections
             
             print(f"[POST_PROCESSOR] Processing {len(detections)} detections")
-            
+            self.similarity_analyses = []
             # Step 1: 提取3D特征
             detection_features = []
             for i, detection in enumerate(detections):
@@ -69,7 +69,40 @@ class Detection3DPostProcessor:
             
             print(f"[POST_PROCESSOR] Filtered {len(detections)} -> {len(filtered_detections)} detections")
             self._log_filtering_results(detections, filtered_detections)
-            
+            self.last_processing_stats = {
+                'original_detections': len(detections),
+                'filtered_detections': len(filtered_detections),
+                'merge_operations': [],
+                'filter_reasons': {
+                    'low_depth_consistency': 0,
+                    'insufficient_spatial_support': 0,
+                    'geometric_outlier': 0
+                },
+                'depth_consistency_analysis': self._analyze_batch_depth_consistency(detection_features)
+            }
+            self.detailed_processing_stats = {
+                'input_summary': {
+                    'total_detections': len(detections),
+                    'classes_detected': list(set(d['class_name'] for d in detections)),
+                    'confidence_range': [min(d['confidence'] for d in detections), 
+                                    max(d['confidence'] for d in detections)] if detections else [0, 0]
+                },
+                'filtering_process': {
+                    'similarity_comparisons': len(self.similarity_analyses),
+                    'merge_operations': len([g for g in duplicate_groups if len(g) > 1]),
+                    'preserved_detections': len([g for g in duplicate_groups if len(g) == 1])
+                },
+                'output_summary': {
+                    'final_detections': len(filtered_detections),
+                    'reduction_rate': (len(detections) - len(filtered_detections)) / len(detections) if detections else 0,
+                    'avg_confidence_change': self._calculate_confidence_change(detections, filtered_detections)
+                },
+                'physical_validation_summary': self._summarize_physical_validation(detection_features)
+            }
+            # 在 return filtered_detections 前
+            print(f"[POST_PROCESSOR] 设置统计数据: detailed_processing_stats={hasattr(self, 'detailed_processing_stats')}")
+            if hasattr(self, 'detailed_processing_stats'):
+                print(f"[POST_PROCESSOR] 统计数据内容: {self.detailed_processing_stats}")
             return filtered_detections
             
         except Exception as e:
@@ -77,6 +110,59 @@ class Detection3DPostProcessor:
             import traceback
             traceback.print_exc()
             return detections  # 返回原始检测结果
+    
+
+    def _summarize_physical_validation(self, detection_features: List[Dict]) -> Dict:
+        """总结物理验证结果"""
+        validations = [feat.get('physical_validation', {}) for feat in detection_features]
+        
+        return {
+            'valid_3d_positions': sum(v.get('has_valid_3d_position', False) for v in validations),
+            'reliable_depth_measurements': sum(v.get('has_reliable_depth', False) for v in validations),
+            'sufficient_coverage': sum(v.get('sufficient_mask_coverage', False) for v in validations),
+            'reasonable_heights': sum(v.get('height_within_reasonable_range', False) for v in validations)
+        }
+
+    def _calculate_confidence_change(self, original: List[Dict], filtered: List[Dict]) -> float:
+        """计算置信度变化"""
+        if not original or not filtered:
+            return 0.0
+        
+        orig_avg = np.mean([d['confidence'] for d in original])
+        filt_avg = np.mean([d['confidence'] for d in filtered])
+        
+        return float(filt_avg - orig_avg)
+
+    def _analyze_batch_depth_consistency(self, detection_features: List[Dict]) -> Dict:
+        """分析整批检测的深度一致性"""
+        try:
+            consistency_scores = []
+            depth_variances = []
+            valid_ratios = []
+            peak_counts = []
+            
+            for feat in detection_features:
+                if 'depth_consistency_score' in feat:
+                    consistency_scores.append(feat['depth_consistency_score'])
+                    depth_variances.append(feat.get('depth_variance', 0))
+                    valid_ratios.append(feat.get('valid_depth_ratio', 0))
+                    peak_counts.append(feat.get('depth_peaks', 0))
+            
+            if not consistency_scores:
+                return {'batch_consistency': 'no_data'}
+            
+            return {
+                'mean_consistency_score': float(np.mean(consistency_scores)),
+                'std_consistency_score': float(np.std(consistency_scores)),
+                'high_quality_detections': sum(1 for s in consistency_scores if s > 0.8),
+                'low_quality_detections': sum(1 for s in consistency_scores if s < 0.4),
+                'mean_depth_variance': float(np.mean(depth_variances)),
+                'multi_peak_detections': sum(1 for p in peak_counts if p > 1)
+            }
+            
+        except Exception as e:
+            print(f"[POST_PROCESSOR] Batch depth consistency analysis failed: {e}")
+            return {'batch_consistency': 'analysis_failed'}
     
     def _extract_3d_features(self, detection: Dict, depth_image: np.ndarray, 
                             waypoint_data: Dict) -> Dict:
@@ -112,9 +198,17 @@ class Detection3DPostProcessor:
             # 计算深度变化
             depth_variance = self._calculate_depth_variance(mask, depth_image)
             features['depth_variance'] = depth_variance
+            depth_analysis = self._analyze_depth_consistency(mask, depth_image)
+            features.update(depth_analysis)
+            # 添加物理属性验证标记
+            features['physical_validation'] = {
+                'has_valid_3d_position': features['world_centroid'] != [0, 0, 0],
+                'has_reliable_depth': features['depth_variance'] < 0.05,
+                'sufficient_mask_coverage': features['mask_area'] > 100,
+                'height_within_reasonable_range': 5 < features['estimated_height'] < 200
+            }
             
             return features
-            
         except Exception as e:
             print(f"[POST_PROCESSOR] 3D feature extraction failed: {e}")
             return {
@@ -129,6 +223,58 @@ class Detection3DPostProcessor:
                 'depth_variance': 0.0
             }
     
+    def _analyze_depth_consistency(self, mask: np.ndarray, depth_image: np.ndarray) -> Dict:
+        """分析深度一致性，用于理论依据"""
+        if mask is None or np.sum(mask) == 0:
+            return {
+                'depth_consistency_score': 0.0,
+                'depth_uniformity': 'invalid',
+                'reflection_likelihood': 'unknown'
+            }
+        
+        masked_depth = depth_image[mask > 0] / 1000.0  # 转换为米
+        valid_depths = masked_depth[masked_depth > 0.01]
+        
+        if len(valid_depths) < 10:
+            return {
+                'depth_consistency_score': 0.0,
+                'depth_uniformity': 'insufficient_data'
+            }
+        
+        # 计算深度统计
+        depth_median = np.median(valid_depths)
+        depth_std = np.std(valid_depths)
+        depth_range = np.max(valid_depths) - np.min(valid_depths)
+        
+        # 计算一致性分数
+        consistency_score = max(0, 1 - (depth_std / (depth_median + 1e-6)) * 2)
+        
+        # 判断深度均匀性
+        if depth_std < 0.01:  # 1cm以内
+            uniformity = 'highly_uniform'
+        elif depth_std < 0.03:  # 3cm以内  
+            uniformity = 'moderately_uniform'
+        else:
+            uniformity = 'non_uniform'
+        
+        # 反射可能性判断
+        if depth_median > 2.0 or depth_std > 0.1:
+            reflection_risk = 'high'
+        elif depth_std > 0.05:
+            reflection_risk = 'medium' 
+        else:
+            reflection_risk = 'low'
+        
+        return {
+            'depth_consistency_score': float(consistency_score),
+            'depth_std_mm': float(depth_std * 1000),
+            'depth_range_mm': float(depth_range * 1000),
+            'depth_uniformity': uniformity,
+            'reflection_likelihood': reflection_risk,
+            'valid_depth_points': len(valid_depths),
+            'depth_coverage_ratio': len(valid_depths) / np.sum(mask > 0)
+        }
+
     def _calculate_3d_centroid(self, mask: np.ndarray, depth_image: np.ndarray, 
                               waypoint_data: Dict) -> List[float]:
         """计算3D质心"""
@@ -262,38 +408,101 @@ class Detection3DPostProcessor:
             return np.zeros((len(detection_features), len(detection_features)))
     
     def _calculate_detection_similarity(self, feat1: Dict, feat2: Dict) -> float:
-        """计算两个检测的相似性"""
-        try:
-            similarity_score = 0.0
+        """计算相似性并记录详细分析数据"""
+        # 初始化相似性分析记录
+        if not hasattr(self, 'similarity_analyses'):
+            self.similarity_analyses = []
+        
+        similarity_breakdown = {
+            'detection_pair': f"{feat1.get('class_name', 'unknown')}_{feat2.get('class_name', 'unknown')}",
+            'individual_similarities': {},
+            'decision_factors': {},
+            'physical_evidence': {}
+        }
+        
+        similarity_score = 0.0
+        
+        # 1. 3D空间距离分析
+        pos1 = np.array(feat1['world_centroid'])
+        pos2 = np.array(feat2['world_centroid'])
+        spatial_distance = 0.0
+        
+        if np.any(pos1) and np.any(pos2):
+            spatial_distance = np.linalg.norm(pos1 - pos2)
+            spatial_similarity = max(0, 1 - spatial_distance / self.spatial_distance_threshold)
+            similarity_score += spatial_similarity * 0.4
             
-            # 1. 3D空间距离相似性 (权重40%)
-            pos1 = np.array(feat1['world_centroid'])
-            pos2 = np.array(feat2['world_centroid'])
+            similarity_breakdown['individual_similarities']['spatial'] = {
+                'distance_mm': float(spatial_distance),
+                'similarity_score': float(spatial_similarity),
+                'weight': 0.4,
+                'threshold_mm': self.spatial_distance_threshold
+            }
             
-            if np.any(pos1) and np.any(pos2):  # 确保坐标有效
-                spatial_distance = np.linalg.norm(pos1 - pos2)
-                spatial_similarity = max(0, 1 - spatial_distance / self.spatial_distance_threshold)
-                similarity_score += spatial_similarity * 0.4
-            
-            # 2. 深度相似性 (权重25%)
-            depth_diff = abs(feat1['average_depth'] - feat2['average_depth']) * 1000  # 转换为mm
-            depth_similarity = max(0, 1 - depth_diff / self.depth_similarity_threshold)
-            similarity_score += depth_similarity * 0.25
-            
-            # 3. 高度相似性 (权重20%)
-            height_diff = abs(feat1['estimated_height'] - feat2['estimated_height'])
-            height_similarity = max(0, 1 - height_diff / self.height_similarity_threshold)
-            similarity_score += height_similarity * 0.2
-            
-            # 4. Mask重叠相似性 (权重15%)
-            mask_similarity = self._calculate_mask_overlap(feat1, feat2)
-            similarity_score += mask_similarity * 0.15
-            
-            return similarity_score
-            
-        except Exception as e:
-            print(f"[POST_PROCESSOR] Similarity calculation failed: {e}")
-            return 0.0
+            # 物理证据：如果距离小于物体尺寸，很可能是同一物体
+            object_size_estimate = max(feat1.get('estimated_height', 30), feat2.get('estimated_height', 30))
+            similarity_breakdown['physical_evidence']['likely_same_object_by_distance'] = spatial_distance < object_size_estimate
+        
+        # 2. 深度相似性分析
+        depth_diff = abs(feat1['average_depth'] - feat2['average_depth']) * 1000
+        depth_similarity = max(0, 1 - depth_diff / self.depth_similarity_threshold)
+        similarity_score += depth_similarity * 0.25
+        
+        similarity_breakdown['individual_similarities']['depth'] = {
+            'difference_mm': float(depth_diff),
+            'similarity_score': float(depth_similarity),
+            'weight': 0.25,
+            'threshold_mm': self.depth_similarity_threshold
+        }
+        
+        # 3. 高度相似性分析
+        height_diff = abs(feat1['estimated_height'] - feat2['estimated_height'])
+        height_similarity = max(0, 1 - height_diff / self.height_similarity_threshold)
+        similarity_score += height_similarity * 0.2
+        
+        similarity_breakdown['individual_similarities']['height'] = {
+            'difference_mm': float(height_diff),
+            'similarity_score': float(height_similarity), 
+            'weight': 0.2,
+            'threshold_mm': self.height_similarity_threshold
+        }
+        
+        # 4. Mask重叠分析
+        mask_overlap = self._calculate_mask_overlap(feat1, feat2)
+        similarity_score += mask_overlap * 0.15
+        
+        similarity_breakdown['individual_similarities']['mask_overlap'] = {
+            'overlap_ratio': float(mask_overlap),
+            'similarity_score': float(mask_overlap),
+            'weight': 0.15,
+            'threshold': self.mask_overlap_threshold
+        }
+        
+        # 综合决策分析
+        similarity_breakdown['decision_factors'] = {
+            'combined_similarity': float(similarity_score),
+            'passes_threshold': similarity_score > 0.6,
+            'same_class': feat1.get('class_name') == feat2.get('class_name'),
+            'confidence_diff': abs(feat1.get('confidence', 0) - feat2.get('confidence', 0))
+        }
+        
+        # 物理合理性判断
+        very_close_position = spatial_distance < 20 if np.any(pos1) and np.any(pos2) else False
+        very_similar_depth = depth_diff < 10
+        very_similar_height = height_diff < 10
+        
+        similarity_breakdown['physical_evidence'].update({
+            'identical_physical_properties': very_close_position and very_similar_depth and very_similar_height,
+            'likely_yolo_duplicate': similarity_score > 0.8 and feat1.get('class_name') == feat2.get('class_name'),
+            'depth_consistency_match': (feat1.get('depth_uniformity') == 'highly_uniform' and 
+                                    feat2.get('depth_uniformity') == 'highly_uniform')
+        })
+        
+        # 只记录可能合并的相似性分析
+        if similarity_score > 0.3:  # 降低阈值以记录更多数据
+            self.similarity_analyses.append(similarity_breakdown)
+        
+        return similarity_score
     
     def _calculate_mask_overlap(self, feat1: Dict, feat2: Dict) -> float:
         """计算mask重叠度"""
@@ -456,6 +665,23 @@ class Detection3DPostProcessor:
             
             print(f"[POST_PROCESSOR] Merged detection: {base_detection['class_name']} "
                   f"conf:{merged_confidence:.3f} from {len(group_detections)} detections")
+            
+            merge_detail = {
+                'kept_detection_idx': group_indices[best_idx],
+                'merged_detection_indices': [idx for i, idx in enumerate(group_indices) if i != best_idx],
+                'spatial_distances': [np.linalg.norm(np.array(group_features[i]['world_centroid']) - 
+                                                np.array(group_features[best_idx]['world_centroid'])) 
+                                    for i in range(len(group_features)) if i != best_idx],
+                'depth_similarities': [abs(group_features[i]['average_depth'] - 
+                                        group_features[best_idx]['average_depth']) * 1000
+                                    for i in range(len(group_features)) if i != best_idx],
+                'mask_overlaps': [self._calculate_mask_overlap(group_features[best_idx], group_features[i])
+                                for i in range(len(group_features)) if i != best_idx]
+            }
+            
+            # 添加到处理统计中
+            if hasattr(self, 'last_processing_stats'):
+                self.last_processing_stats['merge_operations'].append(merge_detail)
             
             return base_detection
             

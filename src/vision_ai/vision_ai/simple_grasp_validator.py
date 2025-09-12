@@ -514,10 +514,10 @@ class TrackingGraspSystem(Node):
                 height_offset = object_height_mm 
             elif object_height_mm < 90:
                 base_pitch = -15.0
-                height_offset = object_height_mm * 0.8
+                height_offset = object_height_mm * 0.5
             elif object_height_mm < 150:
                 base_pitch = -25.0
-                height_offset = object_height_mm * 0.8
+                height_offset = object_height_mm * 0.5
             else:
                 base_pitch = -35.0
                 height_offset = min(object_height_mm * 0.8, 100)

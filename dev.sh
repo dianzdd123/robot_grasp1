@@ -25,14 +25,16 @@ if [ "$1" = "full_system" ]; then
     tmux split-window -h -t vision_ai:2
     tmux send-keys -t vision_ai:2.1 'ros2 run vision_ai detection_node' Enter
 
-    # 窗口3：GUI和监控
+    # 窗口3：GUI和监控 + 自动实验记录
     tmux new-window -t vision_ai:3
     tmux send-keys -t vision_ai:3 'ros2 run vision_ai gui_config_node' Enter
     tmux split-window -h -t vision_ai:3
-    tmux send-keys -t vision_ai:3.1 'echo "📊 监控窗口 - 使用以下命令:"' Enter
-    tmux send-keys -t vision_ai:3.1 'echo "ros2 topic echo /detection_result"' Enter
-    tmux send-keys -t vision_ai:3.1 'echo "ros2 topic echo /stitching_complete"' Enter
-    tmux send-keys -t vision_ai:3.1 'echo "ros2 node list"' Enter
+
+    # 右侧启动自动记录器
+    tmux send-keys -t vision_ai:3.1 'echo "Starting automated experiment logger..."' Enter
+    tmux send-keys -t vision_ai:3.1 'sleep 5' Enter  # 等待其他节点启动
+    tmux send-keys -t vision_ai:3.1 'cd ~/vision_ai_experiments && source /opt/ros/humble/setup.bash && source ~/ros2_ws/install/setup.bash' Enter
+    tmux send-keys -t vision_ai:3.1 './auto_logger.sh' Enter
     # 🆕 窗口4：追踪系统主控制台
     tmux new-window -t vision_ai:4
     tmux send-keys -t vision_ai:4 'echo "🎯 追踪系统主控制台"' Enter
