@@ -1,3 +1,270 @@
+# Vision AI
+
+A ROS 2 Humble–based intelligent vision system for **scan planning, object detection, tracking, and robotic grasping**.
+
+This project integrates camera perception, 3D-aware detection, online tracking, and robot-arm execution into one coordinated pipeline — designed for automated object scanning and manipulation using a RealSense camera and an xArm robot.
+
+---
+
+## Highlights
+
+- **ROS 2 Humble** modular architecture
+- **One-command startup** via `restart.sh`
+- **tmux-based orchestration** for multi-node development and debugging
+- **Adaptive scan planning** with coverage-aware waypoint generation
+- **Direct grid stitching** using planning metadata (no feature matching)
+- **YOLO + SAM2** enhanced detection pipeline
+- **3D duplicate removal** and world-coordinate localization
+- **Hybrid similarity tracking** with online learning and 3D Kalman filtering
+- **Tracking-triggered grasp execution** for robotic picking
+
+---
+
+## System Pipeline
+
+```
+Scan  →  Stitch  →  Detect  →  Track  →  Grasp
+```
+
+| Stage | Node(s) | Description |
+|-------|---------|-------------|
+| **Scan** | `scan_planner_node`, `scan_executor_node` | Adaptive scan path planning, FOV-based height estimation, overlap-aware waypoint generation, robot execution with RGB-D capture |
+| **Stitch** | `smart_stitcher_node` | Direct grid stitching from planning metadata, pixel-to-waypoint traceability, fusion mapping for 3D localization |
+| **Detect** | `detection_node` | YOLO candidate detection, SAM2 segmentation refinement, 2D→3D coordinate conversion, duplicate merging in world space |
+| **Track** | `tracking_node` | Hybrid similarity matching, online weight adaptation, 3D Kalman filtering, target stability estimation |
+| **Grasp** | `simple_grasp_validator` | Grasp target loading, robot target pose publishing, gripper control, grasp validation |
+
+---
+
+## Project Structure
+
+```
+src/vision_ai/vision_ai/
+├── scan_planner_node.py         # Scan path planning
+├── scan_executor_node.py        # Robot scan execution
+├── smart_stitcher_node.py       # Image stitching
+├── detection_node.py            # Object detection
+├── simple_grasp_validator.py    # Grasp execution
+├── gui_config_node.py           # GUI configuration
+├── detection_monitor.py         # Detection monitoring
+├── detection/
+│   ├── detectors/               # YOLO-based detectors
+│   ├── segmentors/              # SAM2 segmentation
+│   ├── features/                # Feature extraction
+│   ├── utils/                   # Post-processing, coordinate calc
+│   └── pipelines/               # Detection pipelines
+├── tracking_system/
+│   ├── tracking_node.py         # Main tracking node
+│   ├── filters/                 # Kalman filtering
+│   ├── ui/                      # Tracking visualization
+│   ├── utils/                   # Tracking utilities
+│   └── adaptive_learning/       # Online weight learning
+├── scripts/                     # Utility scripts
+└── testcode/                    # Tests and validation
+```
+
+---
+
+## Quick Start
+
+### Build and launch the full system
+
+```bash
+./restart.sh
+```
+
+### Headless mode (remote / display-less machines)
+
+```bash
+./restart.sh --no-display
+```
+
+### Force display mode
+
+```bash
+./restart.sh --display
+```
+
+### Development / debugging
+
+```bash
+./dev.sh both          # Planning and detection only
+./dev.sh full_system   # Full pipeline
+```
+
+### What `restart.sh` does
+
+1. Activates the Conda environment (`rel_env`)
+2. Sources ROS 2 Humble
+3. Configures display/headless environment variables
+4. Builds required packages: `vision_ai_interfaces`, `vision_ai`, `xarm_controller`, `camera_node`
+5. Launches the full pipeline via `./dev.sh full_system`
+
+---
+
+## Hardware Integration
+
+### Camera
+
+```bash
+ros2 run camera_node realsense_publisher
+```
+
+### Robot Arm
+
+```bash
+ros2 run xarm_controller xarm_controller
+```
+
+Supported capabilities: RealSense RGB-D acquisition, xArm motion execution, and gripper control for object grasping.
+
+---
+
+## Core Algorithms
+
+### Adaptive Scan Planning
+
+Computes the target region's bounding geometry and camera viewing requirements to generate a minimal set of viewpoints while maintaining sufficient overlap.
+
+### Direct Grid Stitching
+
+Uses scan planning metadata (grid layout, overlap relationships) to build a stable, interpretable stitched result — no image feature matching required.
+
+### 2D-to-3D Detection Enhancement
+
+Combines YOLO and SAM2 with depth data, robot pose, and hand–eye calibration to estimate object location in world coordinates.
+
+### 3D Duplicate Merging
+
+Merges repeated detections using centroid distance, depth difference, estimated height, and mask IoU.
+
+### Hybrid Tracking
+
+Combines geometry, shape, appearance, and spatial similarity. An online learner adjusts weights dynamically under varying conditions.
+
+### 3D Kalman Filtering
+
+Estimates object state using a 3D motion model — `[x, y, z, vx, vy, vz]` — to improve target stability before grasp triggering.
+
+### Grasp Triggering
+
+Once the target reaches sufficient stability, grasp execution is triggered using pose and object-size information from the detection and tracking outputs.
+
+---
+
+## ROS Topics & Interfaces
+
+### Camera
+
+| Topic | Direction |
+|-------|-----------|
+| `/camera/color/image_raw` | Input |
+| `/camera/depth/image_raw` | Input |
+
+### Robot Arm
+
+| Topic | Direction |
+|-------|-----------|
+| `/xarm/current_pose` | Input |
+| `/xarm/target_pose` | Output |
+| `/xarm/gripper_target` | Output |
+
+### Robot Services
+
+| Service |
+|---------|
+| `/xarm/gripper_open` |
+| `/xarm/gripper_close` |
+| `/xarm/go_home` |
+
+### Scan Services
+
+| Service |
+|---------|
+| `plan_scan` |
+| `execute_scan` |
+
+### Stitch Service
+
+| Service |
+|---------|
+| `process_stitching` |
+
+### Detection Output
+
+Detection results, feature library, visualization outputs, `detection_complete`
+
+### Tracking Output
+
+Tracked object states, stability estimation, `grasp_trigger`
+
+---
+
+## tmux Layout
+
+`dev.sh` creates a tmux session named `vision_ai`:
+
+| Window | Left Pane | Right Pane |
+|--------|-----------|------------|
+| 0 — Hardware | Camera node | xArm controller |
+| 1 — Scan | Scan planner | Scan executor |
+| 2 — Stitch & Detection | Smart stitcher | Detection node |
+| 3 — GUI & Logging | GUI config | Auto logger |
+| 4 — Tracking & Grasp | Tracking node + grasp console | — |
+
+The session attaches to the Stitch & Detection window by default.
+
+---
+
+## Environment
+
+| Setting | Display Mode | Headless Mode |
+|---------|-------------|---------------|
+| `VISION_AI_DISPLAY` | `on` | `off` |
+| `QT_QPA_PLATFORM` | `xcb` | `offscreen` |
+| `MPLBACKEND` | `TkAgg` | `Agg` |
+
+- **ROS version:** ROS 2 Humble
+- **Build tool:** colcon
+- **Conda environment:** `rel_env`
+
+> Using `restart.sh` is recommended to avoid missing runtime environment variables.
+
+---
+
+## Key Source Files
+
+| File | Purpose |
+|------|---------|
+| `scan_planner_node.py` | Scan path planning |
+| `scan_executor_node.py` | Robot scan execution |
+| `smart_stitcher_node.py` | Image stitching |
+| `detection/enhanced_detection_pipeline.py` | Main detection pipeline |
+| `detection/utils/detection_post_processor.py` | Detection post-processing |
+| `detection/utils/coordinate_calculator.py` | 2D→3D coordinate mapping |
+| `tracking_system/enhanced_tracker.py` | Multi-feature tracker |
+| `tracking_system/filters/kalman_tracker.py` | 3D Kalman filter |
+| `simple_grasp_validator.py` | Grasp validation and execution |
+
+---
+
+## Notes
+
+- Node names and package lists should follow the launch scripts.
+- New modules can be added by extending `dev.sh` with additional tmux windows or panes.
+- The `testcode/` directory contains validation and regression scripts for quick testing.
+
+
+
+
+
+
+
+
+Chinese Version:
+
+
+
 # Vision AI 项目总览
 
 本项目是一个基于 ROS 2 Humble 的视觉智能系统，围绕扫描（Scan）、检测（Detect）、追踪（Track）和抓取（Grasp）四个核心模块构建，并通过脚本与 tmux 流水线实现一键启动与协同运行。主要代码位于：
