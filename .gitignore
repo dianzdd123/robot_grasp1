@@ -64,3 +64,9 @@ build/
 install/
 log/
 scan_output_*/
+
+# Local development artefacts and credentials
+.venv/
+.pytest_cache/
+.env.*
+!.env.example

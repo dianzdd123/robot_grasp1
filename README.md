@@ -1,5 +1,20 @@
 # Vision AI
 
+## Start here
+
+This repository is a fork of [QC2002/graduate_pro](https://github.com/QC2002/graduate_pro). Original authorship, citations and upstream notices are retained. Changes here apply to this fork.
+
+**Scope:** Research workspace for xArm and RGB-D sensing; dependency exports contain machine-specific entries.
+
+| Need | Where to start |
+|---|---|
+| Setup, file map, inputs/outputs and troubleshooting | [Reuse guide](docs/REUSE.md) |
+| Local structural validation | `python scripts/check_repository.py` (Python 3.10+) |
+| Proposed fixes and reproducibility details | [Contributing](CONTRIBUTING.md) |
+
+The structural check does not run experiments or certify hardware, model accuracy or dependency compatibility. Reuse permissions need clarification: this checkout has no repository-wide licence file.
+
+
 A ROS 2 Humble–based intelligent vision system for **scan planning, object detection, tracking, and robotic grasping**.
 
 This project integrates camera perception, 3D-aware detection, online tracking, and robot-arm execution into one coordinated pipeline — designed for automated object scanning and manipulation using a RealSense camera and an xArm robot.
@@ -321,11 +336,11 @@ restart.sh 会：
   - 自适应策略优先最少拍摄点数，同时保证覆盖与重叠（overlap_ratio 动态计算）。
   - 关键实现：最小包围盒与 yaw 估计、FOV/高度/点数计算、网格/邻接信息。
   - 参考代码：
-    - [scan_planner_node.py](file:///Users/chenqi/graduate_pro/src/vision_ai/vision_ai/scan_planner_node.py)
+    - [scan_planner_node.py](src/vision_ai/vision_ai/scan_planner_node.py)
 - 执行核心
   - 机械臂按 waypoint 运动→采集彩色/深度→记录位姿与规划元信息→调用 Stitch 服务。
   - 参考代码：
-    - [scan_executor_node.py](file:///Users/chenqi/graduate_pro/src/vision_ai/vision_ai/scan_executor_node.py)
+    - [scan_executor_node.py](src/vision_ai/vision_ai/scan_executor_node.py)
 
 理论要点：
 - FOV 与高度：通过 fx、fy 推导水平/垂直视场角；给定区域长短边，计算满足覆盖的最小高度，并限制在安全范围。
@@ -340,7 +355,7 @@ restart.sh 会：
   - direct_grid_stitching：按行列与重叠率放置图块，构建最终分辨率。
   - fusion_mapping/waypoint_contributions：记录像素级来源与深度关联；输出 pkl+json 摘要。
   - 参考代码：
-    - [smart_stitcher_node.py](file:///Users/chenqi/graduate_pro/src/vision_ai/vision_ai/smart_stitcher_node.py)
+    - [smart_stitcher_node.py](src/vision_ai/vision_ai/smart_stitcher_node.py)
 
 理论要点：
 - 将规划阶段的空间约束前移到图像层，拼接更稳定、可解释；像素到 waypoint 的可追溯性支持 3D 反演与不确定性估计。
@@ -349,10 +364,10 @@ restart.sh 会：
 - 流程
   - YOLO 目标候选→SAM2 精细分割→特征与 3D 后处理→构建参考库和可视化。
   - 参考代码：
-    - 管线入口与调度：[enhanced_detection_pipeline.py](file:///Users/chenqi/graduate_pro/src/vision_ai/vision_ai/detection/enhanced_detection_pipeline.py)
-    - 3D 后处理（去重合并）：[detection_post_processor.py](file:///Users/chenqi/graduate_pro/src/vision_ai/vision_ai/detection/utils/detection_post_processor.py)
-    - 坐标/动态补偿与 3D 分析：[coordinate_calculator.py](file:///Users/chenqi/graduate_pro/src/vision_ai/vision_ai/detection/utils/coordinate_calculator.py)
-    - 几何/形状特征提取：[shape_features.py](file:///Users/chenqi/graduate_pro/src/vision_ai/vision_ai/detection/features/shape_features.py)
+    - 管线入口与调度：[enhanced_detection_pipeline.py](src/vision_ai/vision_ai/detection/enhanced_detection_pipeline.py)
+    - 3D 后处理（去重合并）：[detection_post_processor.py](src/vision_ai/vision_ai/detection/utils/detection_post_processor.py)
+    - 坐标/动态补偿与 3D 分析：[coordinate_calculator.py](src/vision_ai/vision_ai/detection/utils/coordinate_calculator.py)
+    - 几何/形状特征提取：[shape_features.py](src/vision_ai/vision_ai/detection/features/shape_features.py)
 
 - 关键算法
   - 相机到世界坐标转换：手眼标定四元数与平移构成 T_cam→tcp，再用机械臂 TCP 欧拉角构建 T_tcp→world；并加入 yaw 角动态补偿插值，修正随姿态变化的系统误差。
@@ -367,9 +382,9 @@ restart.sh 会：
 - 流程
   - 加载参考特征库→筛选同类候选→混合相似度匹配（几何/外观/形状/空间加权）→在线学习自适应权重→3D 卡尔曼滤波估计轨迹与稳定性。
   - 参考代码：
-    - 主体与相似度/学习逻辑：[enhanced_tracker.py](file:///Users/chenqi/graduate_pro/src/vision_ai/vision_ai/tracking_system/enhanced_tracker.py)
-    - 3D 卡尔曼与稳定性管理：[kalman_tracker.py](file:///Users/chenqi/graduate_pro/src/vision_ai/vision_ai/tracking_system/filters/kalman_tracker.py)
-    - 相似度细节（多特征融合）：[similarity_calculator.py](file:///Users/chenqi/graduate_pro/src/vision_ai/vision_ai/detection/features/similarity_calculator.py)
+    - 主体与相似度/学习逻辑：[enhanced_tracker.py](src/vision_ai/vision_ai/tracking_system/enhanced_tracker.py)
+    - 3D 卡尔曼与稳定性管理：[kalman_tracker.py](src/vision_ai/vision_ai/tracking_system/filters/kalman_tracker.py)
+    - 相似度细节（多特征融合）：[similarity_calculator.py](src/vision_ai/vision_ai/detection/features/similarity_calculator.py)
 
 - 关键算法
   - 混合相似度：几何>形状>外观>空间的加权组合，并在光照/距离等上下文下由在线学习器动态调整权重；支持历史成功样本混合，提升稳健性。
@@ -383,7 +398,7 @@ restart.sh 会：
   - 追踪节点在目标稳定且相似度达标时发布抓取触发消息，包含目标 ID 与参考数据目录。
   - 抓取系统加载 grasp_info.json 获取世界坐标、物体宽度与高度等，发布 /xarm/target_pose 与夹爪控制。
   - 参考代码：
-    - [simple_grasp_validator.py](file:///Users/chenqi/graduate_pro/src/vision_ai/vision_ai/simple_grasp_validator.py)
+    - [simple_grasp_validator.py](src/vision_ai/vision_ai/simple_grasp_validator.py)
 
 理论要点：
 - 夹爪宽度来自分割 mask 的最小外接矩形与深度等比例换算；配合安全余量裁剪到可执行范围，保证抓取可行性与稳定性。
