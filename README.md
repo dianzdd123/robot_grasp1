@@ -4,6 +4,8 @@
 
 ## Start here
 
+**Repository:** [dianzdd123/robot_grasp1](https://github.com/dianzdd123/robot_grasp1)
+
 This repository is a fork of [QC2002/graduate_pro](https://github.com/QC2002/graduate_pro). Original authorship, citations and upstream notices are retained. Changes here apply to this fork.
 
 **Scope:** Research workspace for xArm and RGB-D sensing; dependency exports contain machine-specific entries.
