@@ -1,5 +1,7 @@
 # Vision AI
 
+**MSEI Lab:** [Website](https://zhangrobotics.com/msei_website/) · [Website on GitHub](https://github.com/dianzdd123/msei_website)
+
 ## Start here
 
 This repository is a fork of [QC2002/graduate_pro](https://github.com/QC2002/graduate_pro). Original authorship, citations and upstream notices are retained. Changes here apply to this fork.
